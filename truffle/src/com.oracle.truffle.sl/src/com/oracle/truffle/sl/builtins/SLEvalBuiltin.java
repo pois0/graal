@@ -49,6 +49,8 @@ import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 
 /**
@@ -87,5 +89,14 @@ public abstract class SLEvalBuiltin extends SLBuiltinNode {
     /* Work around findbugs warning in generate code. */
     protected static boolean stringsEqual(String a, String b) {
         return a.equals(b);
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLEvalBuiltin)) return false;
+        SLExpressionNode[] thisArgs = getArguments();
+        SLExpressionNode[] thatArgs = ((SLEvalBuiltin) that).getArguments();
+        return thisArgs[0].isEqualNode(thatArgs[0])
+                && thisArgs[1].isEqualNode(thatArgs[1]);
     }
 }

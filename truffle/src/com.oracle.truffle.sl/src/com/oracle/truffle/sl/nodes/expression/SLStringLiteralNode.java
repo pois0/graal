@@ -43,6 +43,7 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Constant literal for a String value.
@@ -59,5 +60,11 @@ public final class SLStringLiteralNode extends SLExpressionNode {
     @Override
     public String executeGeneric(VirtualFrame frame) {
         return value;
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLStringLiteralNode)) return false;
+        return value.equals(((SLStringLiteralNode) that).value);
     }
 }

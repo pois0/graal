@@ -49,6 +49,7 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 
@@ -71,4 +72,8 @@ public abstract class SLImportBuiltin extends SLBuiltinNode {
         }
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        return that instanceof SLImportBuiltin; // TODO
+    }
 }

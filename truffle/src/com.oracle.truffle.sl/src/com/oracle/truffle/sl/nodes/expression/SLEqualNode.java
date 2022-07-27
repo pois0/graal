@@ -49,6 +49,8 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
@@ -152,4 +154,11 @@ public abstract class SLEqualNode extends SLBinaryNode {
         }
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLEqualNode)) return false;
+        SLEqualNode thatAdd = (SLEqualNode) that;
+        return getLeftNode().isEqualNode(thatAdd.getLeftNode())
+                && getRightNode().isEqualNode(thatAdd.getRightNode());
+    }
 }

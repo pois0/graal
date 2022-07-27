@@ -213,4 +213,5 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         }
     }
 
+    public abstract boolean isEqualNode(SLStatementNode that);
 }

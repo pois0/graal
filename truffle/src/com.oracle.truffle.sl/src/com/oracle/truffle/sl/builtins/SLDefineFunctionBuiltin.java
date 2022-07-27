@@ -46,6 +46,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 
 /**
@@ -66,5 +67,11 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
         context.getFunctionRegistry().register(source);
 
         return code;
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLDefineFunctionBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLDefineFunctionBuiltin) that).getArguments()[0]);
     }
 }

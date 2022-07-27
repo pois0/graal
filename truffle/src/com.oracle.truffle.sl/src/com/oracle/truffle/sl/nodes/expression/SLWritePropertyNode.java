@@ -41,6 +41,7 @@
 package com.oracle.truffle.sl.nodes.expression;
 
 import com.oracle.truffle.api.dsl.Cached;
+import com.oracle.truffle.api.dsl.CachedContext;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.interop.InteropLibrary;
@@ -50,8 +51,12 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
+import com.oracle.truffle.sl.parser.SimpleLanguageParser;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 
 /**
@@ -72,12 +77,20 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
 
+    protected abstract SLExpressionNode getReceiverNode();
+    protected abstract SLExpressionNode getNameNode();
+    protected abstract SLExpressionNode getValueNode();
+
     @Specialization(guards = "arrays.hasArrayElements(receiver)", limit = "LIBRARY_LIMIT")
     protected Object writeArray(Object receiver, Object index, Object value,
-                    @CachedLibrary("receiver") InteropLibrary arrays,
-                    @CachedLibrary("index") InteropLibrary numbers) {
+                                @CachedLibrary("receiver") InteropLibrary arrays,
+                                @CachedLibrary("index") InteropLibrary numbers,
+                                @CachedContext(SLLanguage.class) SLContext context) {
+        System.out.println(getNameNode().toString());
         try {
-            arrays.writeArrayElement(receiver, numbers.asLong(index), value);
+            final long i = numbers.asLong(index);
+            arrays.writeArrayElement(receiver, i, value);
+            context.getObjectTracker().notifyAssignment(receiver, i, value);
         } catch (UnsupportedMessageException | UnsupportedTypeException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, index);
@@ -88,9 +101,12 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
     @Specialization(limit = "LIBRARY_LIMIT")
     protected Object writeObject(Object receiver, Object name, Object value,
                     @CachedLibrary("receiver") InteropLibrary objectLibrary,
-                    @Cached SLToMemberNode asMember) {
+                    @Cached SLToMemberNode asMember,
+                    @CachedContext(SLLanguage.class) SLContext context) {
         try {
-            objectLibrary.writeMember(receiver, asMember.execute(name), value);
+            final String id = asMember.execute(name);
+            objectLibrary.writeMember(receiver, id, value);
+            context.getObjectTracker().notifyAssignment(receiver, id, value);
         } catch (UnsupportedMessageException | UnknownIdentifierException | UnsupportedTypeException e) {
             // write was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, name);
@@ -98,4 +114,12 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
         return value;
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLWritePropertyNode)) return false;
+        final SLWritePropertyNode thatWP = (SLWritePropertyNode) that;
+        return getReceiverNode().isEqualNode(thatWP.getReceiverNode())
+                && getNameNode().isEqualNode(thatWP.getNameNode())
+                && getValueNode().isEqualNode(thatWP.getValueNode());
+    }
 }

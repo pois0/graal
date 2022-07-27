@@ -44,6 +44,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Built-in function that queries if the foreign object is executable. See
@@ -55,5 +56,11 @@ public abstract class SLIsExecutableBuiltin extends SLBuiltinNode {
     @Specialization(limit = "3")
     public boolean isExecutable(Object obj, @CachedLibrary("obj") InteropLibrary executables) {
         return executables.isExecutable(obj);
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLIsExecutableBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLIsExecutableBuiltin) that).getArguments()[0]);
     }
 }

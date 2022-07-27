@@ -130,4 +130,11 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
         return SLStatementNode.formatSourceSection(this);
     }
 
+    SLExpressionNode getConditionNode() {
+        return conditionNode;
+    }
+
+    SLStatementNode getBodyNode() {
+        return bodyNode;
+    }
 }

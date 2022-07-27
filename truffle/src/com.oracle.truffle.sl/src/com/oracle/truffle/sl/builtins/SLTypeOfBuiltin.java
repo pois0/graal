@@ -45,6 +45,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLType;
 
@@ -70,4 +71,9 @@ public abstract class SLTypeOfBuiltin extends SLBuiltinNode {
         return SLNull.SINGLETON;
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLTypeOfBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLTypeOfBuiltin) that).getArguments()[0]);
+    }
 }

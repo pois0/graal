@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.oracle.truffle.api.Assumption;
 import com.oracle.truffle.api.CallTarget;
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.TruffleLanguage;
@@ -210,6 +211,8 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
 
     private final Shape rootShape;
 
+    @CompilerDirectives.CompilationFinal private SLContext context;
+
     public SLLanguage() {
         counter++;
         this.rootShape = Shape.newBuilder().layout(SLObject.class).build();
@@ -217,7 +220,12 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
 
     @Override
     protected SLContext createContext(Env env) {
-        return new SLContext(this, env, new ArrayList<>(EXTERNAL_BUILTINS));
+        SLContext context = this.context;
+        if (context == null) {
+            this.context = context = new SLContext(this, env, new ArrayList<>(EXTERNAL_BUILTINS));
+        }
+
+        return context;
     }
 
     public RootCallTarget getOrCreateUndefinedFunction(String name) {
@@ -365,6 +373,10 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
     @Override
     protected Object getLanguageView(SLContext context, Object value) {
         return SLLanguageView.create(value);
+    }
+
+    public SLContext getContext() {
+        return context;
     }
 
     /*

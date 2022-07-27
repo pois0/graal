@@ -61,4 +61,12 @@ public final class SLWhileNode extends SLStatementNode {
         loopNode.execute(frame);
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLWhileNode)) return false;
+        SLWhileRepeatingNode thisRep = (SLWhileRepeatingNode) loopNode.getRepeatingNode();
+        SLWhileRepeatingNode thatRep = (SLWhileRepeatingNode) ((SLWhileNode) that).loopNode.getRepeatingNode();
+        return thisRep.getConditionNode().isEqualNode(thatRep.getConditionNode())
+                && thisRep.getBodyNode().isEqualNode(thatRep.getBodyNode());
+    }
 }

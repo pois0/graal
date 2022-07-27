@@ -45,6 +45,7 @@ import java.math.BigInteger;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 
 /**
@@ -63,5 +64,11 @@ public final class SLBigIntegerLiteralNode extends SLExpressionNode {
     @Override
     public SLBigNumber executeGeneric(VirtualFrame frame) {
         return value;
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLBigIntegerLiteralNode)) return false;
+        return value.equals(((SLBigIntegerLiteralNode) that).value);
     }
 }

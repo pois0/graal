@@ -44,6 +44,7 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * A {@link SLExpressionNode} that represents a parenthesized expression; it simply returns the
@@ -73,5 +74,11 @@ public class SLParenExpressionNode extends SLExpressionNode {
     @Override
     public boolean executeBoolean(VirtualFrame frame) throws UnexpectedResultException {
         return expression.executeBoolean(frame);
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLParenExpressionNode)) return false;
+        return expression.isEqualNode(((SLParenExpressionNode) that).expression);
     }
 }

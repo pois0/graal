@@ -53,8 +53,8 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
  */
 public abstract class SLShortCircuitNode extends SLExpressionNode {
 
-    @Child private SLExpressionNode left;
-    @Child private SLExpressionNode right;
+    @Child protected SLExpressionNode left;
+    @Child protected SLExpressionNode right;
 
     /**
      * Short circuits might be used just like a conditional statement it makes sense to profile the

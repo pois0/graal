@@ -43,6 +43,7 @@ package com.oracle.truffle.sl.nodes.local;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.parser.SLNodeFactory;
 import com.oracle.truffle.sl.runtime.SLNull;
 
@@ -79,5 +80,11 @@ public class SLReadArgumentNode extends SLExpressionNode {
             /* Use the default null value. */
             return SLNull.SINGLETON;
         }
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLReadArgumentNode)) return false;
+        return index == ((SLReadArgumentNode) that).index;
     }
 }

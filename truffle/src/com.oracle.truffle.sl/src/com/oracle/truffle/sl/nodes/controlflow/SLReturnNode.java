@@ -75,4 +75,11 @@ public final class SLReturnNode extends SLStatementNode {
         }
         throw new SLReturnException(result);
     }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLReturnNode)) return false;
+        SLReturnNode thatReturn = (SLReturnNode) that;
+        return valueNode == null ? thatReturn.valueNode == null : valueNode.isEqualNode(thatReturn.valueNode);
+    }
 }

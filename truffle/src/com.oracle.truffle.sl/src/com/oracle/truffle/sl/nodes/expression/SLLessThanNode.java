@@ -46,6 +46,8 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 
 /**
@@ -71,4 +73,11 @@ public abstract class SLLessThanNode extends SLBinaryNode {
         throw SLException.typeError(this, left, right);
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLLessThanNode)) return false;
+        SLLessThanNode thatAdd = (SLLessThanNode) that;
+        return getLeftNode().isEqualNode(thatAdd.getRightNode())
+                && getRightNode().isEqualNode(thatAdd.getRightNode());
+    }
 }
