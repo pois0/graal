@@ -47,6 +47,8 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 
@@ -126,5 +128,13 @@ public abstract class SLAddNode extends SLBinaryNode {
     @Fallback
     protected Object typeError(Object left, Object right) {
         throw SLException.typeError(this, left, right);
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLAddNode)) return false;
+        SLAddNode thatAdd = (SLAddNode) that;
+        return getLeftNode().isEqualNode(thatAdd.getLeftNode())
+                && getRightNode().isEqualNode(thatAdd.getRightNode());
     }
 }

@@ -47,6 +47,8 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Built-in function that returns true if the given operand is of a given meta-object. Meta-objects
@@ -66,4 +68,12 @@ public abstract class SLIsInstanceBuiltin extends SLBuiltinNode {
         }
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLIsInstanceBuiltin)) return false;
+        SLExpressionNode[] thisArgs = getArguments();
+        SLExpressionNode[] thatArgs = ((SLIsInstanceBuiltin) that).getArguments();
+        return thisArgs[0].isEqualNode(thatArgs[0])
+                && thisArgs[1].isEqualNode(thatArgs[1]);
+    }
 }

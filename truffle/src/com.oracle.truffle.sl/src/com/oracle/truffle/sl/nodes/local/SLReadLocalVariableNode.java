@@ -49,6 +49,7 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.ReadVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
 
 /**
@@ -112,5 +113,11 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
     @Override
     public Object getNodeObject() {
         return NodeObjectDescriptor.readVariable(getSlot().getIdentifier().toString());
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLReadLocalVariableNode)) return false;
+        return getSlot().getIdentifier().equals(((SLReadLocalVariableNode) that).getSlot().getIdentifier());
     }
 }

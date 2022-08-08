@@ -308,4 +308,29 @@ public class EventBinding<T> {
 
     }
 
+    static final class ObjectChange<T> extends EventBinding<T> {
+        private final AllocationEventFilter filterObjectChange;
+
+        ObjectChange(AbstractInstrumenter instrumenter, AllocationEventFilter filter, T lister) {
+            super(instrumenter, lister);
+            this.filterObjectChange = filter;
+        }
+
+        AllocationEventFilter getAllocationFilter() {
+            return filterObjectChange;
+        }
+    }
+
+    static final class StackTracking<T> extends EventBinding<T> {
+        private final AllocationEventFilter filterObjectChange;
+
+        StackTracking(AbstractInstrumenter instrumenter, AllocationEventFilter filter, T lister) {
+            super(instrumenter, lister);
+            this.filterObjectChange = filter;
+        }
+
+        AllocationEventFilter getAllocationFilter() {
+            return filterObjectChange;
+        }
+    }
 }

@@ -57,4 +57,9 @@ public final class SLBreakNode extends SLStatementNode {
     public void executeVoid(VirtualFrame frame) {
         throw SLBreakException.SINGLETON;
     }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        return that instanceof SLBreakNode;
+    }
 }

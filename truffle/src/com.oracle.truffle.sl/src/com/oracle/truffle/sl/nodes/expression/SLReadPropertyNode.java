@@ -50,6 +50,7 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 
@@ -67,6 +68,9 @@ import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 public abstract class SLReadPropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
+
+    protected abstract SLExpressionNode getReceiverNode();
+    protected abstract SLExpressionNode getNameNode();
 
     @Specialization(guards = "arrays.hasArrayElements(receiver)", limit = "LIBRARY_LIMIT")
     protected Object readArray(Object receiver, Object index,
@@ -92,4 +96,11 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
         }
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLReadPropertyNode)) return false;
+        final SLReadPropertyNode thatRP = (SLReadPropertyNode) that;
+        return getReceiverNode().isEqualNode(thatRP.getReceiverNode())
+                && getNameNode().isEqualNode(thatRP.getNameNode());
+    }
 }

@@ -141,6 +141,9 @@ final class InstrumentationHandler {
     final Collection<RootNode> loadedRoots = new WeakAsyncList<>(256);
     private final Collection<RootNode> executedRoots = new WeakAsyncList<>(64);
     private final Collection<AllocationReporter> allocationReporters = new WeakAsyncList<>(16);
+    private final Collection<ObjectTracker> objectTrackers = new WeakAsyncList<>(16);
+    private final Collection<StackTracker> stackTrackers = new WeakAsyncList<>(16);
+
 
     private volatile boolean hasLoadOrExecutionBinding = false;
     private final CopyOnWriteList<EventBinding.Source<?>> executionBindings = new CopyOnWriteList<>(new EventBinding.Source<?>[0]);
@@ -153,6 +156,8 @@ final class InstrumentationHandler {
     private final Collection<EventBinding<? extends OutputStream>> outputStdBindings = new EventBindingList<>(1);
     private final Collection<EventBinding<? extends OutputStream>> outputErrBindings = new EventBindingList<>(1);
     private final Collection<EventBinding.Allocation<? extends AllocationListener>> allocationBindings = new EventBindingList<>(2);
+    private final Collection<EventBinding.ObjectChange<? extends ObjectChangeListener>> objectChangeBindings = new EventBindingList<>(2);
+    private final Collection<EventBinding.StackTracking<? extends StackListener>> stackTrackingBindings = new EventBindingList<>(2);
     private final Collection<EventBinding<? extends ContextsListener>> contextsBindings = new EventBindingList<>(8);
     private final Collection<EventBinding<? extends ThreadsListener>> threadsBindings = new EventBindingList<>(8);
     private final Collection<EventBinding<? extends ThreadsActivationListener>> threadsActivationBindings = new EventBindingList<>(8);
@@ -543,6 +548,42 @@ final class InstrumentationHandler {
         return binding;
     }
 
+    private <T extends ObjectChangeListener> EventBinding<T> addObjectChangeBinding(EventBinding.ObjectChange<T> binding) {
+        if (TRACE) {
+            trace("BEGIN: Adding allocation binding %s%n", binding.getElement());
+        }
+
+        this.objectChangeBindings.add(binding);
+        for (ObjectTracker objectTracker : objectTrackers) {
+            if (binding.getAllocationFilter().contains(objectTracker.language)) {
+                objectTracker.addListener(binding.getElement());
+            }
+        }
+
+        if (TRACE) {
+            trace("END: Added allocation binding %s%n", binding.getElement());
+        }
+        return binding;
+    }
+
+    private <T extends StackListener> EventBinding<T> addStackTrackingBinding(EventBinding.StackTracking<T> binding) {
+        if (TRACE) {
+            trace("BEGIN: Adding allocation binding %s%n", binding.getElement());
+        }
+
+        this.stackTrackingBindings.add(binding);
+        for (StackTracker stackTracker : stackTrackers) {
+            if (binding.getAllocationFilter().contains(stackTracker.language)) {
+                stackTracker.addListener(binding.getElement());
+            }
+        }
+
+        if (TRACE) {
+            trace("END: Added allocation binding %s%n", binding.getElement());
+        }
+        return binding;
+    }
+
     private <T extends ContextsListener> EventBinding<T> addContextsBinding(EventBinding<T> binding, boolean includeActiveContexts) {
         if (TRACE) {
             trace("BEGIN: Adding contexts binding %s%n", binding.getElement());
@@ -681,6 +722,22 @@ final class InstrumentationHandler {
             for (AllocationReporter allocationReporter : allocationReporters) {
                 if (allocationBinding.getAllocationFilter().contains(allocationReporter.language)) {
                     allocationReporter.removeListener(l);
+                }
+            }
+        } else if (binding instanceof EventBinding.ObjectChange) {
+            final EventBinding.ObjectChange<?> objectChangeBinding = (EventBinding.ObjectChange<?>) binding;
+            final ObjectChangeListener l = (ObjectChangeListener) binding.getElement();
+            for (ObjectTracker objectTracker : objectTrackers) {
+                if (objectChangeBinding.getAllocationFilter().contains(objectTracker.language)) {
+                    objectTracker.removeListener(l);
+                }
+            }
+        } else if (binding instanceof EventBinding.StackTracking) {
+            final EventBinding.StackTracking<?> stackTrackingBinding = (EventBinding.StackTracking<?>) binding;
+            final StackListener l = (StackListener) binding.getElement();
+            for (StackTracker stackTracker : stackTrackers) {
+                if (stackTrackingBinding.getAllocationFilter().contains(stackTracker.language)) {
+                    stackTracker.removeListener(l);
                 }
             }
         } else {
@@ -989,6 +1046,14 @@ final class InstrumentationHandler {
         return addAllocationBinding(new EventBinding.Allocation<>(instrumenter, filter, listener));
     }
 
+    private <T extends ObjectChangeListener> EventBinding<T> attachObjectChangeListener(AbstractInstrumenter instrumenter, AllocationEventFilter filter, T listener) {
+        return addObjectChangeBinding(new EventBinding.ObjectChange<>(instrumenter, filter, listener));
+    }
+
+    private <T extends StackListener> EventBinding<T> attachStackListener(AbstractInstrumenter instrumenter, AllocationEventFilter filter, T listener) {
+        return addStackTrackingBinding(new EventBinding.StackTracking<>(instrumenter, filter, listener));
+    }
+
     private <T extends ContextsListener> EventBinding<T> attachContextsListener(AbstractInstrumenter instrumenter, T listener, boolean includeActiveContexts) {
         assert listener != null;
         return addContextsBinding(new EventBinding<>(instrumenter, listener), includeActiveContexts);
@@ -1264,6 +1329,28 @@ final class InstrumentationHandler {
             }
         }
         return allocationReporter;
+    }
+
+    ObjectTracker getObjectTracker(LanguageInfo info) {
+        final ObjectTracker objectTracker = new ObjectTracker(info);
+        objectTrackers.add(objectTracker);
+        for (EventBinding.ObjectChange<? extends ObjectChangeListener> binding : objectChangeBindings) {
+            if (binding.getAllocationFilter().contains(info)) {
+                objectTracker.addListener(binding.getElement());
+            }
+        }
+        return objectTracker;
+    }
+
+    StackTracker getStackTracker(LanguageInfo info) {
+        final StackTracker stackTracker = new StackTracker(info);
+        stackTrackers.add(stackTracker);
+        for (EventBinding.StackTracking<? extends StackListener> binding : stackTrackingBindings) {
+            if (binding.getAllocationFilter().contains(info)) {
+                stackTracker.addListener(binding.getElement());
+            }
+        }
+        return stackTracker;
     }
 
     void finalizeStore() {
@@ -2500,6 +2587,16 @@ final class InstrumentationHandler {
         @Override
         public <T extends AllocationListener> EventBinding<T> attachAllocationListener(AllocationEventFilter filter, T listener) {
             return InstrumentationHandler.this.attachAllocationListener(this, filter, listener);
+        }
+
+        @Override
+        public <T extends ObjectChangeListener> EventBinding<T> attachObjectChangeListener(AllocationEventFilter filter, T listener) {
+            return InstrumentationHandler.this.attachObjectChangeListener(this, filter, listener);
+        }
+
+        @Override
+        public <T extends StackListener> EventBinding<T> attachStackListener(AllocationEventFilter filter, T listener) {
+            return InstrumentationHandler.this.attachStackListener(this, filter, listener);
         }
 
         @Override

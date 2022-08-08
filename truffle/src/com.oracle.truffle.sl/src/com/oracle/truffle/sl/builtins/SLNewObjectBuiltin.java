@@ -53,6 +53,7 @@ import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
@@ -80,5 +81,11 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
             /* Foreign access was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, obj);
         }
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLNewObjectBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLNewObjectBuiltin) that).getArguments()[0]);
     }
 }

@@ -49,6 +49,7 @@ import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.library.Message;
 import com.oracle.truffle.api.library.ReflectionLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Builtin function to wrap primitive values in order to increase coverage of the Truffle TCK test.
@@ -84,4 +85,10 @@ public abstract class SLWrapPrimitiveBuiltin extends SLBuiltinNode {
 
     }
 
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLWrapPrimitiveBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLWrapPrimitiveBuiltin) that).getArguments()[0]);
+    }
 }

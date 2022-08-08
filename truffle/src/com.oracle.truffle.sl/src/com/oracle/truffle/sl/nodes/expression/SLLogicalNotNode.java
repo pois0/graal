@@ -46,6 +46,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Example of a simple unary node that uses type specialization. See {@link SLAddNode} for
@@ -54,6 +55,8 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 @NodeChild("valueNode")
 @NodeInfo(shortName = "!")
 public abstract class SLLogicalNotNode extends SLExpressionNode {
+
+    protected abstract SLExpressionNode getValueNode();
 
     @Specialization
     protected boolean doBoolean(boolean value) {
@@ -65,4 +68,9 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
         throw SLException.typeError(this, value);
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLLogicalNotNode)) return false;
+        return getValueNode().isEqualNode(((SLLogicalNotNode) that).getValueNode());
+    }
 }

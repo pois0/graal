@@ -65,4 +65,8 @@ public class SLDebuggerNode extends SLStatementNode {
         return super.hasTag(tag);
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        return that instanceof SLDebuggerNode;
+    }
 }

@@ -57,4 +57,9 @@ public final class SLContinueNode extends SLStatementNode {
     public void executeVoid(VirtualFrame frame) {
         throw SLContinueException.SINGLETON;
     }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        return that instanceof SLContinueNode;
+    }
 }

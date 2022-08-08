@@ -44,6 +44,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Built-in function that queries if the foreign object is a null value. See
@@ -55,5 +56,11 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
     @Specialization(limit = "3")
     public boolean isExecutable(Object obj, @CachedLibrary("obj") InteropLibrary values) {
         return values.isNull(obj);
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLIsNullBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLIsNullBuiltin) that).getArguments()[0]);
     }
 }

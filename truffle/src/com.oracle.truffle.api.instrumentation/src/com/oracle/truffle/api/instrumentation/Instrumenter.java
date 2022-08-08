@@ -301,6 +301,10 @@ public abstract class Instrumenter {
      */
     public abstract <T extends AllocationListener> EventBinding<T> attachAllocationListener(AllocationEventFilter filter, T listener);
 
+    public abstract <T extends ObjectChangeListener> EventBinding<T> attachObjectChangeListener(AllocationEventFilter filter, T listener);
+
+    public abstract <T extends StackListener> EventBinding<T> attachStackListener(AllocationEventFilter filter, T listener);
+
     /**
      * Attach a {@link ContextsListener listener} to be notified about changes in contexts in guest
      * language application. This is supported in {@link TruffleInstrument.Env#getInstrumenter()}

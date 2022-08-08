@@ -98,4 +98,10 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
         /* Return the default null value. */
         return SLNull.SINGLETON;
     }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLFunctionBodyNode)) return false;
+        return bodyNode.isEqualNode(((SLFunctionBodyNode) that).bodyNode);
+    }
 }

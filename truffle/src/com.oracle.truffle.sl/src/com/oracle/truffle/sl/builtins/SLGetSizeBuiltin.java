@@ -46,6 +46,7 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Built-in function that queries the size property of a foreign object. See
@@ -61,5 +62,11 @@ public abstract class SLGetSizeBuiltin extends SLBuiltinNode {
         } catch (UnsupportedMessageException e) {
             throw new SLException("Element is not a valid array.", this);
         }
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLGetSizeBuiltin)) return false;
+        return getArguments()[0].isEqualNode(((SLGetSizeBuiltin) that).getArguments()[0]);
     }
 }

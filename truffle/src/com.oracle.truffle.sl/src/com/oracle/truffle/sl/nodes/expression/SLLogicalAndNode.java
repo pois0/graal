@@ -42,6 +42,7 @@ package com.oracle.truffle.sl.nodes.expression;
 
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Logical conjunction node with short circuit evaluation.
@@ -71,4 +72,11 @@ public final class SLLogicalAndNode extends SLShortCircuitNode {
         return left && right;
     }
 
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLLogicalAndNode)) return false;
+        SLLogicalAndNode thatAdd = (SLLogicalAndNode) that;
+        return left.isEqualNode(thatAdd.left)
+                && right.isEqualNode(thatAdd.right);
+    }
 }
