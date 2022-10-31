@@ -167,7 +167,7 @@ public class SLNodeFactory {
          * ensures that accesses to parameters are specialized the same way as local variables are
          * specialized.
          */
-        final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount);
+        final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount, nameToken.getText());
         readArg.setSourceSection(nameToken.getStartIndex(), nameToken.getText().length());
         SLExpressionNode assignment = createAssignment(createStringLiteral(nameToken, false), readArg, parameterCount);
         methodNodes.add(assignment);
@@ -498,7 +498,7 @@ public class SLNodeFactory {
         final FrameSlot frameSlot = lexicalScope.locals.get(name);
         if (frameSlot != null) {
             /* Read of a local variable. */
-            result = SLReadLocalVariableNodeGen.create(frameSlot);
+            result = SLReadLocalVariableNodeGen.create(name, frameSlot);
         } else {
             /* Read of a global name. In our language, the only global names are functions. */
             result = new SLFunctionLiteralNode(name);

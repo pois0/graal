@@ -48,9 +48,11 @@ import com.oracle.truffle.api.frame.FrameUtil;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.ReadVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
+import com.oracle.truffle.sl.runtime.SLContext;
 
 /**
  * Node to read a local variable from a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -65,6 +67,13 @@ import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
 @NodeField(name = "slot", type = FrameSlot.class)
 public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
+    private final Object slotIdentifier;
+    private final SLContext context = SLLanguage.getCurrentContext();
+
+    protected SLReadLocalVariableNode(Object slotIdentifier) {
+        this.slotIdentifier = slotIdentifier;
+    }
+
     /**
      * Returns the descriptor of the accessed local variable. The implementation of this method is
      * created by the Truffle DSL based on the {@link NodeField} annotation on the class.
@@ -78,12 +87,17 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
          * written to the local variable. So we do not need to check that the frame really contains
          * a primitive long value.
          */
-        return FrameUtil.getLongSafe(frame, getSlot());
+
+        long result = FrameUtil.getLongSafe(frame, getSlot());
+        notifyVariableRead();
+        return result;
     }
 
     @Specialization(guards = "frame.isBoolean(getSlot())")
     protected boolean readBoolean(VirtualFrame frame) {
-        return FrameUtil.getBooleanSafe(frame, getSlot());
+        boolean result = FrameUtil.getBooleanSafe(frame, getSlot());
+        notifyVariableRead();
+        return result;
     }
 
     @Specialization(replaces = {"readLong", "readBoolean"})
@@ -99,10 +113,13 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
             CompilerDirectives.transferToInterpreter();
             Object result = frame.getValue(getSlot());
             frame.setObject(getSlot(), result);
+            notifyVariableRead();
             return result;
         }
 
-        return FrameUtil.getObjectSafe(frame, getSlot());
+        Object result = FrameUtil.getObjectSafe(frame, getSlot());
+        notifyVariableRead();
+        return result;
     }
 
     @Override
@@ -119,5 +136,9 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLReadLocalVariableNode)) return false;
         return getSlot().getIdentifier().equals(((SLReadLocalVariableNode) that).getSlot().getIdentifier());
+    }
+
+    private void notifyVariableRead() {
+        context.getHistoryOperator().onReadLocalVariable(slotIdentifier);
     }
 }

@@ -53,6 +53,7 @@ import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The base class of all Truffle nodes for SL. All nodes (even expressions) can be used as
@@ -214,4 +215,12 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     }
 
     public abstract boolean isEqualNode(SLStatementNode that);
+
+    public NodeIdentifier getNodeIdentifier() {
+        return null; // TODO
+    }
+
+    public boolean hasNewNode() {
+        return false; // TODO
+    }
 }

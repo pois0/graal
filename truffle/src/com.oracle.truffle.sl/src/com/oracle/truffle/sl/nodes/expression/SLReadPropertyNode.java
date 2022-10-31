@@ -49,9 +49,11 @@ import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 
 /**
@@ -69,6 +71,8 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
 
+    private final SLContext context = SLLanguage.getCurrentContext();
+
     protected abstract SLExpressionNode getReceiverNode();
     protected abstract SLExpressionNode getNameNode();
 
@@ -77,7 +81,10 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
                     @CachedLibrary("receiver") InteropLibrary arrays,
                     @CachedLibrary("index") InteropLibrary numbers) {
         try {
-            return arrays.readArrayElement(receiver, numbers.asLong(index));
+            final long id = numbers.asLong(index);
+            Object result = arrays.readArrayElement(receiver, id);
+            context.getHistoryOperator().onReadObjectField(receiver, id);
+            return result;
         } catch (UnsupportedMessageException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, index);
@@ -89,7 +96,10 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
                     @CachedLibrary("receiver") InteropLibrary objects,
                     @Cached SLToMemberNode asMember) {
         try {
-            return objects.readMember(receiver, asMember.execute(name));
+            final String field = asMember.execute(name);
+            Object result = objects.readMember(receiver, field);
+            context.getHistoryOperator().onReadObjectField(receiver, field);
+            return result;
         } catch (UnsupportedMessageException | UnknownIdentifierException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, name);

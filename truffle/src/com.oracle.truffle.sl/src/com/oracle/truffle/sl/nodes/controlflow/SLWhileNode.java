@@ -44,21 +44,31 @@ import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 
 @NodeInfo(shortName = "while", description = "The node implementing a while loop")
 public final class SLWhileNode extends SLStatementNode {
 
+    @SuppressWarnings("FieldMayBeFinal")
     @Child private LoopNode loopNode;
 
+    private final SLContext context = SLLanguage.getCurrentContext();
+
     public SLWhileNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
-        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode));
+        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode, getNodeIdentifier()));
     }
 
     @Override
     public void executeVoid(VirtualFrame frame) {
-        loopNode.execute(frame);
+        context.getHistoryOperator().onEnterLoop(getNodeIdentifier());
+        try {
+            loopNode.execute(frame);
+        } finally {
+            context.getHistoryOperator().onExitLoop(getNodeIdentifier());
+        }
     }
 
     @Override

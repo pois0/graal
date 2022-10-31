@@ -78,6 +78,8 @@ import com.oracle.truffle.sl.builtins.SLReadlnBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLStackTraceBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLTypeOfBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistory;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * The run-time state of SL during execution. The context is created by the {@link SLLanguage}. It
@@ -96,8 +98,8 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final ObjectTracker objectTracker;
-
     private final StackTracker stackTracker;
+    private final ExecutionHistoryOperator historyOperator;
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins) {
         this.env = env;
@@ -108,6 +110,7 @@ public final class SLContext {
         this.functionRegistry = new SLFunctionRegistry(language);
         this.objectTracker = env.lookup(ObjectTracker.class);
         this.stackTracker = env.lookup(StackTracker.class);
+        this.historyOperator = new ExecutionHistoryOperator(new ExecutionHistory());
         installBuiltins();
         for (NodeFactory<? extends SLBuiltinNode> builtin : externalBuiltins) {
             installBuiltin(builtin);
@@ -231,5 +234,9 @@ public final class SLContext {
 
     public StackTracker getStackTracker() {
         return stackTracker;
+    }
+
+    public ExecutionHistoryOperator getHistoryOperator() {
+        return historyOperator;
     }
 }

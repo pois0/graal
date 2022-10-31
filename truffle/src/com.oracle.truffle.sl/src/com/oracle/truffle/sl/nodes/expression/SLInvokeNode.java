@@ -50,8 +50,10 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 
@@ -69,6 +71,7 @@ public final class SLInvokeNode extends SLExpressionNode {
     @Child private SLExpressionNode functionNode;
     @Children private final SLExpressionNode[] argumentNodes;
     @Child private InteropLibrary library;
+    private final SLContext ctx = SLLanguage.getCurrentContext();
 
     public SLInvokeNode(SLExpressionNode functionNode, SLExpressionNode[] argumentNodes) {
         this.functionNode = functionNode;
@@ -95,10 +98,13 @@ public final class SLInvokeNode extends SLExpressionNode {
         }
 
         try {
+            ctx.getHistoryOperator().onEnterFunction(getNodeIdentifier());
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, function);
+        } finally {
+            ctx.getHistoryOperator().onExitFunction(getNodeIdentifier());
         }
     }
 

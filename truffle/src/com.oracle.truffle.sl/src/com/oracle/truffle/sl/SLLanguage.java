@@ -260,7 +260,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * from this array.
          */
         for (int i = 0; i < argumentCount; i++) {
-            argumentNodes[i] = new SLReadArgumentNode(i);
+            argumentNodes[i] = new SLReadArgumentNode(i, null);
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */
         SLBuiltinNode builtinBodyNode = factory.createNode((Object) argumentNodes);

@@ -47,9 +47,12 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RepeatingNode;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.BranchProfile;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The loop body of a {@link SLWhileNode while loop}. A Truffle framework {@link LoopNode} between
@@ -76,36 +79,47 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     private final BranchProfile continueTaken = BranchProfile.create();
     private final BranchProfile breakTaken = BranchProfile.create();
 
-    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
+    private final NodeIdentifier parentIdentifier;
+    private final SLContext context = SLLanguage.getCurrentContext();
+
+    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode, NodeIdentifier parentIdentifier) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
         this.bodyNode = bodyNode;
+        this.parentIdentifier =parentIdentifier;
     }
 
     @Override
     public boolean executeRepeating(VirtualFrame frame) {
+        boolean result;
         if (!evaluateCondition(frame)) {
             /* Normal exit of the loop when loop condition is false. */
-            return false;
+            result = false;
+        } else {
+            try {
+                /* Execute the loop body. */
+                bodyNode.executeVoid(frame);
+                /* Continue with next loop iteration. */
+                result = true;
+
+            } catch (SLContinueException ex) {
+                /* In the interpreter, record profiling information that the loop uses continue. */
+                continueTaken.enter();
+                /* Continue with next loop iteration. */
+                result = true;
+
+            } catch (SLBreakException ex) {
+                /* In the interpreter, record profiling information that the loop uses break. */
+                breakTaken.enter();
+                /* Break out of the loop. */
+                result = false;
+            }
         }
 
-        try {
-            /* Execute the loop body. */
-            bodyNode.executeVoid(frame);
-            /* Continue with next loop iteration. */
-            return true;
-
-        } catch (SLContinueException ex) {
-            /* In the interpreter, record profiling information that the loop uses continue. */
-            continueTaken.enter();
-            /* Continue with next loop iteration. */
-            return true;
-
-        } catch (SLBreakException ex) {
-            /* In the interpreter, record profiling information that the loop uses break. */
-            breakTaken.enter();
-            /* Break out of the loop. */
-            return false;
+        if (result) {
+            context.getHistoryOperator().onGotoNextIteration(parentIdentifier);
         }
+
+        return result;
     }
 
     private boolean evaluateCondition(VirtualFrame frame) {
