@@ -122,4 +122,9 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
                 && getNameNode().isEqualNode(thatWP.getNameNode())
                 && getValueNode().isEqualNode(thatWP.getValueNode());
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getReceiverNode().hasNewNode() || getNameNode().hasNewNode() || getValueNode().hasNewNode();
+    }
 }

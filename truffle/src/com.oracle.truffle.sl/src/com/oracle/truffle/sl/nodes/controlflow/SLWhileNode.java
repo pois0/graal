@@ -55,8 +55,6 @@ public final class SLWhileNode extends SLStatementNode {
     @SuppressWarnings("FieldMayBeFinal")
     @Child private LoopNode loopNode;
 
-    private final SLContext context = SLLanguage.getCurrentContext();
-
     public SLWhileNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
         this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode, getNodeIdentifier()));
     }
@@ -78,5 +76,11 @@ public final class SLWhileNode extends SLStatementNode {
         SLWhileRepeatingNode thatRep = (SLWhileRepeatingNode) ((SLWhileNode) that).loopNode.getRepeatingNode();
         return thisRep.getConditionNode().isEqualNode(thatRep.getConditionNode())
                 && thisRep.getBodyNode().isEqualNode(thatRep.getBodyNode());
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        SLWhileRepeatingNode repeatingNode = (SLWhileRepeatingNode) loopNode.getRepeatingNode();
+        return repeatingNode.hasNewNode();
     }
 }

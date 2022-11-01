@@ -119,5 +119,4 @@ public abstract class SLToMemberNode extends Node {
     private static String longToString(long longValue) {
         return String.valueOf(longValue);
     }
-
 }

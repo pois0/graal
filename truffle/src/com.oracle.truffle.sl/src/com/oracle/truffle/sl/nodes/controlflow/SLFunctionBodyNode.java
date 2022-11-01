@@ -104,4 +104,9 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
         if (!(that instanceof SLFunctionBodyNode)) return false;
         return bodyNode.isEqualNode(((SLFunctionBodyNode) that).bodyNode);
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return bodyNode.hasNewNode();
+    }
 }

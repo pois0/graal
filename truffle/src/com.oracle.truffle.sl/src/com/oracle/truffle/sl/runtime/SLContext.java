@@ -57,6 +57,7 @@ import com.oracle.truffle.api.instrumentation.AllocationReporter;
 import com.oracle.truffle.api.instrumentation.ObjectTracker;
 import com.oracle.truffle.api.instrumentation.StackTracker;
 import com.oracle.truffle.api.interop.TruffleObject;
+import com.oracle.truffle.api.nodes.LanguageInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.builtins.SLBuiltinNode;
@@ -108,9 +109,14 @@ public final class SLContext {
         this.language = language;
         this.allocationReporter = env.lookup(AllocationReporter.class);
         this.functionRegistry = new SLFunctionRegistry(language);
-        this.objectTracker = env.lookup(ObjectTracker.class);
-        this.stackTracker = env.lookup(StackTracker.class);
-        this.historyOperator = new ExecutionHistoryOperator(new ExecutionHistory());
+        ObjectTracker objTracker = env.lookup(ObjectTracker.class);
+        objTracker = this.objectTracker = objTracker == null ? new ObjectTracker(null) : objTracker;
+        StackTracker stackTracker = env.lookup(StackTracker.class);
+        stackTracker = this.stackTracker = stackTracker == null ? new StackTracker(null) : stackTracker;
+        ExecutionHistoryOperator op = this.historyOperator = new ExecutionHistoryOperator(new ExecutionHistory());
+        objTracker.addListener(op.getObjectChangeListener());
+        stackTracker.addListener(op.getStackListener());
+
         installBuiltins();
         for (NodeFactory<? extends SLBuiltinNode> builtin : externalBuiltins) {
             installBuiltin(builtin);

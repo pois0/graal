@@ -71,8 +71,6 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
 
-    private final SLContext context = SLLanguage.getCurrentContext();
-
     protected abstract SLExpressionNode getReceiverNode();
     protected abstract SLExpressionNode getNameNode();
 
@@ -112,5 +110,10 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
         final SLReadPropertyNode thatRP = (SLReadPropertyNode) that;
         return getReceiverNode().isEqualNode(thatRP.getReceiverNode())
                 && getNameNode().isEqualNode(thatRP.getNameNode());
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getReceiverNode().hasNewNode() || getNameNode().hasNewNode();
     }
 }

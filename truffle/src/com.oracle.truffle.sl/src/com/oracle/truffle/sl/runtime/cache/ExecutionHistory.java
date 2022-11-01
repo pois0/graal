@@ -1,21 +1,33 @@
 package com.oracle.truffle.sl.runtime.cache;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 public final class ExecutionHistory {
-    private final ArrayList<ExecutionContext> timeToContext = new ArrayList<>();
+    private final ArrayList<ItemWithTime<ExecutionContext>> timeToContext = new ArrayList<>();
     private final HashMap<ExecutionContext, TimePair> contextToTime = new HashMap<>();
     private final ArrayList<ItemWithTime<ReadContent>> readMap = new ArrayList<>();
     private final HashMap<Integer, ExecutionContext> objectGenerationContext = new HashMap<>();
     private final HashMap<Integer, HashMap<String, ArrayList<ItemWithTime<Object>>>> objectUpdateMap = new HashMap<>();
     private final ArrayList<ItemWithTime<UpdateContent>> objectUpdateList = new ArrayList<>();
+    private final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
 
-    public void onTick(Time startTime, Time endTime, ExecutionContext ctx) {
-        timeToContext.add(ctx);
+    public void onReturnValue(Time startTime, Time endTime, ExecutionContext ctx, Object value) {
+        timeToContext.add(new ItemWithTime<>(endTime, ctx));
         contextToTime.put(ctx, new TimePair(startTime, endTime));
+        returnedValueOrException.add(new ItemWithTime<>(endTime, replaceReference(value)));
+    }
+
+    public void onReturnExceptional(Time startTime, Time endTime, ExecutionContext ctx, RuntimeException throwable) {
+        timeToContext.add(new ItemWithTime<>(endTime, ctx));
+        contextToTime.put(ctx, new TimePair(startTime, endTime));
+        returnedValueOrException.add(new ItemWithTime<>(endTime, throwable));
     }
 
     public void onReadArgument(Time time, CallContextElement[] ctx, Object argumentName) {
@@ -39,22 +51,19 @@ public final class ExecutionHistory {
     }
 
     public void onUpdateObjectWithHash(Time time, int objectHash, String fieldName, Object newValue) {
-        Object saveNewValue;
-        if (newValue == null
-                || newValue instanceof Byte
-                || newValue instanceof Short
-                || newValue instanceof Integer
-                || newValue instanceof Long
-                || newValue instanceof Float
-                || newValue instanceof Double
-                || newValue instanceof Character
-                || newValue instanceof String) {
-            saveNewValue = newValue;
-        } else {
-            saveNewValue = new ObjectReference(System.identityHashCode(newValue));
-        }
+        onUpdateObjectInner(time, objectHash, fieldName, replaceReference(newValue));
+    }
 
-        onUpdateObjectInner(time, objectHash, fieldName, saveNewValue);
+    public Object getReturnedValueOrThrow(Time time) {
+        Object result = ItemWithTime.binarySearchJust(returnedValueOrException, time);
+
+        if (result instanceof RuntimeException) throw (RuntimeException) result;
+
+        return result;
+    }
+
+    public boolean didExecuted(ExecutionContext ctx) {
+        return contextToTime.containsKey(ctx);
     }
 
     private void onUpdateObjectInner(Time time, int objectHash, String fieldName, Object newValue) {
@@ -65,25 +74,69 @@ public final class ExecutionHistory {
     }
 
     public Iterator<ItemWithTime<ReadContent>> getReadOperations(Time startTime, Time endTime) {
-        return new ItemsWithTimeIterator<>(readMap, startTime, endTime);
+        return ItemsWithTimeIterator.create(readMap, startTime, endTime);
     }
 
     public Iterator<ItemWithTime<ReadContent>> getReadOperations(ExecutionContext ctx) {
         TimePair timePair = contextToTime.get(ctx);
+        if (timePair == null) return null;
         return getReadOperations(timePair.start, timePair.end);
     }
 
     public Iterator<ItemWithTime<UpdateContent>> getUpdateOperations(Time startTime, Time endTime) {
-        return new ItemsWithTimeIterator<>(objectUpdateList, startTime, endTime);
+        return ItemsWithTimeIterator.create(objectUpdateList, startTime, endTime);
     }
 
     public Iterator<ItemWithTime<UpdateContent>> getUpdateOperations(ExecutionContext ctx) {
         TimePair timePair = contextToTime.get(ctx);
+        if (timePair == null) return null;
         return getUpdateOperations(timePair.start, timePair.end);
     }
 
+    public void deleteRecords(Time startTime, Time endTime) {
+        ItemWithTime.subList(readMap, startTime, endTime).clear();
+        List<ItemWithTime<UpdateContent>> updates = ItemWithTime.subList(objectUpdateList, startTime, endTime);
+        HashMap<Integer, HashSet<String>> updatedFields = new HashMap<>();
+        for (ItemWithTime<UpdateContent> update : updates) {
+            UpdateContent item = update.getItem();
+            updatedFields.computeIfAbsent(item.getObjectId(), it -> new HashSet<>())
+                    .add(item.getFieldName());
+        }
+
+        for (Map.Entry<Integer, HashSet<String>> entry : updatedFields.entrySet()) {
+            Integer objectId = entry.getKey();
+            HashSet<String> fields = entry.getValue();
+            HashMap<String, ArrayList<ItemWithTime<Object>>> map = objectUpdateMap.get(objectId);
+            for (String field : fields) {
+                ArrayList<ItemWithTime<Object>> fieldHistory = map.get(field);
+                ItemWithTime.subList(fieldHistory, startTime, endTime).clear();
+            }
+        }
+        updates.clear();
+        ItemWithTime.subList(returnedValueOrException, startTime, endTime).clear();
+    }
+
+    private static Object replaceReference(Object value) {
+        Object saveNewValue;
+        if (value == null
+                || value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long
+                || value instanceof Float
+                || value instanceof Double
+                || value instanceof Character
+                || value instanceof String) {
+            saveNewValue = value;
+        } else {
+            saveNewValue = new ObjectReference(System.identityHashCode(value));
+        }
+
+        return saveNewValue;
+    }
+
     public static class TimePair {
-        private final Time  start;
+        private final Time start;
         private final Time end;
 
         public TimePair(Time start, Time end) {
@@ -118,6 +171,14 @@ public final class ExecutionHistory {
         public Object getArgumentName() {
             return argumentName;
         }
+
+        @Override
+        public String toString() {
+            return "ReadArgument{" +
+                    "callContext=" + Arrays.toString(callContext) +
+                    ", argumentName=" + argumentName +
+                    '}';
+        }
     }
 
     public static class ReadLocalVariable extends ReadContent {
@@ -136,6 +197,14 @@ public final class ExecutionHistory {
         public Object getVariableName() {
             return variableName;
         }
+
+        @Override
+        public String toString() {
+            return "ReadLocalVariable{" +
+                    "callContext=" + Arrays.toString(callContext) +
+                    ", variableName=" + variableName +
+                    '}';
+        }
     }
 
     public static class ReadObjectField extends ReadContent {
@@ -153,6 +222,14 @@ public final class ExecutionHistory {
 
         public Object getFieldName() {
             return fieldName;
+        }
+
+        @Override
+        public String toString() {
+            return "ReadObjectField{" +
+                    "objectId=" + objectId +
+                    ", fieldName=" + fieldName +
+                    '}';
         }
     }
 
@@ -198,9 +275,10 @@ public final class ExecutionHistory {
         private ItemWithTime<T> currentItem;
         private final Time endTime;
 
-        private ItemsWithTimeIterator(ArrayList<ItemWithTime<T>> items, Time startTime, Time endTime) {
-            this.cursor = ItemWithTime.binarySearch(items, startTime);
+        private ItemsWithTimeIterator(ArrayList<ItemWithTime<T>> items, int initIndex, ItemWithTime<T> initItem, Time endTime) {
             this.items = items;
+            this.cursor = initIndex;
+            this.currentItem = initItem;
             this.endTime = endTime;
         }
 
@@ -229,5 +307,30 @@ public final class ExecutionHistory {
 
             return result;
         }
+
+        private static <T> Iterator<ItemWithTime<T>> create(ArrayList<ItemWithTime<T>> items, Time startTime, Time endTime) {
+            int initIndex = ItemWithTime.binarySearch(items, startTime);
+            if (items.size() == initIndex) return noElementIterator();
+            ItemWithTime<T> initItem = items.get(initIndex);
+            if (initItem.getTime().compareTo(endTime) > 0) return noElementIterator();
+            return new ItemsWithTimeIterator<>(items, initIndex, initItem, endTime);
+        }
+    }
+
+    private static final Object noElementIteratorInner = new Iterator<ItemWithTime<Object>>() {
+        @Override
+        public boolean hasNext() {
+            return false;
+        }
+
+        @Override
+        public ItemWithTime<Object> next() {
+            throw new NoSuchElementException();
+        }
+    };
+
+    @SuppressWarnings("unchecked")
+    private static <T> Iterator<ItemWithTime<T>> noElementIterator() {
+        return (Iterator<ItemWithTime<T>>) noElementIteratorInner;
     }
 }

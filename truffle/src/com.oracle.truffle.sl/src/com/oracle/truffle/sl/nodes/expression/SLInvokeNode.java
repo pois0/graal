@@ -127,4 +127,15 @@ public final class SLInvokeNode extends SLExpressionNode {
 
         return true;
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        if (functionNode.hasNewNode()) return true;
+
+        for (SLExpressionNode argNode: argumentNodes) {
+            if (argNode.hasNewNode()) return true;
+        }
+
+        return false;
+    }
 }

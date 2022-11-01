@@ -81,4 +81,9 @@ public class SLParenExpressionNode extends SLExpressionNode {
         if (!(that instanceof SLParenExpressionNode)) return false;
         return expression.isEqualNode(((SLParenExpressionNode) that).expression);
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return expression.hasNewNode();
+    }
 }

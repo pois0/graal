@@ -119,4 +119,9 @@ public abstract class SLUnboxNode extends SLExpressionNode {
         if (!(that instanceof SLUnboxNode)) return false;
         return true; //TODO
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return true;
+    }
 }

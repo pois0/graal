@@ -57,9 +57,11 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.NodeUtil;
 import com.oracle.truffle.api.nodes.NodeVisitor;
 
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 
 /**
  * A statement node that just executes a list of other statements.
@@ -142,6 +144,16 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
         }
 
         return true;
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        SLStatementNode[] elements = block.getElements();
+        for (SLStatementNode child : elements) {
+            if (child.hasNewNode()) return true;
+        }
+
+        return false;
     }
 
     /**

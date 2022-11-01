@@ -105,4 +105,8 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
      */
     protected abstract boolean execute(boolean leftValue, boolean rightValue);
 
+    @Override
+    protected boolean hasNewChildNode() {
+        return left.hasNewNode() || right.hasNewNode();
+    }
 }

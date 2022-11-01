@@ -48,8 +48,10 @@ import com.oracle.truffle.api.TruffleLanguage.ContextPolicy;
 import com.oracle.truffle.api.TruffleLanguage.ContextReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
@@ -96,6 +98,24 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
 
     @Override
     public SLFunction executeGeneric(VirtualFrame frame) {
+        return findFunction();
+    }
+
+    @Override
+    public boolean isEqualNode(SLStatementNode that) {
+        if (!(that instanceof SLFunctionLiteralNode)) return false;
+        SLFunctionLiteralNode thatFunc = (SLFunctionLiteralNode) that;
+        return Objects.equals(functionName, thatFunc.functionName); // TODO
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        RootNode rootNode = findFunction().getCallTarget().getRootNode();
+        if (!(rootNode instanceof SLRootNode)) return true;
+        return ((SLRootNode) rootNode).getBodyNode().hasNewNode();
+    }
+
+    private SLFunction findFunction() {
         ContextReference<SLContext> contextReference = contextRef;
         if (contextReference == null) {
             CompilerDirectives.transferToInterpreterAndInvalidate();
@@ -130,12 +150,5 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
             function = contextReference.get().getFunctionRegistry().lookup(functionName, true);
         }
         return function;
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLFunctionLiteralNode)) return false;
-        SLFunctionLiteralNode thatFunc = (SLFunctionLiteralNode) that;
-        return Objects.equals(functionName, thatFunc.functionName); // TODO
     }
 }

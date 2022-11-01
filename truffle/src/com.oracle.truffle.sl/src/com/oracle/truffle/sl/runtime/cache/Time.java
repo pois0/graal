@@ -27,7 +27,7 @@ public class Time implements Comparable<Time>{
         return new Time(newRaw);
     }
 
-    private Time subdivide() {
+    public Time subdivide() {
         int[] thisRaw = this.raw;
         return new Time(Arrays.copyOf(thisRaw, thisRaw.length + 1));
     }

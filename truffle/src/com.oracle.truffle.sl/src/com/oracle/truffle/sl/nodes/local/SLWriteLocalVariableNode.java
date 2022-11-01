@@ -181,4 +181,9 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         if (!(that instanceof SLWriteLocalVariableNode)) return false;
         return getNameNode().isEqualNode(((SLWriteLocalVariableNode) that).getNameNode());
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
+    }
 }

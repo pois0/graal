@@ -24,6 +24,7 @@ public final class ExecutionHistoryOperator {
 
     private CallContextElement[] callContextCache = null;
     private HashSet<Object> localVarFlagCache = null;
+    private NextTimeState nextTimeState;
 
     private final ObjectChangeListener objectChangeListener = new ObjectChangeListener() {
         @Override
@@ -87,12 +88,12 @@ public final class ExecutionHistoryOperator {
         this(new ExecutionHistory());
     }
 
-    public ExecutionHistory getHistory() {
-        return history;
-    }
-
     public ObjectChangeListener getObjectChangeListener() {
         return objectChangeListener;
+    }
+
+    public StackListener getStackListener() {
+        return stackListener;
     }
 
     public ExecutionEventNodeFactory getTickFactory() {
@@ -142,6 +143,10 @@ public final class ExecutionHistoryOperator {
         assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
     }
 
+    public boolean didExecuted(NodeIdentifier nodeIdentifier) {
+        return history.didExecuted(getExecutionContext(nodeIdentifier));
+    }
+
     public Iterator<ItemWithTime<ExecutionHistory.ReadContent>> getReadContentIterator(NodeIdentifier identifier) {
         return history.getReadOperations(getExecutionContext(identifier));
     }
@@ -150,8 +155,28 @@ public final class ExecutionHistoryOperator {
         return history.getUpdateOperations(getExecutionContext(identifier));
     }
 
-    private Time incrementTime() {
-        return currentTime = currentTime.inc();
+    public void startNewExecution() {
+        nextTimeState = NextTimeState.SUBDIVIDE;
+    }
+
+    public void endNewExecution() {
+        nextTimeState = NextTimeState.NORMAL;
+    }
+
+    private Time getAndIncrementTime() {
+        Time currentTime = this.currentTime;
+
+        switch (nextTimeState) {
+            case SUBDIVIDE:
+                this.currentTime = currentTime.subdivide();
+                nextTimeState = NextTimeState.NORMAL;
+                break;
+            case NORMAL:
+                this.currentTime = currentTime.inc();
+                break;
+        }
+
+        return currentTime;
     }
 
     private ExecutionContext getExecutionContext(NodeIdentifier identifier) {
@@ -202,7 +227,18 @@ public final class ExecutionHistoryOperator {
 
         @Override
         protected void onReturnValue(VirtualFrame frame, Object result) {
-            history.onTick(startTime, incrementTime(), new ExecutionContext(getCallContext(), identifier));
+            history.onReturnValue(startTime, getAndIncrementTime(), getExecutionContext(identifier), result);
         }
+
+        @Override
+        protected void onReturnExceptional(VirtualFrame frame, Throwable exception) {
+            if (exception instanceof RuntimeException) {
+                history.onReturnExceptional(startTime, getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
+            }
+        }
+    }
+
+    private enum NextTimeState {
+        NORMAL, SUBDIVIDE
     }
 }

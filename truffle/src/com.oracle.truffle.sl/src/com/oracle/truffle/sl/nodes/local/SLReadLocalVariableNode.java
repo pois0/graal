@@ -68,7 +68,6 @@ import com.oracle.truffle.sl.runtime.SLContext;
 public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
     private final Object slotIdentifier;
-    private final SLContext context = SLLanguage.getCurrentContext();
 
     protected SLReadLocalVariableNode(Object slotIdentifier) {
         this.slotIdentifier = slotIdentifier;
@@ -140,5 +139,10 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
     private void notifyVariableRead() {
         context.getHistoryOperator().onReadLocalVariable(slotIdentifier);
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
     }
 }

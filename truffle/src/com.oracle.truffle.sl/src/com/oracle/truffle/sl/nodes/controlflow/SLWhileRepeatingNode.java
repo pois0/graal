@@ -81,6 +81,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
 
     private final NodeIdentifier parentIdentifier;
     private final SLContext context = SLLanguage.getCurrentContext();
+    private int hasNewNodeState = -1;
 
     public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode, NodeIdentifier parentIdentifier) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
@@ -150,5 +151,13 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
 
     SLStatementNode getBodyNode() {
         return bodyNode;
+    }
+
+    public final boolean hasNewNode() {
+        int state = hasNewNodeState;
+        if (state < 0) {
+            hasNewNodeState = state = conditionNode.hasNewNode() || bodyNode.hasNewNode() ? 1 : 0;
+        }
+        return state != 0;
     }
 }

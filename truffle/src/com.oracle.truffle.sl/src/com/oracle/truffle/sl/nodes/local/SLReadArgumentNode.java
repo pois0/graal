@@ -61,7 +61,6 @@ public class SLReadArgumentNode extends SLExpressionNode {
     /** The argument number, i.e., the index into the array of arguments. */
     private final int index;
     private final Object argumentIdentifier;
-    private final SLContext context = SLLanguage.getCurrentContext();
 
     /**
      * Profiling information, collected by the interpreter, capturing whether the function was
@@ -95,5 +94,10 @@ public class SLReadArgumentNode extends SLExpressionNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLReadArgumentNode)) return false;
         return index == ((SLReadArgumentNode) that).index;
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
     }
 }

@@ -82,4 +82,10 @@ public final class SLReturnNode extends SLStatementNode {
         SLReturnNode thatReturn = (SLReturnNode) that;
         return valueNode == null ? thatReturn.valueNode == null : valueNode.isEqualNode(thatReturn.valueNode);
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        final SLExpressionNode valueNode = this.valueNode;
+        return valueNode == null || valueNode.hasNewNode();
+    }
 }

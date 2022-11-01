@@ -91,4 +91,8 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
 
     protected abstract Object execute(VirtualFrame frame);
 
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
+    }
 }

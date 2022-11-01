@@ -52,7 +52,9 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -72,6 +74,11 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
 
     private boolean hasStatementTag;
     private boolean hasRootTag;
+
+    private boolean isNewNode = false;
+    private int hasNewNodeState = -1;
+
+    protected final SLContext context = SLLanguage.getCurrentContext();
 
     /*
      * The creation of source section can be implemented lazily by looking up the root node source
@@ -217,10 +224,24 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public abstract boolean isEqualNode(SLStatementNode that);
 
     public NodeIdentifier getNodeIdentifier() {
-        return null; // TODO
+        return new NodeIdentifier(); // TODO
     }
 
-    public boolean hasNewNode() {
-        return false; // TODO
+    public final boolean isNewNode() {
+        return false;
     }
+
+    public void setNewNode() {
+        isNewNode = true;
+    }
+
+    public final boolean hasNewNode() {
+        int state = hasNewNodeState;
+        if (state < 0) {
+            hasNewNodeState = state = isNewNode || hasNewChildNode() ? 1 : 0;
+        }
+        return state != 0;
+    }
+
+    protected abstract boolean hasNewChildNode();
 }

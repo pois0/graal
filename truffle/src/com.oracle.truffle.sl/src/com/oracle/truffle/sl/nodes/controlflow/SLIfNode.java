@@ -106,6 +106,11 @@ public final class SLIfNode extends SLStatementNode {
                 && (elsePartNode == null ? thatIf.elsePartNode == null : elsePartNode.isEqualNode(thatIf.elsePartNode));
     }
 
+    @Override
+    protected boolean hasNewChildNode() {
+        return conditionNode.hasNewNode() || thenPartNode.hasNewNode() || elsePartNode.hasNewNode();
+    }
+
     private boolean evaluateCondition(VirtualFrame frame) {
         try {
             /*

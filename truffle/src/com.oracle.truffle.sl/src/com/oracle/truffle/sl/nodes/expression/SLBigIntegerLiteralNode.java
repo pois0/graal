@@ -44,7 +44,6 @@ import java.math.BigInteger;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 
@@ -53,7 +52,7 @@ import com.oracle.truffle.sl.runtime.SLBigNumber;
  * {@link SLLongLiteralNode}.
  */
 @NodeInfo(shortName = "const")
-public final class SLBigIntegerLiteralNode extends SLExpressionNode {
+public final class SLBigIntegerLiteralNode extends SLLiteralNode {
 
     private final SLBigNumber value;
 

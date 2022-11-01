@@ -49,7 +49,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
  * Constant literal for a String value.
  */
 @NodeInfo(shortName = "const")
-public final class SLStringLiteralNode extends SLExpressionNode {
+public final class SLStringLiteralNode extends SLLiteralNode {
 
     private final String value;
 

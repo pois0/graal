@@ -73,4 +73,9 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
         if (!(that instanceof SLLogicalNotNode)) return false;
         return getValueNode().isEqualNode(((SLLogicalNotNode) that).getValueNode());
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getValueNode().hasNewNode();
+    }
 }
