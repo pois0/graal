@@ -59,6 +59,12 @@ public final class SLBreakNode extends SLStatementNode {
     }
 
     @Override
+    public void calcVoid(VirtualFrame frame) {
+        executeVoid(frame);
+    }
+
+
+    @Override
     public boolean isEqualNode(SLStatementNode that) {
         return that instanceof SLBreakNode;
     }

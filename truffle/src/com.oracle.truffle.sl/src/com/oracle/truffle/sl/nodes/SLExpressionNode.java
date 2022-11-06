@@ -48,6 +48,7 @@ import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import org.graalvm.compiler.virtual.phases.ea.VirtualUtil;
 
 /**
  * Base class for all SL nodes that produce a value and therefore benefit from type specialization.
@@ -67,6 +68,8 @@ public abstract class SLExpressionNode extends SLStatementNode {
      */
     public abstract Object executeGeneric(VirtualFrame frame);
 
+    public abstract Object calcGeneric(VirtualFrame frame);
+
     /**
      * When we use an expression at places where a {@link SLStatementNode statement} is already
      * sufficient, the return value is just discarded.
@@ -74,6 +77,11 @@ public abstract class SLExpressionNode extends SLStatementNode {
     @Override
     public void executeVoid(VirtualFrame frame) {
         executeGeneric(frame);
+    }
+
+    @Override
+    public void calcVoid(VirtualFrame frame) {
+        calcGeneric(frame);
     }
 
     @Override
@@ -106,7 +114,15 @@ public abstract class SLExpressionNode extends SLStatementNode {
         return SLTypesGen.expectLong(executeGeneric(frame));
     }
 
+    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+        return SLTypesGen.expectLong(calcGeneric(frame));
+    }
+
     public boolean executeBoolean(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(executeGeneric(frame));
+    }
+
+    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+        return SLTypesGen.expectBoolean(calcGeneric(frame));
     }
 }

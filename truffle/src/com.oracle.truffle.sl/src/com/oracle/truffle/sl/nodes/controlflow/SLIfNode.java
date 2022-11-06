@@ -48,6 +48,7 @@ import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 @NodeInfo(shortName = "if", description = "The node implementing a condional statement")
 public final class SLIfNode extends SLStatementNode {
@@ -95,6 +96,17 @@ public final class SLIfNode extends SLStatementNode {
                 elsePartNode.executeVoid(frame);
             }
         }
+    }
+
+    @Override
+    public void calcVoid(VirtualFrame frame) {
+        if (isNewNode()) {
+            executeVoid(frame);
+            return;
+        }
+
+        ExecutionHistoryOperator op = context.getHistoryOperator();
+        if (op.shouldRecalculate(()))
     }
 
     @Override

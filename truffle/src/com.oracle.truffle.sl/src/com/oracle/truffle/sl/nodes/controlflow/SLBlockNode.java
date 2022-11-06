@@ -62,12 +62,16 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * A statement node that just executes a list of other statements.
  */
 @NodeInfo(shortName = "block", description = "The node implementing a source code block")
 public final class SLBlockNode extends SLStatementNode implements BlockNode.ElementExecutor<SLStatementNode> {
+
+    private final static int EXECUTE = 0;
+    private final static int CALC = 1;
 
     /**
      * The block of child nodes. Using the block node allows Truffle to split the block into
@@ -106,8 +110,18 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     @Override
     public void executeVoid(VirtualFrame frame) {
         if (this.block != null) {
-            this.block.executeVoid(frame, BlockNode.NO_ARGUMENT);
+            this.block.executeVoid(frame, 0);
         }
+    }
+
+    @Override
+    public void calcVoid(VirtualFrame frame) {
+        if (isNewNode()) {
+            executeVoid(frame);
+            return;
+        }
+
+        this.block.executeVoid(frame, 1);
     }
 
     public List<SLStatementNode> getStatements() {
@@ -128,7 +142,22 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
      */
     @Override
     public void executeVoid(VirtualFrame frame, SLStatementNode node, int index, int argument) {
-        node.executeVoid(frame);
+        if (argument == EXECUTE) {
+            node.executeVoid(frame);
+            return;
+        }
+
+        if (hasNewChildNode()) {
+            node.calcVoid(frame);
+            return;
+        }
+
+        ExecutionHistoryOperator op = this.context.getHistoryOperator();
+        if (op.shouldRecalculate(node.getNodeIdentifier())) {
+            node.calcVoid(frame);
+        } else {
+            op.getReturnedValueOrThrow(node.getNodeIdentifier());
+        }
     }
 
     @Override
@@ -229,5 +258,4 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
             return allVariables;
         }
     }
-
 }

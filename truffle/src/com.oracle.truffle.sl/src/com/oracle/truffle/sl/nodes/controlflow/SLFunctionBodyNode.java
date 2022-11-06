@@ -100,6 +100,23 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
     }
 
     @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        if (isNewNode()) {
+            return executeGeneric(frame);
+        }
+
+        try {
+            bodyNode.calcVoid(frame);
+        } catch (SLReturnException ex) {
+            exceptionTaken.enter();
+            return ex.getResult();
+        }
+
+        nullTaken.enter();
+        return SLNull.SINGLETON;
+    }
+
+    @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLFunctionBodyNode)) return false;
         return bodyNode.isEqualNode(((SLFunctionBodyNode) that).bodyNode);

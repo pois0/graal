@@ -54,6 +54,11 @@ public final class ExecutionHistory {
         onUpdateObjectInner(time, objectHash, fieldName, replaceReference(newValue));
     }
 
+    public Time getFinishedTime(ExecutionContext ctx) {
+        TimePair timePair = contextToTime.get(ctx);
+        return timePair == null ? null : timePair.end;
+    }
+
     public Object getReturnedValueOrThrow(Time time) {
         Object result = ItemWithTime.binarySearchJust(returnedValueOrException, time);
 

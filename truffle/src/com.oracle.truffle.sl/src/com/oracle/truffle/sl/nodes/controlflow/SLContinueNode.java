@@ -59,6 +59,11 @@ public final class SLContinueNode extends SLStatementNode {
     }
 
     @Override
+    public void calcVoid(VirtualFrame frame) {
+        executeVoid(frame);
+    }
+
+    @Override
     public boolean isEqualNode(SLStatementNode that) {
         return that instanceof SLContinueNode;
     }

@@ -173,6 +173,8 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
      */
     public abstract void executeVoid(VirtualFrame frame);
 
+    public abstract void calcVoid(VirtualFrame frame);
+
     /**
      * Marks this node as being a {@link StandardTags.StatementTag} for instrumentation purposes.
      */

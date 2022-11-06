@@ -10,6 +10,7 @@ import com.oracle.truffle.api.instrumentation.StackListener;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -18,7 +19,7 @@ public final class ExecutionHistoryOperator {
     private Time currentTime = Time.zero();
     private final ExecutionHistory history;
     private final ArrayDeque<HashSet<Object>> localVarFlagStack = new ArrayDeque<>();
-    private final HashMap<Integer, HashSet<String>> objectFieldFlags = new HashMap<>();
+    private final HashMap<Integer, HashSet<Object>> objectFieldFlags = new HashMap<>();
     private final ArrayDeque<CallContextElement> currentStack = new ArrayDeque<>();
     private final HashMap<Integer, Integer> objectMapping = new HashMap<>(); // objId in prevExec -> objId in currentExec
 
@@ -141,6 +142,36 @@ public final class ExecutionHistoryOperator {
         invalidateCallContextCache();
         CallContextElement elem = currentStack.pop();
         assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
+    }
+
+    public boolean shouldRecalculate(NodeIdentifier identifier) {
+        Iterator<ItemWithTime<ExecutionHistory.ReadContent>> iter = getReadContentIterator(identifier);
+
+        while (iter.hasNext()) {
+            ExecutionHistory.ReadContent readContent = iter.next().getItem();
+            if (readContent instanceof ExecutionHistory.ReadArgument) {
+
+            } else if (readContent instanceof ExecutionHistory.ReadLocalVariable) {
+                ExecutionHistory.ReadLocalVariable content = (ExecutionHistory.ReadLocalVariable) readContent;
+                if (Arrays.equals(content.getCallContext(), getCallContext()) && getLocalVarFlagCache().contains(content.getVariableName())) {
+                    return true;
+                }
+            } else if (readContent instanceof ExecutionHistory.ReadObjectField) {
+                ExecutionHistory.ReadObjectField content = (ExecutionHistory.ReadObjectField) readContent;
+                HashSet<Object> fields = objectFieldFlags.get(content.getObjectId());
+                if (fields != null && fields.contains(content.getFieldName())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public Object getReturnedValueOrThrow(NodeIdentifier identifier) {
+        Time finishedTime = history.getFinishedTime(getExecutionContext(identifier));
+        assert finishedTime != null;
+        return history.getReturnedValueOrThrow(finishedTime);
     }
 
     public boolean didExecuted(NodeIdentifier nodeIdentifier) {

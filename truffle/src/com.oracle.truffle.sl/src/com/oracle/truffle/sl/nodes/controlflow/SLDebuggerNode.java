@@ -58,6 +58,11 @@ public class SLDebuggerNode extends SLStatementNode {
     }
 
     @Override
+    public void calcVoid(VirtualFrame frame) {
+        executeVoid(frame);
+    }
+
+    @Override
     public boolean hasTag(Class<? extends Tag> tag) {
         if (tag == DebuggerTags.AlwaysHalt.class) {
             return true;
