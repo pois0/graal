@@ -7,6 +7,9 @@ import com.oracle.truffle.api.instrumentation.ExecutionEventNodeFactory;
 import com.oracle.truffle.api.instrumentation.ObjectChangeEvent;
 import com.oracle.truffle.api.instrumentation.ObjectChangeListener;
 import com.oracle.truffle.api.instrumentation.StackListener;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.SLException;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 import java.util.ArrayDeque;
@@ -144,7 +147,9 @@ public final class ExecutionHistoryOperator {
         assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
     }
 
-    public boolean shouldRecalculate(NodeIdentifier identifier) {
+    public boolean shouldRecalculate(SLStatementNode node) {
+        if (node.hasNewNode()) return true;
+        final NodeIdentifier identifier = node.getNodeIdentifier();
         Iterator<ItemWithTime<ExecutionHistory.ReadContent>> iter = getReadContentIterator(identifier);
 
         while (iter.hasNext()) {
@@ -174,6 +179,56 @@ public final class ExecutionHistoryOperator {
         return history.getReturnedValueOrThrow(finishedTime);
     }
 
+    public Object calcGeneric(VirtualFrame frame, SLExpressionNode node) {
+        if (shouldRecalculate(node)) {
+            return node.calcGeneric(frame);
+        } else {
+            return getReturnedValueOrThrow(node.getNodeIdentifier());
+        }
+    }
+
+    public boolean calcBoolean(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
+        try {
+            if (shouldRecalculate(node)) {
+                return node.calcBoolean(frame);
+            } else {
+                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
+                if (obj instanceof Boolean) {
+                    return (boolean) obj;
+                } else {
+                    throw new UnexpectedResultException(obj);
+                }
+            }
+        } catch (UnexpectedResultException ex) {
+            throw SLException.typeError(currentNode, ex.getResult());
+        }
+    }
+
+    public long calcLong(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
+        try {
+            if (shouldRecalculate(node)) {
+                return node.calcLong(frame);
+            } else {
+                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
+                if (obj instanceof Long) {
+                    return (long) obj;
+                } else {
+                    throw new UnexpectedResultException(obj);
+                }
+            }
+        } catch (UnexpectedResultException ex) {
+            throw SLException.typeError(currentNode, ex.getResult());
+        }
+    }
+
+    public void calcVoid(VirtualFrame frame, SLStatementNode node) {
+        if (shouldRecalculate(node)) {
+            node.calcVoid(frame);
+        } else {
+            getReturnedValueOrThrow(node.getNodeIdentifier());
+        }
+    }
+
     public boolean didExecuted(NodeIdentifier nodeIdentifier) {
         return history.didExecuted(getExecutionContext(nodeIdentifier));
     }
@@ -186,11 +241,11 @@ public final class ExecutionHistoryOperator {
         return history.getUpdateOperations(getExecutionContext(identifier));
     }
 
-    public void startNewExecution() {
+    public void startNewExecution(NodeIdentifier identifier) {
         nextTimeState = NextTimeState.SUBDIVIDE;
     }
 
-    public void endNewExecution() {
+    public void endNewExecution(NodeIdentifier identifier) {
         nextTimeState = NextTimeState.NORMAL;
     }
 

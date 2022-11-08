@@ -90,7 +90,13 @@ public interface RepeatingNode extends NodeInterface {
      *         <code>false</code> if it must not.
      * @since 0.8 or earlier
      */
-    boolean executeRepeating(VirtualFrame frame);
+    default boolean executeRepeating(VirtualFrame frame) {
+        return false;
+    }
+
+    default boolean executeRepeating(VirtualFrame frame, int arg) {
+        return executeRepeating(frame);
+    }
 
     /**
      * Repeatedly invoked by a {@link LoopNode loop node} implementation, but allows returning a
@@ -103,7 +109,7 @@ public interface RepeatingNode extends NodeInterface {
      *         complete the loop and any other value if it must not.
      * @since 19.3
      */
-    default Object executeRepeatingWithValue(VirtualFrame frame) {
+    default Object executeRepeatingWithValue(VirtualFrame frame, int arg) {
         if (executeRepeating(frame)) {
             return CONTINUE_LOOP_STATUS;
         } else {

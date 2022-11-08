@@ -41,6 +41,8 @@
 package com.oracle.truffle.sl.nodes;
 
 import com.oracle.truffle.api.dsl.NodeChild;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.library.LibraryFactory;
 
 /**
  * Utility base class for operations that take two arguments (per convention called "left" and
@@ -50,6 +52,8 @@ import com.oracle.truffle.api.dsl.NodeChild;
 @NodeChild("leftNode")
 @NodeChild("rightNode")
 public abstract class SLBinaryNode extends SLExpressionNode {
+    protected static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY = LibraryFactory.resolve(InteropLibrary.class);
+
     protected abstract SLExpressionNode getLeftNode();
     protected abstract SLExpressionNode getRightNode();
 

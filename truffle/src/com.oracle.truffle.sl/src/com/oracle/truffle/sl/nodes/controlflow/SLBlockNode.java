@@ -57,11 +57,9 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.NodeUtil;
 import com.oracle.truffle.api.nodes.NodeVisitor;
 
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
-import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
@@ -117,7 +115,10 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     @Override
     public void calcVoid(VirtualFrame frame) {
         if (isNewNode()) {
+            final ExecutionHistoryOperator op = context.getHistoryOperator();
+            op.startNewExecution(getNodeIdentifier());
             executeVoid(frame);
+            op.endNewExecution(getNodeIdentifier());
             return;
         }
 
@@ -152,12 +153,7 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
             return;
         }
 
-        ExecutionHistoryOperator op = this.context.getHistoryOperator();
-        if (op.shouldRecalculate(node.getNodeIdentifier())) {
-            node.calcVoid(frame);
-        } else {
-            op.getReturnedValueOrThrow(node.getNodeIdentifier());
-        }
+        context.getHistoryOperator().calcVoid(frame, node);
     }
 
     @Override

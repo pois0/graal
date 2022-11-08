@@ -41,10 +41,15 @@
 package com.oracle.truffle.sl.builtins;
 
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Built-in function that queries if the foreign object is a null value. See
@@ -56,6 +61,32 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
     @Specialization(limit = "3")
     public boolean isExecutable(Object obj, @CachedLibrary("obj") InteropLibrary values) {
         return values.isNull(obj);
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        return calcBoolean(frame);
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeBoolean(frame);
+            } catch (UnexpectedResultException e) {
+                throw new RuntimeException(e);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final SLExpressionNode arg = getArguments()[0];
+        final Object o = op.calcGeneric(frame, arg);
+
+        return INTEROP_LIBRARY.getUncached(o).isNull(o);
     }
 
     @Override

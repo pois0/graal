@@ -50,6 +50,7 @@ import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.WriteVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.sl.SLLanguage;
@@ -57,6 +58,8 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Node to write a local variable to a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -151,6 +154,42 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     protected boolean isBooleanOrIllegal(VirtualFrame frame) {
         final FrameSlotKind kind = frame.getFrameDescriptor().getFrameSlotKind(getSlot());
         return kind == FrameSlotKind.Boolean || kind == FrameSlotKind.Illegal;
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeGeneric(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeBoolean(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
+    }
+
+    @Override
+    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeLong(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
     }
 
     @Override

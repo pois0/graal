@@ -45,6 +45,8 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.ConditionProfile;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Logical operations in SL use short circuit evaluation: if the evaluation of the left operand
@@ -91,6 +93,45 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
             throw SLException.typeError(this, leftValue, e.getResult());
         }
         return execute(leftValue, rightValue);
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        return calcBoolean(frame);
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            boolean result = executeBoolean(frame);
+            op.endNewExecution(identifier);
+            return result;
+        }
+
+        boolean leftValue = calcSubNode(left, frame);
+        boolean rightValue = isEvaluateRight(leftValue) && calcSubNode(right, frame);
+        return execute(leftValue, rightValue);
+    }
+
+    private boolean calcSubNode(SLExpressionNode node, VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        if (op.shouldRecalculate(node)) {
+            try {
+                return node.calcBoolean(frame);
+            } catch (UnexpectedResultException ex) {
+                throw SLException.typeError(this, ex.getResult());
+            }
+        } else {
+            final Object returnedCache = op.getReturnedValueOrThrow(node.getNodeIdentifier());
+            if (returnedCache instanceof Boolean) {
+                return (boolean) returnedCache;
+            } else {
+                throw SLException.typeError(this, returnedCache);
+            }
+        }
     }
 
     /**

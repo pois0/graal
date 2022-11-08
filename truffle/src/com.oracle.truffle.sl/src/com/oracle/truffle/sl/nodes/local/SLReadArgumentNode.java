@@ -48,6 +48,8 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.parser.SLNodeFactory;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Reads a function argument. Arguments are passed in as an object array.
@@ -87,6 +89,18 @@ public class SLReadArgumentNode extends SLExpressionNode {
             outOfBoundsTaken.enter();
             /* Use the default null value. */
             return SLNull.SINGLETON;
+        }
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeGeneric(frame);
+        } finally {
+            op.endNewExecution(identifier);
         }
     }
 

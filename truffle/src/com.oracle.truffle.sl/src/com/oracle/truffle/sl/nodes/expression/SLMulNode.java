@@ -43,12 +43,19 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+
+import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
 /**
  * This class is similar to the extensively documented {@link SLAddNode}.
@@ -65,6 +72,59 @@ public abstract class SLMulNode extends SLBinaryNode {
     @TruffleBoundary
     protected SLBigNumber mul(SLBigNumber left, SLBigNumber right) {
         return new SLBigNumber(left.getValue().multiply(right.getValue()));
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeGeneric(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final Object left = op.calcGeneric(frame, getLeftNode());
+        final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
+        final Object right = op.calcGeneric(frame, getRightNode());
+        final InteropLibrary rightInterop = INTEROP_LIBRARY.getUncached(right);
+
+        try {
+            if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+                return mul(leftInterop.asLong(left), rightInterop.asLong(right));
+            } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
+                return mul((SLBigNumber) left, (SLBigNumber) right);
+            } else {
+                return 0;
+            }
+        } catch (UnsupportedMessageException e) {
+            throw shouldNotReachHere(e);
+        }
+    }
+
+    @Override
+    public long calcLong(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeLong(frame);
+            } catch (UnexpectedResultException ex) {
+                throw SLException.typeError(this, ex.getResult());
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final long left = op.calcLong(frame, this, getLeftNode());
+        final long right = op.calcLong(frame, this, getRightNode());
+        return mul(left, right);
     }
 
     @Fallback

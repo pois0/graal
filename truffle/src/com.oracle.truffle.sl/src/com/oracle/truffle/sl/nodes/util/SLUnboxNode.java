@@ -45,6 +45,7 @@ import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.dsl.TypeSystemReference;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
@@ -54,6 +55,8 @@ import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The node to normalize any value to an SL value. This is useful to reduce the number of values
@@ -111,6 +114,19 @@ public abstract class SLUnboxNode extends SLExpressionNode {
             }
         } catch (UnsupportedMessageException e) {
             throw shouldNotReachHere(e);
+        }
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        op.startNewExecution(identifier);
+        try {
+            return executeGeneric(frame);
+        } finally {
+            op.endNewExecution(identifier);
         }
     }
 

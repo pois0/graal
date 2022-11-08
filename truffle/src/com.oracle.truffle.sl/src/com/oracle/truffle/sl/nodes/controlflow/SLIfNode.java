@@ -49,6 +49,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 @NodeInfo(shortName = "if", description = "The node implementing a condional statement")
 public final class SLIfNode extends SLStatementNode {
@@ -100,13 +101,34 @@ public final class SLIfNode extends SLStatementNode {
 
     @Override
     public void calcVoid(VirtualFrame frame) {
+        ExecutionHistoryOperator op = context.getHistoryOperator();
         if (isNewNode()) {
+            op.startNewExecution(getNodeIdentifier());
             executeVoid(frame);
+            op.endNewExecution(getNodeIdentifier());
             return;
         }
 
-        ExecutionHistoryOperator op = context.getHistoryOperator();
-        if (op.shouldRecalculate(()))
+        final SLExpressionNode conditionNode = this.conditionNode;
+        boolean cond;
+        if (op.shouldRecalculate(conditionNode)) {
+            cond = calculateCondition(frame);
+        } else {
+            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier());
+            if (returnedCache instanceof Boolean) {
+                cond = (boolean) returnedCache;
+            } else {
+                throw SLException.typeError(this, returnedCache);
+            }
+        }
+
+        if (condition.profile(cond)) {
+            op.calcVoid(frame, thenPartNode);
+        } else {
+            if (elsePartNode != null) {
+                op.calcVoid(frame, elsePartNode);
+            }
+        }
     }
 
     @Override
@@ -135,6 +157,14 @@ public final class SLIfNode extends SLStatementNode {
              * The condition evaluated to a non-boolean result. This is a type error in the SL
              * program.
              */
+            throw SLException.typeError(this, ex.getResult());
+        }
+    }
+
+    private boolean calculateCondition(VirtualFrame frame) {
+        try {
+            return conditionNode.calcBoolean(frame);
+        } catch (UnexpectedResultException ex) {
             throw SLException.typeError(this, ex.getResult());
         }
     }

@@ -44,6 +44,8 @@ import com.oracle.truffle.api.dsl.GenerateNodeFactory;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.UnsupportedSpecializationException;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
@@ -62,6 +64,7 @@ import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 @NodeChild(value = "arguments", type = SLExpressionNode[].class)
 @GenerateNodeFactory
 public abstract class SLBuiltinNode extends SLExpressionNode {
+    protected static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY = LibraryFactory.resolve(InteropLibrary.class);
 
     protected abstract SLExpressionNode[] getArguments();
 
@@ -82,6 +85,11 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
     @Override
     public final long executeLong(VirtualFrame frame) throws UnexpectedResultException {
         return super.executeLong(frame);
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        return executeGeneric(frame); // TODO
     }
 
     @Override

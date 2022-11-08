@@ -44,16 +44,22 @@ import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
+import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The {@code ==} operator of SL is defined on all types. Therefore, we need a
@@ -152,6 +158,32 @@ public abstract class SLEqualNode extends SLBinaryNode {
             // this case must not happen as we always check interop types before converting
             throw shouldNotReachHere(e);
         }
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        return calcBoolean(frame);
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeBoolean(frame);
+            } catch (UnexpectedResultException ex) {
+                throw SLException.typeError(this, ex.getResult());
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final Object left = op.calcGeneric(frame, getLeftNode());
+        final Object right = op.calcGeneric(frame, getRightNode());
+        return doGeneric(left, right, INTEROP_LIBRARY.getUncached(left), INTEROP_LIBRARY.getUncached(right));
     }
 
     @Override

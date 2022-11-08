@@ -47,11 +47,13 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RepeatingNode;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.BranchProfile;
+import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -123,6 +125,48 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
         return result;
     }
 
+    @Override
+    public boolean executeRepeating(VirtualFrame frame, int arg) {
+        if (arg == SLWhileNode.EXECUTE) {
+            executeRepeating(frame);
+        }
+
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        boolean cond;
+        if (op.shouldRecalculate(conditionNode)) {
+            cond = calculateCondition(frame);
+        } else {
+            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier());
+            if (returnedCache instanceof Boolean) {
+                cond = (boolean) returnedCache;
+            } else {
+                throw SLException.typeError(this, returnedCache);
+            }
+        }
+
+        boolean result;
+        if (cond) {
+            result = false;
+        } else {
+            try {
+                op.calcVoid(frame, bodyNode);
+                result = true;
+            } catch (SLContinueException ex) {
+                continueTaken.enter();
+                result = true;
+            } catch (SLBreakException ex) {
+                breakTaken.enter();
+                result = false;
+            }
+        }
+
+        if (result) {
+            op.onGotoNextIteration(parentIdentifier);
+        }
+
+        return result;
+    }
+
     private boolean evaluateCondition(VirtualFrame frame) {
         try {
             /*
@@ -137,6 +181,14 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
              * report type errors.
              */
             throw new UnsupportedSpecializationException(this, new Node[]{conditionNode}, ex.getResult());
+        }
+    }
+
+    private boolean calculateCondition(VirtualFrame frame) {
+        try {
+            return conditionNode.calcBoolean(frame);
+        } catch (UnexpectedResultException ex) {
+            throw SLException.typeError(this, ex.getResult());
         }
     }
 

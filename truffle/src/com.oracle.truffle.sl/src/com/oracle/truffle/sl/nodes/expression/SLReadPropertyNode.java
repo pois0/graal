@@ -43,11 +43,13 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.InvalidArrayIndexException;
 import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
+import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
@@ -55,6 +57,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * The node for reading a property of an object. When executed, this node:
@@ -68,6 +71,7 @@ import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 @NodeChild("receiverNode")
 @NodeChild("nameNode")
 public abstract class SLReadPropertyNode extends SLExpressionNode {
+    private static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY = LibraryFactory.resolve(InteropLibrary.class);
 
     static final int LIBRARY_LIMIT = 3;
 
@@ -102,6 +106,15 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, name);
         }
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        if (isNewNode()) {
+            // TODO
+        }
+        return null;
     }
 
     @Override

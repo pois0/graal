@@ -48,11 +48,12 @@ import com.oracle.truffle.api.frame.FrameUtil;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.ReadVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
-import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
-import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Node to read a local variable from a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -119,6 +120,42 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
         Object result = FrameUtil.getObjectSafe(frame, getSlot());
         notifyVariableRead();
         return result;
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeGeneric(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
+    }
+
+    @Override
+    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeLong(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        try {
+            return executeBoolean(frame);
+        } finally {
+            op.endNewExecution(identifier);
+        }
     }
 
     @Override

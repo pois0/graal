@@ -48,9 +48,13 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 @NodeInfo(shortName = "while", description = "The node implementing a while loop")
 public final class SLWhileNode extends SLStatementNode {
+    static final int EXECUTE = 0;
+    static final int CALC = 1;
 
     @SuppressWarnings("FieldMayBeFinal")
     @Child private LoopNode loopNode;
@@ -61,12 +65,33 @@ public final class SLWhileNode extends SLStatementNode {
 
     @Override
     public void executeVoid(VirtualFrame frame) {
-        context.getHistoryOperator().onEnterLoop(getNodeIdentifier());
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        op.onEnterLoop(getNodeIdentifier());
         try {
-            loopNode.execute(frame);
+            loopNode.execute(frame, EXECUTE);
         } finally {
-            context.getHistoryOperator().onExitLoop(getNodeIdentifier());
+            op.onExitLoop(getNodeIdentifier());
         }
+    }
+
+    @Override
+    public void calcVoid(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            executeVoid(frame);
+            op.endNewExecution(identifier);
+            return;
+        }
+
+        op.onEnterLoop(identifier);
+        try {
+            loopNode.execute(frame, CALC);
+        } finally {
+            op.onExitLoop(identifier);
+        }
+
     }
 
     @Override

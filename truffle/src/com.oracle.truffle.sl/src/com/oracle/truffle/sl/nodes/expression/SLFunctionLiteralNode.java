@@ -102,6 +102,12 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
     }
 
     @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        // TODO
+        return null;
+    }
+
+    @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLFunctionLiteralNode)) return false;
         SLFunctionLiteralNode thatFunc = (SLFunctionLiteralNode) that;

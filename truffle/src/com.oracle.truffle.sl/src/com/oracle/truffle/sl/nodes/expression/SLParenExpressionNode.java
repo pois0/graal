@@ -45,6 +45,8 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * A {@link SLExpressionNode} that represents a parenthesized expression; it simply returns the
@@ -76,6 +78,56 @@ public class SLParenExpressionNode extends SLExpressionNode {
         return expression.executeBoolean(frame);
     }
 
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return expression.calcGeneric(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        return op.calcGeneric(frame, expression);
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return expression.calcBoolean(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        return op.calcBoolean(frame, this, expression);
+    }
+
+    @Override
+    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return expression.calcLong(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        return op.calcLong(frame, this, expression);
+    }
     @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLParenExpressionNode)) return false;

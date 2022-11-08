@@ -45,6 +45,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * Implementation of the SL return statement. We need to unwind an unknown number of interpreter
@@ -71,6 +72,24 @@ public final class SLReturnNode extends SLStatementNode {
             /*
              * Return statement that was not followed by an expression, so return the SL null value.
              */
+            result = SLNull.SINGLETON;
+        }
+        throw new SLReturnException(result);
+    }
+
+    @Override
+    public void calcVoid(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        if (isNewNode()) {
+            op.startNewExecution(getNodeIdentifier());
+            executeVoid(frame);
+            op.endNewExecution(getNodeIdentifier());
+        }
+
+        Object result;
+        if (valueNode != null) {
+            result = op.calcGeneric(frame, valueNode);
+        } else {
             result = SLNull.SINGLETON;
         }
         throw new SLReturnException(result);

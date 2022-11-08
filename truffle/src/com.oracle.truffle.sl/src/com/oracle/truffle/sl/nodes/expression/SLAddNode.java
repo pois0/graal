@@ -44,13 +44,21 @@ import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.ImplicitCast;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+
+import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
 /**
  * SL node that performs the "+" operation, which performs addition on arbitrary precision numbers,
@@ -115,6 +123,61 @@ public abstract class SLAddNode extends SLBinaryNode {
     @TruffleBoundary
     protected String add(Object left, Object right) {
         return left.toString() + right.toString();
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeGeneric(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final Object left = op.calcGeneric(frame, getLeftNode());
+        final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
+        final Object right = op.calcGeneric(frame, getRightNode());
+        final InteropLibrary rightInterop = INTEROP_LIBRARY.getUncached(right);
+
+        try {
+            if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+                return add(leftInterop.asLong(left), rightInterop.asLong(right));
+            } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
+                return add((SLBigNumber) left, (SLBigNumber) right);
+            } else if (leftInterop.isString(left) && leftInterop.isString(right)) {
+                return add(leftInterop.asString(left), rightInterop.asString(right));
+            } else {
+                return 0;
+            }
+        } catch (UnsupportedMessageException e) {
+            throw shouldNotReachHere(e);
+        }
+    }
+
+    @Override
+    public long calcLong(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeLong(frame);
+            } catch (UnexpectedResultException ex) {
+                throw SLException.typeError(this, ex.getResult());
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final long left = op.calcLong(frame, this, getLeftNode());
+        final long right = op.calcLong(frame, this, getRightNode());
+        return add(left, right);
     }
 
     /**

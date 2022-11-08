@@ -43,12 +43,16 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * This class is similar to the extensively documented {@link SLAddNode}. The only difference: the
@@ -66,6 +70,38 @@ public abstract class SLLessThanNode extends SLBinaryNode {
     @TruffleBoundary
     protected boolean lessThan(SLBigNumber left, SLBigNumber right) {
         return left.compareTo(right) < 0;
+    }
+
+    @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        return calcBoolean(frame);
+    }
+
+    @Override
+    public boolean calcBoolean(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                return executeBoolean(frame);
+            } catch (UnexpectedResultException ex) {
+                throw SLException.typeError(this, ex.getResult());
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        final Object left = op.calcGeneric(frame, getLeftNode());
+        final Object right = op.calcGeneric(frame, getRightNode());
+        if (left instanceof Long && right instanceof Long) {
+            return lessThan((long) left, (long) right);
+        } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
+            return lessThan((SLBigNumber) left, (SLBigNumber) right);
+        } else {
+            return (boolean) typeError(left, right);
+        }
     }
 
     @Fallback

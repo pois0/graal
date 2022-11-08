@@ -109,6 +109,12 @@ public final class SLInvokeNode extends SLExpressionNode {
     }
 
     @Override
+    public Object calcGeneric(VirtualFrame frame) {
+        // TODO
+        return null;
+    }
+
+    @Override
     public boolean hasTag(Class<? extends Tag> tag) {
         if (tag == StandardTags.CallTag.class) {
             return true;

@@ -164,6 +164,10 @@ public abstract class LoopNode extends Node {
         throw new AbstractMethodError("This method must be overridden in concrete subclasses.");
     }
 
+    public Object execute(VirtualFrame frame, int arg) {
+        return execute(frame);
+    }
+
     /**
      * Returns the repeating node the loop node was created with.
      *

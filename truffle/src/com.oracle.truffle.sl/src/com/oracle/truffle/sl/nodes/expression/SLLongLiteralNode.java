@@ -45,6 +45,8 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Constant literal for a primitive {@code long} value. The unboxed value can be returned when the
@@ -66,7 +68,25 @@ public final class SLLongLiteralNode extends SLLiteralNode {
     }
 
     @Override
+    public long calcLong(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        op.endNewExecution(identifier);
+        return value;
+    }
+
+    @Override
     public Object executeGeneric(VirtualFrame frame) {
+        return value;
+    }
+
+    @Override
+    public Long calcGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        op.startNewExecution(identifier);
+        op.endNewExecution(identifier);
         return value;
     }
 
