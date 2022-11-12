@@ -20,6 +20,7 @@ import java.util.Iterator;
 
 public final class ExecutionHistoryOperator {
     private Time currentTime = Time.zero();
+    private Time nextCalcTime;
     private final ExecutionHistory history;
     private final ArrayDeque<HashSet<Object>> localVarFlagStack = new ArrayDeque<>();
     private final HashMap<Integer, HashSet<Object>> objectFieldFlags = new HashMap<>();
@@ -28,7 +29,6 @@ public final class ExecutionHistoryOperator {
 
     private CallContextElement[] callContextCache = null;
     private HashSet<Object> localVarFlagCache = null;
-    private NextTimeState nextTimeState;
 
     private final ObjectChangeListener objectChangeListener = new ObjectChangeListener() {
         @Override
@@ -242,27 +242,20 @@ public final class ExecutionHistoryOperator {
     }
 
     public void startNewExecution(NodeIdentifier identifier) {
-        nextTimeState = NextTimeState.SUBDIVIDE;
+        final ExecutionContext execCtx = getExecutionContext(identifier);
+        final ExecutionHistory.TimePair tp = history.getTime(execCtx);
+        final Time nextCalcTime = history.nextTime(tp.getEnd());
+        this.nextCalcTime = nextCalcTime;
+        history.deleteRecords(tp.getStart(), nextCalcTime);
+        currentTime = currentTime.subdivide();
     }
 
     public void endNewExecution(NodeIdentifier identifier) {
-        nextTimeState = NextTimeState.NORMAL;
+        currentTime = nextCalcTime;
     }
 
     private Time getAndIncrementTime() {
-        Time currentTime = this.currentTime;
-
-        switch (nextTimeState) {
-            case SUBDIVIDE:
-                this.currentTime = currentTime.subdivide();
-                nextTimeState = NextTimeState.NORMAL;
-                break;
-            case NORMAL:
-                this.currentTime = currentTime.inc();
-                break;
-        }
-
-        return currentTime;
+        return currentTime = currentTime.inc();
     }
 
     private ExecutionContext getExecutionContext(NodeIdentifier identifier) {
@@ -322,9 +315,5 @@ public final class ExecutionHistoryOperator {
                 history.onReturnExceptional(startTime, getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
             }
         }
-    }
-
-    private enum NextTimeState {
-        NORMAL, SUBDIVIDE
     }
 }

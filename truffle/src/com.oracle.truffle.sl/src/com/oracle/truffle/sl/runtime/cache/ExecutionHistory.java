@@ -98,6 +98,14 @@ public final class ExecutionHistory {
         return getUpdateOperations(timePair.start, timePair.end);
     }
 
+    public TimePair getTime(ExecutionContext ctx) {
+        return contextToTime.get(ctx);
+    }
+
+    /**
+     * @param startTime inclusive
+     * @param endTime exclusive
+     */
     public void deleteRecords(Time startTime, Time endTime) {
         ItemWithTime.subList(readMap, startTime, endTime).clear();
         List<ItemWithTime<UpdateContent>> updates = ItemWithTime.subList(objectUpdateList, startTime, endTime);
@@ -119,6 +127,19 @@ public final class ExecutionHistory {
         }
         updates.clear();
         ItemWithTime.subList(returnedValueOrException, startTime, endTime).clear();
+    }
+
+    public Time nextTime(Time baseTime) {
+        final int check = ItemWithTime.binarySearch(timeToContext, baseTime);
+        if (check == timeToContext.size()) return null;
+
+        final ItemWithTime<ExecutionContext> cand = timeToContext.get(check);
+        if (cand.getTime().equals(baseTime)) {
+            if (check + 1 == timeToContext.size()) return null;
+            return timeToContext.get(check + 1).getTime();
+        } else {
+            return cand.getTime();
+        }
     }
 
     private static Object replaceReference(Object value) {

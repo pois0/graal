@@ -59,6 +59,8 @@ import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.parser.SimpleLanguageParser;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The node for writing a property of an object. When executed, this node:
@@ -117,8 +119,18 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
 
     @Override
     public Object calcGeneric(VirtualFrame frame) {
-        // TODO
-        return null;
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        if (isNewNode()) {
+            op.startNewExecution(identifier);
+            try {
+                executeGeneric(frame);
+            } finally {
+                op.endNewExecution(identifier);
+            }
+        }
+
+        return executeGeneric(frame);
     }
 
     @Override
