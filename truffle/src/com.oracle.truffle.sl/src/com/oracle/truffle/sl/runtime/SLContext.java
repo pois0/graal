@@ -54,6 +54,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.TruffleLanguage.Env;
 import com.oracle.truffle.api.dsl.NodeFactory;
 import com.oracle.truffle.api.instrumentation.AllocationReporter;
+import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
 import com.oracle.truffle.api.instrumentation.ObjectTracker;
 import com.oracle.truffle.api.instrumentation.StackTracker;
 import com.oracle.truffle.api.interop.TruffleObject;
@@ -107,15 +108,17 @@ public final class SLContext {
         this.input = new BufferedReader(new InputStreamReader(env.in()));
         this.output = new PrintWriter(env.out(), true);
         this.language = language;
-        this.allocationReporter = env.lookup(AllocationReporter.class);
+        AllocationReporter allocationReporter = env.lookup(AllocationReporter.class);
+        this.allocationReporter = allocationReporter;
         this.functionRegistry = new SLFunctionRegistry(language);
         ObjectTracker objTracker = env.lookup(ObjectTracker.class);
         objTracker = this.objectTracker = objTracker == null ? new ObjectTracker(null) : objTracker;
         StackTracker stackTracker = env.lookup(StackTracker.class);
         stackTracker = this.stackTracker = stackTracker == null ? new StackTracker(null) : stackTracker;
-        ExecutionHistoryOperator op = this.historyOperator = new ExecutionHistoryOperator(new ExecutionHistory());
+        ExecutionHistoryOperator op = this.historyOperator = new ExecutionHistoryOperator(language, allocationReporter, new ExecutionHistory());
         objTracker.addListener(op.getObjectChangeListener());
         stackTracker.addListener(op.getStackListener());
+        InstrumentationHandler.staticFactory = op.getTickFactory();
 
         installBuiltins();
         for (NodeFactory<? extends SLBuiltinNode> builtin : externalBuiltins) {

@@ -56,6 +56,9 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The node for function invocation in SL. Since SL has first class functions, the {@link SLFunction
@@ -71,7 +74,6 @@ public final class SLInvokeNode extends SLExpressionNode {
     @Child private SLExpressionNode functionNode;
     @Children private final SLExpressionNode[] argumentNodes;
     @Child private InteropLibrary library;
-    private final SLContext ctx = SLLanguage.getCurrentContext();
 
     public SLInvokeNode(SLExpressionNode functionNode, SLExpressionNode[] argumentNodes) {
         this.functionNode = functionNode;
@@ -92,26 +94,58 @@ public final class SLInvokeNode extends SLExpressionNode {
          */
         CompilerAsserts.compilationConstant(argumentNodes.length);
 
-        Object[] argumentValues = new Object[argumentNodes.length];
+        final int argumentLength = argumentNodes.length;
+        Object[] argumentValues = new Object[argumentLength + 1];
+        argumentValues[argumentLength] = FunctionCallSpecialParameter.EXEC;
         for (int i = 0; i < argumentNodes.length; i++) {
             argumentValues[i] = argumentNodes[i].executeGeneric(frame);
         }
 
         try {
-            ctx.getHistoryOperator().onEnterFunction(getNodeIdentifier());
+            context.getHistoryOperator().onEnterFunction(getNodeIdentifier());
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, function);
         } finally {
-            ctx.getHistoryOperator().onExitFunction(getNodeIdentifier());
+            context.getHistoryOperator().onExitFunction(getNodeIdentifier());
         }
     }
 
+    @ExplodeLoop
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        // TODO
-        return null;
+    public Object calcGenericInner(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        if (isNewNode()) {
+            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
+        }
+        final Object function = op.calcGeneric(frame, functionNode);
+
+        /*
+         * The number of arguments is constant for one invoke node. During compilation, the loop is
+         * unrolled and the execute methods of all arguments are inlined. This is triggered by the
+         * ExplodeLoop annotation on the method. The compiler assertion below illustrates that the
+         * array length is really constant.
+         */
+        CompilerAsserts.compilationConstant(argumentNodes.length);
+
+        final int argumentLength = argumentNodes.length;
+        Object[] argumentValues = new Object[argumentLength + 1];
+        argumentValues[argumentLength] = FunctionCallSpecialParameter.CALC;
+        for (int i = 0; i < argumentNodes.length; i++) {
+            argumentValues[i] = argumentNodes[i].calcGeneric(frame);
+        }
+
+        try {
+            context.getHistoryOperator().onEnterFunction(identifier);
+            return library.execute(function, argumentValues);
+        } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
+            /* Execute was not successful. */
+            throw SLUndefinedNameException.undefinedFunction(this, function);
+        } finally {
+            context.getHistoryOperator().onExitFunction(identifier);
+        }
     }
 
     @Override

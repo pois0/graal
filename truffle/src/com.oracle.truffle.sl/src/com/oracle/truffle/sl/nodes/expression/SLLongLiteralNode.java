@@ -43,7 +43,6 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
@@ -68,12 +67,12 @@ public final class SLLongLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public long calcLong(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
-        op.endNewExecution(identifier);
-        return value;
+    public long calcLongInner(VirtualFrame frame) {
+        try {
+            return context.getHistoryOperator().newExecutionLong(getNodeIdentifier(), frame, (it) -> value);
+        } catch (UnexpectedResultException e) {
+            throw new RuntimeException("Never reach here");
+        }
     }
 
     @Override
@@ -82,12 +81,8 @@ public final class SLLongLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public Long calcGeneric(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
-        op.endNewExecution(identifier);
-        return value;
+    public Long calcGenericInner(VirtualFrame frame) {
+        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
     }
 
     @Override

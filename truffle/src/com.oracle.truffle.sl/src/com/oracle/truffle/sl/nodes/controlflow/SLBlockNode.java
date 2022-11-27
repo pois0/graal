@@ -60,7 +60,6 @@ import com.oracle.truffle.api.nodes.NodeVisitor;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * A statement node that just executes a list of other statements.
@@ -113,16 +112,12 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     }
 
     @Override
-    public void calcVoid(VirtualFrame frame) {
+    public void calcVoidInner(VirtualFrame frame) {
         if (isNewNode()) {
-            final ExecutionHistoryOperator op = context.getHistoryOperator();
-            op.startNewExecution(getNodeIdentifier());
-            executeVoid(frame);
-            op.endNewExecution(getNodeIdentifier());
-            return;
+            context.getHistoryOperator().newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
+        } else {
+            this.block.executeVoid(frame, 1);
         }
-
-        this.block.executeVoid(frame, 1);
     }
 
     public List<SLStatementNode> getStatements() {

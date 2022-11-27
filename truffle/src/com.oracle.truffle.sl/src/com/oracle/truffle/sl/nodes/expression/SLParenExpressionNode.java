@@ -79,51 +79,36 @@ public class SLParenExpressionNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            try {
-                return expression.calcGeneric(frame);
-            } finally {
-                op.endNewExecution(identifier);
-            }
+            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
         }
 
         return op.calcGeneric(frame, expression);
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            try {
-                return expression.calcBoolean(frame);
-            } finally {
-                op.endNewExecution(identifier);
-            }
+            return op.newExecutionBoolean(identifier, frame, this::executeBoolean);
         }
 
         return op.calcBoolean(frame, this, expression);
     }
 
     @Override
-    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            try {
-                return expression.calcLong(frame);
-            } finally {
-                op.endNewExecution(identifier);
-            }
+            return op.newExecutionLong(identifier, frame, this::executeLong);
         }
 
         return op.calcLong(frame, this, expression);

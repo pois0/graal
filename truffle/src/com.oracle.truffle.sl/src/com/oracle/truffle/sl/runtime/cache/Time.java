@@ -27,6 +27,11 @@ public class Time implements Comparable<Time>{
         return new Time(newRaw);
     }
 
+    public Time carryAllAndInc() {
+        int[] raw = this.raw;
+        return new Time(new int[]{raw[0] + 1});
+    }
+
     public Time subdivide() {
         int[] thisRaw = this.raw;
         return new Time(Arrays.copyOf(thisRaw, thisRaw.length + 1));
@@ -60,5 +65,12 @@ public class Time implements Comparable<Time>{
     public int hashCode() {
         if (raw.length == 0) return 0;
         return Arrays.hashCode(raw);
+    }
+
+    @Override
+    public String toString() {
+        return "Time{" +
+                "raw=" + Arrays.toString(raw) +
+                '}';
     }
 }

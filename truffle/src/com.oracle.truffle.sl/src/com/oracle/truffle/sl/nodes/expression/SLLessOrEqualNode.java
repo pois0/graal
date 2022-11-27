@@ -50,11 +50,9 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
@@ -76,24 +74,27 @@ public abstract class SLLessOrEqualNode extends SLBinaryNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        return calcBoolean(frame);
+    public Object calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame);
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) {
+    public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
             try {
-                return executeBoolean(frame);
-            } catch (UnexpectedResultException ex) {
-                throw SLException.typeError(this, ex.getResult());
-            } finally {
-                op.endNewExecution(identifier);
+                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
+                    try {
+                        return executeBoolean(f);
+                    } catch (UnexpectedResultException ex) {
+                        throw SLException.typeError(this, ex.getResult());
+                    }
+                });
+            } catch (UnexpectedResultException e) {
+                throw new RuntimeException("Never reach here");
             }
+
         }
 
         final Object left = op.calcGeneric(frame, getLeftNode());

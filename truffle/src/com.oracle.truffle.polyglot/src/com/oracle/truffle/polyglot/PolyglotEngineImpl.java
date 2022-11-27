@@ -68,6 +68,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -731,6 +732,21 @@ final class PolyglotEngineImpl extends AbstractPolyglotImpl.AbstractEngineImpl i
             instruments.put(id, instrumentImpl);
             infos.put(id, instrumentImpl.info);
         }
+//        {
+//            InstrumentCache instrumentCache = new InstrumentCache("test", "test", "1", false, new TreeSet<>(), new );
+//            PolyglotInstrument instrumentImpl = new PolyglotInstrument(this, instrumentCache);
+//            instrumentImpl.info = LANGUAGE.createInstrument(instrumentImpl, instrumentCache.getId(), instrumentCache.getName(), instrumentCache.getVersion());
+//            Instrument instrument = impl.getAPIAccess().newInstrument(instrumentImpl);
+//            instrumentImpl.api = instrument;
+//
+//            String id = instrumentImpl.cache.getId();
+//            verifyId(id, instrumentCache.getClassName());
+//            if (instruments.containsKey(id)) {
+//                throw failDuplicateId(id, instrumentImpl.cache.getClassName(), instruments.get(id).cache.getClassName());
+//            }
+//            instruments.put(id, instrumentImpl);
+//            infos.put(id, instrumentImpl.info);
+//        }
         return instruments;
     }
 

@@ -59,6 +59,7 @@ import com.oracle.truffle.sl.nodes.controlflow.SLBlockNode;
 import com.oracle.truffle.sl.nodes.controlflow.SLFunctionBodyNode;
 import com.oracle.truffle.sl.nodes.local.SLReadArgumentNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
+import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
  * The root of all SL execution trees. It is a Truffle requirement that the tree root extends the
@@ -95,7 +96,13 @@ public class SLRootNode extends RootNode {
     @Override
     public Object execute(VirtualFrame frame) {
         assert lookupContextReference(SLLanguage.class).get() != null;
-        return bodyNode.executeGeneric(frame);
+        final Object[] arguments = frame.getArguments();
+        if (arguments.length == 0 || arguments[arguments.length - 1] == FunctionCallSpecialParameter.EXEC) {
+            return bodyNode.executeGeneric(frame);
+        } else {
+            // return bodyNode.calcGeneric(frame);
+            return bodyNode.executeGeneric(frame);
+        }
     }
 
     public SLExpressionNode getBodyNode() {
@@ -160,5 +167,4 @@ public class SLRootNode extends RootNode {
         });
         return writeArgNodes.toArray(new SLWriteLocalVariableNode[writeArgNodes.size()]);
     }
-
 }

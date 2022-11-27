@@ -77,6 +77,7 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
 
     private boolean isNewNode = false;
     private int hasNewNodeState = -1;
+    private NodeIdentifier identifier = null;
 
     protected final SLContext context = SLLanguage.getCurrentContext();
 
@@ -173,7 +174,12 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
      */
     public abstract void executeVoid(VirtualFrame frame);
 
-    public abstract void calcVoid(VirtualFrame frame);
+    public abstract void calcVoidInner(VirtualFrame frame);
+
+    public void calcVoid(VirtualFrame frame) {
+        calcVoidInner(frame);
+        context.getHistoryOperator().finishCalc(getNodeIdentifier());
+    }
 
     /**
      * Marks this node as being a {@link StandardTags.StatementTag} for instrumentation purposes.
@@ -226,7 +232,11 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public abstract boolean isEqualNode(SLStatementNode that);
 
     public NodeIdentifier getNodeIdentifier() {
-        return new NodeIdentifier(); // TODO
+        return identifier;
+    }
+
+    public void setIdentifier(NodeIdentifier identifier) {
+        this.identifier = identifier;
     }
 
     public final boolean isNewNode() {

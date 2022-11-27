@@ -65,12 +65,8 @@ public final class SLStringLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public String calcGeneric(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
-        op.endNewExecution(identifier);
-        return value;
+    public String calcGenericInner(VirtualFrame frame) {
+        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
     }
 
     @Override

@@ -75,13 +75,11 @@ public final class SLWhileNode extends SLStatementNode {
     }
 
     @Override
-    public void calcVoid(VirtualFrame frame) {
+    public void calcVoidInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            executeVoid(frame);
-            op.endNewExecution(identifier);
+            op.newExecutionVoid(identifier, frame, this::executeVoid);
             return;
         }
 

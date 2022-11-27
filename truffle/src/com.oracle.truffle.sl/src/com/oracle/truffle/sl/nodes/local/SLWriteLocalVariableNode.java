@@ -157,10 +157,10 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
+        op.startNewExecution(frame, identifier);
         try {
             return executeGeneric(frame);
         } finally {
@@ -169,10 +169,10 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
+    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
+        op.startNewExecution(frame, identifier);
         try {
             return executeBoolean(frame);
         } finally {
@@ -181,10 +181,10 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
-    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
+    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
+        op.startNewExecution(frame, identifier);
         try {
             return executeLong(frame);
         } finally {

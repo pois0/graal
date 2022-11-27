@@ -118,16 +118,8 @@ public abstract class SLUnboxNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-
-        op.startNewExecution(identifier);
-        try {
-            return executeGeneric(frame);
-        } finally {
-            op.endNewExecution(identifier);
-        }
+    public Object calcGenericInner(VirtualFrame frame) {
+        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
     }
 
     @Override

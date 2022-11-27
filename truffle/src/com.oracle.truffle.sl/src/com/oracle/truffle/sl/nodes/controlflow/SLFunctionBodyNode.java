@@ -47,6 +47,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
  * The body of a user-defined SL function. This is the node referenced by a {@link SLRootNode} for
@@ -76,6 +77,27 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
+        final Object[] args = frame.getArguments();
+        if (args.length == 0) {
+            throw new RuntimeException("No argument");
+        }
+
+        final Object arg = args[args.length - 1];
+        if (!(arg instanceof FunctionCallSpecialParameter)) {
+            throw new RuntimeException("The last argument is not a instance of FunctionCallSpecialParameter");
+        }
+
+        if (arg == FunctionCallSpecialParameter.EXEC) {
+            return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
+        } else {
+            assert arg == FunctionCallSpecialParameter.CALC;
+
+            // return calcGeneric(frame);
+            return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
+        }
+    }
+
+    public Object executeGenericInner(VirtualFrame frame) {
         try {
             /* Execute the function body. */
             bodyNode.executeVoid(frame);
@@ -100,20 +122,8 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        if (isNewNode()) {
-            return executeGeneric(frame);
-        }
-
-        try {
-            bodyNode.calcVoid(frame);
-        } catch (SLReturnException ex) {
-            exceptionTaken.enter();
-            return ex.getResult();
-        }
-
-        nullTaken.enter();
-        return SLNull.SINGLETON;
+    public Object calcGenericInner(VirtualFrame frame) {
+        throw new RuntimeException("Never called this method");
     }
 
     @Override

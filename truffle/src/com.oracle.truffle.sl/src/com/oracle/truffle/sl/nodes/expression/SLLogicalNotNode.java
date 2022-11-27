@@ -50,7 +50,6 @@ import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Example of a simple unary node that uses type specialization. See {@link SLAddNode} for
@@ -68,23 +67,25 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        return calcBoolean(frame);
+    public Object calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame);
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) {
+    public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
             try {
-                return executeBoolean(frame);
+                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
+                    try {
+                        return executeBoolean(f);
+                    } catch (UnexpectedResultException ex) {
+                        throw SLException.typeError(this, ex.getResult());
+                    }
+                });
             } catch (UnexpectedResultException e) {
-                return (boolean) typeError(e.getResult());
-            } finally {
-                op.endNewExecution(identifier);
+                throw new RuntimeException("Never reach here");
             }
         }
 

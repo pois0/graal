@@ -75,17 +75,17 @@ public abstract class SLMulNode extends SLBinaryNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            try {
-                return executeGeneric(frame);
-            } finally {
-                op.endNewExecution(identifier);
-            }
+            return op.newExecutionGeneric(getNodeIdentifier(), frame, f -> {
+                try {
+                    return executeBoolean(f);
+                } catch (UnexpectedResultException ex) {
+                    throw SLException.typeError(this, ex.getResult());
+                }
+            });
         }
 
         final Object left = op.calcGeneric(frame, getLeftNode());
@@ -107,18 +107,21 @@ public abstract class SLMulNode extends SLBinaryNode {
     }
 
     @Override
-    public long calcLong(VirtualFrame frame) {
+    public long calcLongInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
             try {
-                return executeLong(frame);
-            } catch (UnexpectedResultException ex) {
-                throw SLException.typeError(this, ex.getResult());
-            } finally {
-                op.endNewExecution(identifier);
+                return op.newExecutionLong(getNodeIdentifier(), frame, f -> {
+                    try {
+                        return executeLong(f);
+                    } catch (UnexpectedResultException ex) {
+                        throw SLException.typeError(this, ex.getResult());
+                    }
+                });
+            } catch (UnexpectedResultException e) {
+                throw new RuntimeException("Never reach here");
             }
         }
 

@@ -58,7 +58,7 @@ public class SLDebuggerNode extends SLStatementNode {
     }
 
     @Override
-    public void calcVoid(VirtualFrame frame) {
+    public void calcVoidInner(VirtualFrame frame) {
         executeVoid(frame);
     }
 

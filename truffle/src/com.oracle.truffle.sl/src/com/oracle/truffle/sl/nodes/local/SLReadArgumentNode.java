@@ -93,10 +93,10 @@ public class SLReadArgumentNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
+        op.startNewExecution(frame, identifier);
         try {
             return executeGeneric(frame);
         } finally {

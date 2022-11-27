@@ -46,8 +46,6 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Constant literal for a arbitrary-precision number that exceeds the range of
@@ -68,12 +66,8 @@ public final class SLBigIntegerLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public SLBigNumber calcGeneric(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(identifier);
-        op.endNewExecution(identifier);
-        return value;
+    public SLBigNumber calcGenericInner(VirtualFrame frame) {
+        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
     }
 
     @Override

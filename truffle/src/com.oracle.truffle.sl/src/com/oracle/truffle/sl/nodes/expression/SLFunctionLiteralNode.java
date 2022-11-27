@@ -102,7 +102,7 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
     }
 
     @Override
-    public SLFunction calcGeneric(VirtualFrame frame) {
+    public SLFunction calcGenericInner(VirtualFrame frame) {
         return executeGeneric(frame); // TODO
     }
 

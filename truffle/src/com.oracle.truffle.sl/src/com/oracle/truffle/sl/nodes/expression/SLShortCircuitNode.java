@@ -96,19 +96,15 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        return calcBoolean(frame);
+    public Object calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame);
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) {
+    public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            boolean result = executeBoolean(frame);
-            op.endNewExecution(identifier);
-            return result;
+            return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeBoolean);
         }
 
         boolean leftValue = calcSubNode(left, frame);
@@ -117,21 +113,7 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
     }
 
     private boolean calcSubNode(SLExpressionNode node, VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        if (op.shouldRecalculate(node)) {
-            try {
-                return node.calcBoolean(frame);
-            } catch (UnexpectedResultException ex) {
-                throw SLException.typeError(this, ex.getResult());
-            }
-        } else {
-            final Object returnedCache = op.getReturnedValueOrThrow(node.getNodeIdentifier());
-            if (returnedCache instanceof Boolean) {
-                return (boolean) returnedCache;
-            } else {
-                throw SLException.typeError(this, returnedCache);
-            }
-        }
+        return context.getHistoryOperator().calcBoolean(frame, this, node);
     }
 
     /**

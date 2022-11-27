@@ -96,7 +96,16 @@ import com.oracle.truffle.api.source.SourceSection;
  * Central coordinator class for the Truffle instrumentation framework. Allocated once per
  * {@linkplain org.graalvm.polyglot.Engine engine}.
  */
-final class InstrumentationHandler {
+public final class InstrumentationHandler {
+
+    private static final ExecutionEventNodeFactory staticDelegatedFactory = new ExecutionEventNodeFactory() {
+        @Override
+        public ExecutionEventNode create(EventContext context) {
+            return staticFactory.create(context);
+        }
+    };
+
+    public static ExecutionEventNodeFactory staticFactory;
 
     /* Enable trace output to stdout. */
     static final boolean TRACE = Boolean.getBoolean("truffle.instrumentation.trace");
@@ -190,6 +199,8 @@ final class InstrumentationHandler {
     }
 
     void onLoad(RootNode root) {
+        hasLoadOrExecutionBinding = true;
+        executionBindings.add(new EventBinding.Source<>(engineInstrumenter, SourceSectionFilter.ANY, null, staticDelegatedFactory, true));
         if (TRACE) {
             String name = root.getName();
             if (name == null) {

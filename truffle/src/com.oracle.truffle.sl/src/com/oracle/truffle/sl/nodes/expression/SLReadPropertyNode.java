@@ -110,11 +110,11 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
-            op.startNewExecution(identifier);
+            op.startNewExecution(frame, identifier);
             try {
                 executeGeneric(frame);
             } finally {

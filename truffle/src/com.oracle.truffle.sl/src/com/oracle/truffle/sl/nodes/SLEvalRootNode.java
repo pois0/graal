@@ -53,6 +53,7 @@ import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
  * This class performs two additional tasks:
@@ -128,11 +129,13 @@ public final class SLEvalRootNode extends RootNode {
             return SLNull.SINGLETON;
         } else {
             /* Conversion of arguments to types understood by SL. */
-            Object[] arguments = frame.getArguments();
-            for (int i = 0; i < arguments.length; i++) {
-                arguments[i] = SLContext.fromForeignValue(arguments[i]);
+            Object[] originalArgs = frame.getArguments();
+            Object[] newArgs = new Object[originalArgs.length + 1];
+            for (int i = 0; i < originalArgs.length; i++) {
+                newArgs[i] = SLContext.fromForeignValue(originalArgs[i]);
             }
-            return mainCallNode.call(arguments);
+            newArgs[originalArgs.length] = FunctionCallSpecialParameter.CALC;
+            return mainCallNode.call(newArgs);
         }
     }
 

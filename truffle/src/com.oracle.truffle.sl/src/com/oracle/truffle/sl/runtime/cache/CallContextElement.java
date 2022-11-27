@@ -1,6 +1,8 @@
 package com.oracle.truffle.sl.runtime.cache;
 
 
+import java.util.Arrays;
+
 public abstract class CallContextElement {
     protected final NodeIdentifier nodeIdentifier;
 
@@ -67,6 +69,34 @@ public abstract class CallContextElement {
             int result = nodeIdentifier.hashCode();
             result = 31 * result + loopCount;
             return result;
+        }
+    }
+
+    public final static class FunctionCallArray {
+        private final FunctionCall[] raws;
+
+        public FunctionCallArray(FunctionCall[] raws) {
+            this.raws = raws;
+        }
+
+        public FunctionCall[] getRaws() {
+            return raws;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof FunctionCallArray)) return false;
+
+            FunctionCallArray that = (FunctionCallArray) o;
+
+            // Probably incorrect - comparing Object[] arrays with Arrays.equals
+            return Arrays.equals(raws, that.raws);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(raws);
         }
     }
 }

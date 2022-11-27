@@ -133,10 +133,10 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
 
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         boolean cond;
-        if (op.shouldRecalculate(conditionNode)) {
+        if (op.shouldReExecute(conditionNode)) {
             cond = calculateCondition(frame);
         } else {
-            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier());
+            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier(), frame);
             if (returnedCache instanceof Boolean) {
                 cond = (boolean) returnedCache;
             } else {
@@ -160,9 +160,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
             }
         }
 
-        if (result) {
-            op.onGotoNextIteration(parentIdentifier);
-        }
+        if (result) op.onGotoNextIteration(parentIdentifier);
 
         return result;
     }
@@ -185,11 +183,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     }
 
     private boolean calculateCondition(VirtualFrame frame) {
-        try {
-            return conditionNode.calcBoolean(frame);
-        } catch (UnexpectedResultException ex) {
-            throw SLException.typeError(this, ex.getResult());
-        }
+        return context.getHistoryOperator().calcBoolean(frame, conditionNode, conditionNode);
     }
 
     @Override

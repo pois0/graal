@@ -50,7 +50,6 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
@@ -85,17 +84,12 @@ public abstract class SLDivNode extends SLBinaryNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
+    public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
-            try {
-                return executeGeneric(frame);
-            } finally {
-                op.endNewExecution(identifier);
-            }
+            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
         }
 
         final Object left = op.calcGeneric(frame, getLeftNode());
@@ -117,18 +111,21 @@ public abstract class SLDivNode extends SLBinaryNode {
     }
 
     @Override
-    public long calcLong(VirtualFrame frame) {
+    public long calcLongInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
-            op.startNewExecution(identifier);
             try {
-                return executeLong(frame);
-            } catch (UnexpectedResultException ex) {
-                throw SLException.typeError(this, ex.getResult());
-            } finally {
-                op.endNewExecution(identifier);
+                return op.newExecutionLong(getNodeIdentifier(), frame, f -> {
+                    try {
+                        return executeLong(f);
+                    } catch (UnexpectedResultException ex) {
+                        throw SLException.typeError(this, ex.getResult());
+                    }
+                });
+            } catch (UnexpectedResultException e) {
+                throw new RuntimeException("Never reach here");
             }
         }
 

@@ -208,8 +208,39 @@ r='return'                                      { SLExpressionNode value = null;
 ';'
 ;
 
-
 expression returns [SLExpressionNode result]
+:
+u='delete'
+'('
+(
+   from=NUMERIC_LITERAL
+   ','
+   to=NUMERIC_LITERAL                           { $result = factory.createDelete($from, $to); }
+)
+')'
+|
+u='insert'
+'('
+(                                               { factory.startNewExp(); }
+    logic_big_term                              { $result = factory.createInsert($logic_big_term.result); }
+)                                               { factory.endNewExp(); }
+')'
+|
+u='replace'
+'('
+(
+   from=NUMERIC_LITERAL
+   ','
+   to=NUMERIC_LITERAL
+   ','                                          { factory.startNewExp(); }
+   logic_big_term                               { $result = factory.createReplace($from, $to, $logic_big_term.result); }
+)                                               { factory.endNewExp(); }
+')'
+|
+logic_big_term                                  { $result = $logic_big_term.result; }
+;
+
+logic_big_term returns [SLExpressionNode result]
 :
 logic_term                                      { $result = $logic_term.result; }
 (
@@ -345,4 +376,3 @@ fragment STRING_CHAR : ~('"' | '\\' | '\r' | '\n');
 IDENTIFIER : LETTER (LETTER | DIGIT)*;
 STRING_LITERAL : '"' STRING_CHAR* '"';
 NUMERIC_LITERAL : '0' | NON_ZERO_DIGIT DIGIT*;
-

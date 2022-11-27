@@ -64,16 +64,16 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
     }
 
     @Override
-    public Object calcGeneric(VirtualFrame frame) {
-        return calcBoolean(frame);
+    public Object calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame);
     }
 
     @Override
-    public boolean calcBoolean(VirtualFrame frame) {
+    public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
-            op.startNewExecution(identifier);
+            op.startNewExecution(frame, identifier);
             try {
                 return executeBoolean(frame);
             } catch (UnexpectedResultException e) {
