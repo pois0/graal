@@ -58,10 +58,12 @@ import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
+import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.api.utilities.CyclicAssumption;
 import com.oracle.truffle.api.utilities.TriState;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLUndefinedFunctionRootNode;
 
 /**
@@ -92,6 +94,8 @@ public final class SLFunction implements TruffleObject {
     /** The name of the function. */
     private final String name;
 
+    private final boolean hasNewNode;
+
     /** The current implementation of this function. */
     private RootCallTarget callTarget;
 
@@ -107,7 +111,9 @@ public final class SLFunction implements TruffleObject {
     }
 
     protected SLFunction(RootCallTarget callTarget) {
-        this.name = callTarget.getRootNode().getName();
+        final SLRootNode rootNode = (SLRootNode) callTarget.getRootNode();
+        this.name = rootNode.getName();
+        this.hasNewNode = rootNode.hasNewNode();
         this.callTargetStable = new CyclicAssumption(name);
         setCallTarget(callTarget);
     }

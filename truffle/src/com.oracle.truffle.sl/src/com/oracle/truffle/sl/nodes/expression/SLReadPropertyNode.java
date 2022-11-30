@@ -51,11 +51,9 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
-import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
@@ -86,7 +84,7 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
         try {
             final long id = numbers.asLong(index);
             Object result = arrays.readArrayElement(receiver, id);
-            context.getHistoryOperator().onReadObjectField(receiver, id);
+            getContext().getHistoryOperator().onReadObjectField(receiver, id);
             return result;
         } catch (UnsupportedMessageException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
@@ -101,7 +99,7 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
         try {
             final String field = asMember.execute(name);
             Object result = objects.readMember(receiver, field);
-            context.getHistoryOperator().onReadObjectField(receiver, field);
+            getContext().getHistoryOperator().onReadObjectField(receiver, field);
             return result;
         } catch (UnsupportedMessageException | UnknownIdentifierException e) {
             // read was not successful. In SL we only have basic support for errors.
@@ -111,7 +109,7 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
             op.startNewExecution(frame, identifier);
@@ -122,7 +120,10 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
             }
         }
 
-        return executeGeneric(frame);
+        final Object receiver = op.calcGeneric(frame, getReceiverNode());
+        final Object fldName = op.calcGeneric(frame, getNameNode());
+
+        return op.getFieldValue(receiver, (String) fldName, identifier);
     }
 
     @Override

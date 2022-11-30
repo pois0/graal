@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,26 +64,27 @@ public final class SLMain {
     public static void main(String[] args) throws IOException {
         Source source;
         Map<String, String> options = new HashMap<>();
-        String file = null;
+        ArrayList<String> files = new ArrayList<>();
         for (String arg : args) {
             if (parseOption(options, arg)) {
                 continue;
             } else {
-                if (file == null) {
-                    file = arg;
-                }
+                files.add(arg);
             }
         }
 
-        if (file == null) {
+        if (files.isEmpty()) {
             // @formatter:off
             source = Source.newBuilder(SL, new InputStreamReader(System.in), "<stdin>").build();
             // @formatter:on
         } else {
-            source = Source.newBuilder(SL, new File(file)).build();
+            for (String file : files) {
+                System.out.println("execute: " + file);
+                source = Source.newBuilder(SL, new File(file)).build();
+                executeSource(source, System.in, System.out, options);
+            }
         }
 
-        System.exit(executeSource(source, System.in, System.out, options));
     }
 
     private static int executeSource(Source source, InputStream in, PrintStream out, Map<String, String> options) {

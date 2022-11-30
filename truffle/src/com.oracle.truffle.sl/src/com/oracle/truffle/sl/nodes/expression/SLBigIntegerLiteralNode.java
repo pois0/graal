@@ -67,7 +67,7 @@ public final class SLBigIntegerLiteralNode extends SLLiteralNode {
 
     @Override
     public SLBigNumber calcGenericInner(VirtualFrame frame) {
-        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
+        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
     }
 
     @Override

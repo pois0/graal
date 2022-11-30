@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.oracle.truffle.api.Assumption;
@@ -56,7 +57,6 @@ import com.oracle.truffle.api.TruffleLanguage.ContextPolicy;
 import com.oracle.truffle.api.debug.DebuggerTags;
 import com.oracle.truffle.api.dsl.NodeFactory;
 import com.oracle.truffle.api.frame.FrameDescriptor;
-import com.oracle.truffle.api.instrumentation.AllocationReporter;
 import com.oracle.truffle.api.instrumentation.ProvidedTags;
 import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.interop.InteropLibrary;
@@ -112,6 +112,9 @@ import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.SLLanguageView;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObject;
+import com.oracle.truffle.sl.runtime.cache.ExecutionContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import org.graalvm.collections.Pair;
 
 /**
  * SL is a simple language to demonstrate and showcase features of Truffle. The implementation is as
@@ -260,7 +263,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * from this array.
          */
         for (int i = 0; i < argumentCount; i++) {
-            argumentNodes[i] = new SLReadArgumentNode(i, null);
+            argumentNodes[i] = new SLReadArgumentNode(i);
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */
         SLBuiltinNode builtinBodyNode = factory.createNode((Object) argumentNodes);
@@ -300,12 +303,15 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
     protected CallTarget parse(ParsingRequest request) throws Exception {
         Source source = request.getSource();
         Map<String, RootCallTarget> functions;
+        Set<String> functionContainsNewNode;
         /*
          * Parse the provided source. At this point, we do not have a SLContext yet. Registration of
          * the functions with the SLContext happens lazily in SLEvalRootNode.
          */
         if (request.getArgumentNames().isEmpty()) {
-            functions = SimpleLanguageParser.parseSL(this, source);
+            final Pair<Map<String, RootCallTarget>, Set<String>> ff = SimpleLanguageParser.parseSL(this, source);
+            functions = ff.getLeft();
+            functionContainsNewNode = ff.getRight();
         } else {
             StringBuilder sb = new StringBuilder();
             sb.append("function main(");
@@ -320,7 +326,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
             sb.append(";}");
             String language = source.getLanguage() == null ? ID : source.getLanguage();
             Source decoratedSource = Source.newBuilder(language, sb.toString(), source.getName()).build();
-            functions = SimpleLanguageParser.parseSL(this, decoratedSource);
+            final Pair<Map<String, RootCallTarget>, Set<String>> ff = SimpleLanguageParser.parseSL(this, decoratedSource);
+            functions = ff.getLeft();
+            functionContainsNewNode = ff.getRight();
         }
 
         RootCallTarget main = functions.get("main");
@@ -332,13 +340,13 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
              * we cannot use the original SLRootNode for the main function. Instead, we create a new
              * SLEvalRootNode that does everything we need.
              */
-            evalMain = new SLEvalRootNode(this, main, functions);
+            evalMain = new SLEvalRootNode(this, main, functions, functionContainsNewNode);
         } else {
             /*
              * Even without a main function, "evaluating" the parsed source needs to register the
              * functions into the SLContext.
              */
-            evalMain = new SLEvalRootNode(this, null, functions);
+            evalMain = new SLEvalRootNode(this, null, functions, functionContainsNewNode);
         }
         return Truffle.getRuntime().createCallTarget(evalMain);
     }
@@ -407,10 +415,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
      * Allocate an empty object. All new objects initially have no properties. Properties are added
      * when they are first stored, i.e., the store triggers a shape change of the object.
      */
-    public SLObject createObject(AllocationReporter reporter) {
-        reporter.onEnter(null, 0, AllocationReporter.SIZE_UNKNOWN);
+    public SLObject createObject(ExecutionHistoryOperator execOperator, ExecutionContext execCtx) {
         SLObject object = new SLObject(rootShape);
-        reporter.onReturnValue(object, 0, AllocationReporter.SIZE_UNKNOWN);
+        execOperator.onGenerateObject(object, execCtx);
         return object;
     }
 

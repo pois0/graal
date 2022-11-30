@@ -80,7 +80,7 @@ public class SLParenExpressionNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
@@ -92,7 +92,7 @@ public class SLParenExpressionNode extends SLExpressionNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
@@ -104,7 +104,7 @@ public class SLParenExpressionNode extends SLExpressionNode {
 
     @Override
     public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {

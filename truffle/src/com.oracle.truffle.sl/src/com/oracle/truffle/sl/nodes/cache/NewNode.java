@@ -29,7 +29,17 @@ public final class NewNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        return null;
+        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
+    }
+
+    @Override
+    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+        return getContext().getHistoryOperator().newExecutionBoolean(getNodeIdentifier(), frame, this::executeBoolean);
+    }
+
+    @Override
+    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+        return getContext().getHistoryOperator().newExecutionLong(getNodeIdentifier(), frame, this::executeLong);
     }
 
     @Override
@@ -39,6 +49,6 @@ public final class NewNode extends SLExpressionNode {
 
     @Override
     protected boolean hasNewChildNode() {
-        return false;
+        return true;
     }
 }

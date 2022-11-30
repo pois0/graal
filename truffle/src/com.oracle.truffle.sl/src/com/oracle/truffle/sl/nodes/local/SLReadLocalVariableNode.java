@@ -48,7 +48,6 @@ import com.oracle.truffle.api.frame.FrameUtil;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.ReadVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
@@ -124,35 +123,11 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         op.startNewExecution(frame, identifier);
         try {
-            return executeGeneric(frame);
-        } finally {
-            op.endNewExecution(identifier);
-        }
-    }
-
-    @Override
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeLong(frame);
-        } finally {
-            op.endNewExecution(identifier);
-        }
-    }
-
-    @Override
-    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeBoolean(frame);
+            return op.getVariableValue(slotIdentifier, identifier);
         } finally {
             op.endNewExecution(identifier);
         }
@@ -175,7 +150,7 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
     }
 
     private void notifyVariableRead() {
-        context.getHistoryOperator().onReadLocalVariable(slotIdentifier);
+        getContext().getHistoryOperator().onReadLocalVariable(slotIdentifier);
     }
 
     @Override

@@ -100,8 +100,7 @@ public class SLRootNode extends RootNode {
         if (arguments.length == 0 || arguments[arguments.length - 1] == FunctionCallSpecialParameter.EXEC) {
             return bodyNode.executeGeneric(frame);
         } else {
-            // return bodyNode.calcGeneric(frame);
-            return bodyNode.executeGeneric(frame);
+             return bodyNode.calcGeneric(frame);
         }
     }
 
@@ -166,5 +165,9 @@ public class SLRootNode extends RootNode {
             }
         });
         return writeArgNodes.toArray(new SLWriteLocalVariableNode[writeArgNodes.size()]);
+    }
+
+    public boolean hasNewNode() {
+        return bodyNode.hasNewNode();
     }
 }

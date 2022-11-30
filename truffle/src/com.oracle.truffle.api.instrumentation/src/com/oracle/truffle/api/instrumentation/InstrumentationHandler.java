@@ -200,7 +200,7 @@ public final class InstrumentationHandler {
 
     void onLoad(RootNode root) {
         hasLoadOrExecutionBinding = true;
-        executionBindings.add(new EventBinding.Source<>(engineInstrumenter, SourceSectionFilter.ANY, null, staticDelegatedFactory, true));
+        if (executionBindings.isEmpty()) executionBindings.add(new EventBinding.Source<>(engineInstrumenter, SourceSectionFilter.ANY, null, staticDelegatedFactory, true));
         if (TRACE) {
             String name = root.getName();
             if (name == null) {

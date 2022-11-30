@@ -126,7 +126,7 @@ public abstract class SLAddNode extends SLBinaryNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
         if (isNewNode()) {
             return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
@@ -142,7 +142,7 @@ public abstract class SLAddNode extends SLBinaryNode {
                 return add(leftInterop.asLong(left), rightInterop.asLong(right));
             } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
                 return add((SLBigNumber) left, (SLBigNumber) right);
-            } else if (leftInterop.isString(left) && leftInterop.isString(right)) {
+            } else if (leftInterop.isString(left) && rightInterop.isString(right)) {
                 return add(leftInterop.asString(left), rightInterop.asString(right));
             } else {
                 return 0;
@@ -154,7 +154,7 @@ public abstract class SLAddNode extends SLBinaryNode {
 
     @Override
     public long calcLongInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {

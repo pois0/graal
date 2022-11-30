@@ -40,7 +40,9 @@
  */
 package com.oracle.truffle.sl.nodes;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.GenerateWrapper;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
@@ -63,7 +65,6 @@ import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
  * local variables.
  */
 @NodeInfo(language = "SL", description = "The abstract base node for all SL statements")
-@GenerateWrapper
 public abstract class SLStatementNode extends SLScopedNode implements InstrumentableNode {
 
     private static final int NO_SOURCE = -1;
@@ -77,9 +78,12 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
 
     private boolean isNewNode = false;
     private int hasNewNodeState = -1;
+
+    @CompilerDirectives.CompilationFinal
     private NodeIdentifier identifier = null;
 
-    protected final SLContext context = SLLanguage.getCurrentContext();
+    @CompilerDirectives.CompilationFinal
+    private TruffleLanguage.ContextReference<SLContext> contextRef;
 
     /*
      * The creation of source section can be implemented lazily by looking up the root node source
@@ -139,6 +143,12 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         return sourceLength;
     }
 
+    protected SLContext getContext() {
+        TruffleLanguage.ContextReference<SLContext> contextRef = this.contextRef;
+        if (contextRef == null) contextRef = this.contextRef = lookupContextReference(SLLanguage.class);
+        return contextRef.get();
+    }
+
     // invoked by the parser to set the source
     public final void setSourceSection(int charIndex, int length) {
         assert sourceCharIndex == NO_SOURCE : "source must only be set once";
@@ -178,7 +188,7 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
 
     public void calcVoid(VirtualFrame frame) {
         calcVoidInner(frame);
-        context.getHistoryOperator().finishCalc(getNodeIdentifier());
+        getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
     }
 
     /**
@@ -240,7 +250,7 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     }
 
     public final boolean isNewNode() {
-        return false;
+        return isNewNode;
     }
 
     public void setNewNode() {
@@ -250,9 +260,9 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public final boolean hasNewNode() {
         int state = hasNewNodeState;
         if (state < 0) {
-            hasNewNodeState = state = isNewNode || hasNewChildNode() ? 1 : 0;
+            hasNewNodeState = state = isNewNode() || hasNewChildNode() ? 1 : 0;
         }
-        return state != 0;
+        return state == 1;
     }
 
     protected abstract boolean hasNewChildNode();

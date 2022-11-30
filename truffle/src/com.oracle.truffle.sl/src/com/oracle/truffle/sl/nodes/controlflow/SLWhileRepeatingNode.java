@@ -56,6 +56,8 @@ import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
+import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.EXEC;
+
 /**
  * The loop body of a {@link SLWhileNode while loop}. A Truffle framework {@link LoopNode} between
  * the {@link SLWhileNode} and {@link SLWhileRepeatingNode} allows Truffle to perform loop
@@ -127,25 +129,14 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
 
     @Override
     public boolean executeRepeating(VirtualFrame frame, int arg) {
-        if (arg == SLWhileNode.EXECUTE) {
+        if (arg == EXEC) {
             executeRepeating(frame);
         }
 
         final ExecutionHistoryOperator op = context.getHistoryOperator();
-        boolean cond;
-        if (op.shouldReExecute(conditionNode)) {
-            cond = calculateCondition(frame);
-        } else {
-            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier(), frame);
-            if (returnedCache instanceof Boolean) {
-                cond = (boolean) returnedCache;
-            } else {
-                throw SLException.typeError(this, returnedCache);
-            }
-        }
 
         boolean result;
-        if (cond) {
+        if (op.calcBoolean(frame, this, conditionNode)) {
             result = false;
         } else {
             try {

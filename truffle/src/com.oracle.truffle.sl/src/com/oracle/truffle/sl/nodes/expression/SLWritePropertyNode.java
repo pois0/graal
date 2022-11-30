@@ -56,7 +56,6 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
-import com.oracle.truffle.sl.parser.SimpleLanguageParser;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
@@ -89,11 +88,11 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
                                 @CachedLibrary("receiver") InteropLibrary arrays,
                                 @CachedLibrary("index") InteropLibrary numbers,
                                 @CachedContext(SLLanguage.class) SLContext context) {
-        System.out.println(getNameNode().toString());
         try {
             final long i = numbers.asLong(index);
             arrays.writeArrayElement(receiver, i, value);
             context.getObjectTracker().notifyAssignment(receiver, i, value);
+            context.getHistoryOperator().onObjectUpdated(receiver, Long.toString(i), value); // FIXME
         } catch (UnsupportedMessageException | UnsupportedTypeException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, index);
@@ -110,6 +109,7 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
             final String id = asMember.execute(name);
             objectLibrary.writeMember(receiver, id, value);
             context.getObjectTracker().notifyAssignment(receiver, id, value);
+            context.getHistoryOperator().onObjectUpdated(receiver, id, value);
         } catch (UnsupportedMessageException | UnknownIdentifierException | UnsupportedTypeException e) {
             // write was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, name);
@@ -119,7 +119,7 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
             op.startNewExecution(frame, identifier);

@@ -70,7 +70,7 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
             op.startNewExecution(frame, identifier);

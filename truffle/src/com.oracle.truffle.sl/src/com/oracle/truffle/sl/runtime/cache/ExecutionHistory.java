@@ -1,7 +1,5 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-import com.oracle.truffle.sl.runtime.SLBigNumber;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -15,17 +13,19 @@ public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<ExecutionContext>> timeToContext = new ArrayList<>();
     private final HashMap<ExecutionContext, TimePair> contextToTime = new HashMap<>();
     private final ArrayList<ItemWithTime<ReadContent>> readMap = new ArrayList<>();
-    private final HashMap<Integer, ExecutionContext> objectGenerationContext = new HashMap<>();
-    private final HashMap<Integer, HashMap<String, ArrayList<ItemWithTime<Object>>>> objectUpdateMap = new HashMap<>();
-    private final ArrayList<ItemWithTime<ObjectUpdate>> objectUpdateList = new ArrayList<>();
+    private final HashMap<ExecutionContext, HashMap<String, ArrayList<ItemWithTime<Object>>>> objectUpdateMap = new HashMap<>();
+    private final ArrayList<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> objectUpdateList = new ArrayList<>();
     private final HashMap<CallContextElement.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> localVariableUpdateMap = new HashMap<>();
     private final HashMap<CallContextElement.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> localVariableUpdateList = new HashMap<>();
-    private final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
+    final ArrayList<ItemWithTime<String>> functionCalls = new ArrayList<>();
+    final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
 
     public void onReturnValue(Time startTime, Time endTime, ExecutionContext ctx, Object value) {
         timeToContext.add(new ItemWithTime<>(endTime, ctx));
         contextToTime.put(ctx, new TimePair(startTime, endTime));
-        returnedValueOrException.add(new ItemWithTime<>(endTime, replaceReference(value)));
+        if (value != null) {
+            returnedValueOrException.add(new ItemWithTime<>(endTime, value));
+        }
     }
 
     public void onReturnExceptional(Time startTime, Time endTime, ExecutionContext ctx, RuntimeException throwable) {
@@ -34,43 +34,32 @@ public final class ExecutionHistory {
         returnedValueOrException.add(new ItemWithTime<>(endTime, throwable));
     }
 
-    public void onReadArgument(Time time, CallContextElement[] ctx, Object argumentName) {
-        readMap.add(new ItemWithTime<>(time, new ReadArgument(ctx, argumentName)));
+    public void onReadArgument(Time time, CallContextElement.FunctionCallArray ctx, int argIndex) {
+        readMap.add(new ItemWithTime<>(time, new ReadArgument(ctx, argIndex)));
     }
 
     public void onReadLocalVariable(Time time, CallContextElement[] ctx, Object variableName) {
         readMap.add(new ItemWithTime<>(time, new ReadLocalVariable(ctx, variableName)));
     }
 
-    public void onReadObjectField(Time time, Object object, Object field) {
-        readMap.add(new ItemWithTime<>(time, new ReadObjectField(System.identityHashCode(object), field)));
+    public void onReadObjectField(Time time, ExecutionContext objGenCtx, Object field) {
+        readMap.add(new ItemWithTime<>(time, new ReadObjectField(objGenCtx, field)));
     }
 
-    public void onGenerateObject(ExecutionContext ctx, Object object) {
-        objectGenerationContext.put(System.identityHashCode(object), ctx);
-    }
-
-    public void onUpdateObject(Time time, Object object, String fieldName, Object newValue) {
-        onUpdateObjectWithHash(time, System.identityHashCode(object), fieldName, newValue);
-    }
-
-    public void onUpdateObjectWithHash(Time time, int objectHash, String fieldName, Object newValue) {
-        onUpdateObjectInner(time, objectHash, fieldName, replaceReference(newValue));
+    public void onUpdateObjectWithHash(Time time, ExecutionContext objGenCtx, String fieldName, Object newValue) {
+        onUpdateObjectInner(time, objGenCtx, fieldName, newValue);
     }
 
     public void onUpdateLocalVariable(Time time, CallContextElement.FunctionCallArray ctx, String variableName, Object newValue) {
-        Object refObj = replaceReference(newValue);
-
         localVariableUpdateMap.computeIfAbsent(ctx, it -> new HashMap<>())
                 .computeIfAbsent(variableName, it -> new ArrayList<>())
-                .add(new ItemWithTime<>(time, refObj));
+                .add(new ItemWithTime<>(time, newValue));
         localVariableUpdateList.computeIfAbsent(ctx, it -> new ArrayList<>())
-                .add(new ItemWithTime<>(time, new LocalVariableUpdate(variableName, refObj)));
+                .add(new ItemWithTime<>(time, new LocalVariableUpdate(variableName, newValue)));
     }
 
-    public Time getFinishedTime(ExecutionContext ctx) {
-        TimePair timePair = contextToTime.get(ctx);
-        return timePair == null ? null : timePair.end;
+    public void onEnterFunction(Time time, String funcName) {
+        functionCalls.add(new ItemWithTime<>(time, funcName));
     }
 
     public Object getReturnedValueOrThrow(Time time) {
@@ -81,15 +70,11 @@ public final class ExecutionHistory {
         return result;
     }
 
-    public boolean didExecuted(ExecutionContext ctx) {
-        return contextToTime.containsKey(ctx);
-    }
-
-    private void onUpdateObjectInner(Time time, int objectHash, String fieldName, Object newValue) {
-        objectUpdateMap.computeIfAbsent(objectHash, it -> new HashMap<>())
+    private void onUpdateObjectInner(Time time, ExecutionContext objGenCtx, String fieldName, Object newValue) {
+        objectUpdateMap.computeIfAbsent(objGenCtx, it -> new HashMap<>())
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
                 .add(new ItemWithTime<>(time, newValue));
-        objectUpdateList.add(new ItemWithTime<>(time, new ObjectUpdate(objectHash, fieldName, newValue)));
+        objectUpdateList.add(new ItemWithTime<>(time, new ExecutionHistoryOperator.ObjectUpdate(objGenCtx, fieldName, newValue)));
     }
 
     public Iterator<ItemWithTime<ReadContent>> getReadOperations(Time startTime, Time endTime) {
@@ -102,11 +87,11 @@ public final class ExecutionHistory {
         return getReadOperations(timePair.start, timePair.end);
     }
 
-    public Iterator<ItemWithTime<ObjectUpdate>> getObjectUpdates(Time startTime, Time endTime) {
+    public Iterator<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> getObjectUpdates(Time startTime, Time endTime) {
         return ItemsWithTimeIterator.create(objectUpdateList, startTime, endTime);
     }
 
-    public Iterator<ItemWithTime<ObjectUpdate>> getObjectUpdates(ExecutionContext ctx) {
+    public Iterator<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> getObjectUpdates(ExecutionContext ctx) {
         TimePair timePair = contextToTime.get(ctx);
         if (timePair == null) return null;
         return getObjectUpdates(timePair.start, timePair.end);
@@ -114,22 +99,40 @@ public final class ExecutionHistory {
 
     public Iterator<ItemWithTime<LocalVariableUpdate>> getLocalVariableUpdates(CallContextElement.FunctionCallArray callCtx, ExecutionContext execCtx) {
         TimePair timePair = contextToTime.get(execCtx);
-        if (timePair == null) return null;
+        if (timePair == null) return noElementIterator();
         ArrayList<ItemWithTime<LocalVariableUpdate>> varHistory = localVariableUpdateList.get(callCtx);
         if (varHistory == null) return noElementIterator();
         return ItemsWithTimeIterator.create(varHistory, timePair.start, timePair.end);
+    }
+
+    public Iterator<ItemWithTime<String>> getFunctionEnters(Time startTime, Time endTime) {
+        return ItemsWithTimeIterator.create(functionCalls, startTime, endTime);
+    }
+
+    public Iterator<ItemWithTime<String>> getFunctionEnters(ExecutionContext ctx) {
+        TimePair timePair = contextToTime.get(ctx);
+        if (timePair == null) return null;
+        return getFunctionEnters(timePair.start, timePair.end);
     }
 
     public HashMap<String, ArrayList<ItemWithTime<Object>>> getLocalHistory(CallContextElement.FunctionCallArray fca) {
         return localVariableUpdateMap.get(fca);
     }
 
-    public HashMap<String, ArrayList<ItemWithTime<Object>>> getObjectHistory(int objHash) {
-        return objectUpdateMap.get(objHash);
+    public HashMap<String, ArrayList<ItemWithTime<Object>>> getObjectHistory(ExecutionContext objGenCtx) {
+        return objectUpdateMap.get(objGenCtx);
     }
 
     public TimePair getTime(ExecutionContext ctx) {
         return contextToTime.get(ctx);
+    }
+
+    public void deleteRecords(ExecutionContext context) {
+        final TimePair tp = contextToTime.get(context);
+        Time endTime = tp.end;
+        final int i = ItemWithTime.binarySearch(timeToContext, endTime);
+        endTime = timeToContext.get(i + 1).getTime();
+        deleteRecords(tp.start, endTime);
     }
 
     /**
@@ -138,16 +141,16 @@ public final class ExecutionHistory {
      */
     public void deleteRecords(Time startTime, Time endTime) {
         ItemWithTime.subList(readMap, startTime, endTime).clear();
-        List<ItemWithTime<ObjectUpdate>> updates = ItemWithTime.subList(objectUpdateList, startTime, endTime);
-        HashMap<Integer, HashSet<String>> updatedFields = new HashMap<>();
-        for (ItemWithTime<ObjectUpdate> update : updates) {
-            ObjectUpdate item = update.getItem();
-            updatedFields.computeIfAbsent(item.getObjectId(), it -> new HashSet<>())
+        List<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> updates = ItemWithTime.subList(objectUpdateList, startTime, endTime);
+        HashMap<ExecutionContext, HashSet<String>> updatedFields = new HashMap<>();
+        for (ItemWithTime<ExecutionHistoryOperator.ObjectUpdate> update : updates) {
+            ExecutionHistoryOperator.ObjectUpdate item = update.getItem();
+            updatedFields.computeIfAbsent(item.getObjectGenCtx(), it -> new HashSet<>())
                     .add(item.getFieldName());
         }
 
-        for (Map.Entry<Integer, HashSet<String>> entry : updatedFields.entrySet()) {
-            Integer objectId = entry.getKey();
+        for (Map.Entry<ExecutionContext, HashSet<String>> entry : updatedFields.entrySet()) {
+            ExecutionContext objectId = entry.getKey();
             HashSet<String> fields = entry.getValue();
             HashMap<String, ArrayList<ItemWithTime<Object>>> map = objectUpdateMap.get(objectId);
             for (String field : fields) {
@@ -159,21 +162,87 @@ public final class ExecutionHistory {
         ItemWithTime.subList(returnedValueOrException, startTime, endTime).clear();
     }
 
-    public Time nextTime(Time baseTime) {
-        final int check = ItemWithTime.binarySearch(timeToContext, baseTime);
-        if (check == timeToContext.size()) return null;
+    public void merge(ExecutionHistory other) {
+        if (other.timeToContext.size() == 0) return;
 
-        final ItemWithTime<ExecutionContext> cand = timeToContext.get(check);
-        if (cand.getTime().equals(baseTime)) {
-            if (check + 1 == timeToContext.size()) return null;
-            return timeToContext.get(check + 1).getTime();
-        } else {
-            return cand.getTime();
+        final Time initialTime = other.timeToContext.get(0).getTime();
+        final int timeToCtxPoint = ItemWithTime.binarySearchWhereInsertTo(timeToContext, initialTime);
+        timeToContext.addAll(timeToCtxPoint, other.timeToContext);
+        contextToTime.putAll(other.contextToTime);
+
+        if (other.readMap.size() != 0) {
+            final int readMapPoint = ItemWithTime.binarySearchWhereInsertTo(readMap, initialTime);
+            readMap.addAll(readMapPoint, other.readMap);
         }
+
+        for (Map.Entry<ExecutionContext, HashMap<String, ArrayList<ItemWithTime<Object>>>> entry : other.objectUpdateMap.entrySet()) {
+            ExecutionContext objGenCtx = entry.getKey();
+            HashMap<String, ArrayList<ItemWithTime<Object>>> objHistory = entry.getValue();
+
+            objectUpdateMap.merge(objGenCtx, objHistory, (thisObjHistory, thatObjHistory) -> {
+                for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> e : objHistory.entrySet()) {
+                    String fldName = e.getKey();
+                    ArrayList<ItemWithTime<Object>> fldHistory = e.getValue();
+
+                    thisObjHistory.merge(fldName, fldHistory, (thisFldHistory, thatFldHistory) -> {
+                        final int fhPoint = ItemWithTime.binarySearchWhereInsertTo(thisFldHistory, initialTime);
+                        thisFldHistory.addAll(fhPoint, thatFldHistory);
+                        return thisFldHistory;
+                    });
+                }
+                return thisObjHistory;
+            });
+        }
+
+        final int objUpPoint = ItemWithTime.binarySearchWhereInsertTo(objectUpdateList, initialTime);
+        objectUpdateList.addAll(objUpPoint, other.objectUpdateList);
+
+        for (Map.Entry<CallContextElement.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> e : localVariableUpdateMap.entrySet()) {
+            CallContextElement.FunctionCallArray fcs = e.getKey();
+            HashMap<String, ArrayList<ItemWithTime<Object>>> upMap = e.getValue();
+
+            localVariableUpdateMap.merge(fcs, upMap, (thisUpMap, thatUpMap) -> {
+                for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : thatUpMap.entrySet()) {
+                    String varName = entry.getKey();
+                    ArrayList<ItemWithTime<Object>> varHistory = entry.getValue();
+
+                    thisUpMap.merge(varName, varHistory, (thisVarHistory, thatVarHistory) -> {
+                        final int vhPoint = ItemWithTime.binarySearchWhereInsertTo(thisVarHistory, initialTime);
+                        thisVarHistory.addAll(vhPoint, thatVarHistory);
+                        return thisVarHistory;
+                    });
+                }
+                return thisUpMap;
+            });
+        }
+
+        for (Map.Entry<CallContextElement.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> entry : localVariableUpdateList.entrySet()) {
+            CallContextElement.FunctionCallArray fcs = entry.getKey();
+            ArrayList<ItemWithTime<LocalVariableUpdate>> upList = entry.getValue();
+
+            localVariableUpdateList.merge(fcs, upList, (thisUpList, thatUpList) -> {
+                final int hPoint = ItemWithTime.binarySearchWhereInsertTo(thisUpList, initialTime);
+                thisUpList.addAll(hPoint, thatUpList);
+                return thisUpList;
+            });
+        }
+
+        final int revPoint = ItemWithTime.binarySearchWhereInsertTo(returnedValueOrException, initialTime);
+        returnedValueOrException.addAll(revPoint, other.returnedValueOrException);
     }
 
-    public void merge(ExecutionHistory history) {
-        // TODO
+    public String toStringSize() {
+        return "ExecutionHistory{" +
+                "timeToContext=" + timeToContext.size() +
+                ", contextToTime=" + contextToTime.size() +
+                ", readMap=" + readMap.size() +
+                ", objectUpdateMap=" + objectUpdateMap.size() +
+                ", objectUpdateList=" + objectUpdateList.size() +
+                ", localVariableUpdateMap=" + localVariableUpdateMap.size() +
+                ", localVariableUpdateList=" + localVariableUpdateList.size() +
+                ", functionCalls=" + functionCalls.size() +
+                ", returnedValueOrException=" + returnedValueOrException.size() +
+                '}';
     }
 
     @Override
@@ -182,32 +251,13 @@ public final class ExecutionHistory {
                 "timeToContext=" + timeToContext +
                 ", contextToTime=" + contextToTime +
                 ", readMap=" + readMap +
-                ", objectGenerationContext=" + objectGenerationContext +
                 ", objectUpdateMap=" + objectUpdateMap +
                 ", objectUpdateList=" + objectUpdateList +
+                ", localVariableUpdateMap=" + localVariableUpdateMap +
+                ", localVariableUpdateList=" + localVariableUpdateList +
+                ", functionCalls=" + functionCalls +
                 ", returnedValueOrException=" + returnedValueOrException +
                 '}';
-    }
-
-    private static Object replaceReference(Object value) {
-        Object saveNewValue;
-        if (value == null
-                || value instanceof Byte
-                || value instanceof Short
-                || value instanceof Integer
-                || value instanceof Long
-                || value instanceof Float
-                || value instanceof Double
-                || value instanceof Character
-                || value instanceof String
-                || value instanceof SLBigNumber
-        ) {
-            saveNewValue = value;
-        } else {
-            saveNewValue = new ObjectReference(System.identityHashCode(value));
-        }
-
-        return saveNewValue;
     }
 
     public static class TimePair {
@@ -231,27 +281,27 @@ public final class ExecutionHistory {
     public static abstract class ReadContent {}
 
     public static class ReadArgument extends ReadContent {
-        private final CallContextElement[] callContext;
-        private final Object argumentName;
+        private final CallContextElement.FunctionCallArray callContext;
+        private final int argIndex;
 
-        public ReadArgument(CallContextElement[] callContext, Object argumentName) {
+        public ReadArgument(CallContextElement.FunctionCallArray callContext, int argIndex) {
             this.callContext = callContext;
-            this.argumentName = argumentName;
+            this.argIndex = argIndex;
         }
 
-        public CallContextElement[] getCallContext() {
+        public CallContextElement.FunctionCallArray getCallContext() {
             return callContext;
         }
 
-        public Object getArgumentName() {
-            return argumentName;
+        public int getArgIndex() {
+            return argIndex;
         }
 
         @Override
         public String toString() {
             return "ReadArgument{" +
-                    "callContext=" + Arrays.toString(callContext) +
-                    ", argumentName=" + argumentName +
+                    "callContext=" + callContext +
+                    ", argIndex=" + argIndex +
                     '}';
         }
     }
@@ -283,16 +333,16 @@ public final class ExecutionHistory {
     }
 
     public static class ReadObjectField extends ReadContent {
-        private final int objectId;
+        private final ExecutionContext objGenCtx;
         private final Object fieldName;
 
-        public ReadObjectField(int objectId, Object fieldName) {
-            this.objectId = objectId;
+        public ReadObjectField(ExecutionContext objGenCtx, Object fieldName) {
+            this.objGenCtx = objGenCtx;
             this.fieldName = fieldName;
         }
 
-        public int getObjectId() {
-            return objectId;
+        public ExecutionContext getObjGenCtx() {
+            return objGenCtx;
         }
 
         public Object getFieldName() {
@@ -302,7 +352,7 @@ public final class ExecutionHistory {
         @Override
         public String toString() {
             return "ReadObjectField{" +
-                    "objectId=" + objectId +
+                    "objGenCtx=" + objGenCtx +
                     ", fieldName=" + fieldName +
                     '}';
         }
@@ -326,48 +376,15 @@ public final class ExecutionHistory {
         }
     }
 
-    public final static class ObjectUpdate {
-        private final int objectId;
-        private final String fieldName;
-        private final Object newValue;
-
-        public ObjectUpdate(int objectId, String fieldName, Object newValue) {
-            this.objectId = objectId;
-            this.fieldName = fieldName;
-            this.newValue = newValue;
-        }
-
-        public int getObjectId() {
-            return objectId;
-        }
-
-        public String getFieldName() {
-            return fieldName;
-        }
-
-        public Object getNewValue() {
-            return newValue;
-        }
-
-        @Override
-        public String toString() {
-            return "UpdateContent{" +
-                    "objectId=" + objectId +
-                    ", fieldName='" + fieldName + '\'' +
-                    ", newValue=" + newValue +
-                    '}';
-        }
-    }
-
     public static class ObjectReference {
-        private final int referenceHash;
+        private final ExecutionContext objGenCtx;
 
-        public ObjectReference(int referenceHash) {
-            this.referenceHash = referenceHash;
+        public ObjectReference(ExecutionContext objGenCtx) {
+            this.objGenCtx = objGenCtx;
         }
 
-        public int getReferenceHash() {
-            return referenceHash;
+        public ExecutionContext getObjGenCtx() {
+            return objGenCtx;
         }
     }
 

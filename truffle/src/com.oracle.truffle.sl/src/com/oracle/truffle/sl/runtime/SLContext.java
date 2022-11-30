@@ -108,15 +108,13 @@ public final class SLContext {
         this.input = new BufferedReader(new InputStreamReader(env.in()));
         this.output = new PrintWriter(env.out(), true);
         this.language = language;
-        AllocationReporter allocationReporter = env.lookup(AllocationReporter.class);
-        this.allocationReporter = allocationReporter;
-        this.functionRegistry = new SLFunctionRegistry(language);
-        ObjectTracker objTracker = env.lookup(ObjectTracker.class);
-        objTracker = this.objectTracker = objTracker == null ? new ObjectTracker(null) : objTracker;
+        this.allocationReporter = env.lookup(AllocationReporter.class);
+        final SLFunctionRegistry functionRegistry = new SLFunctionRegistry(language);
+        this.functionRegistry = functionRegistry;
+        this.objectTracker = env.lookup(ObjectTracker.class);
         StackTracker stackTracker = env.lookup(StackTracker.class);
         stackTracker = this.stackTracker = stackTracker == null ? new StackTracker(null) : stackTracker;
-        ExecutionHistoryOperator op = this.historyOperator = new ExecutionHistoryOperator(language, allocationReporter, new ExecutionHistory());
-        objTracker.addListener(op.getObjectChangeListener());
+        ExecutionHistoryOperator op = this.historyOperator = new ExecutionHistoryOperator(language, functionRegistry);
         stackTracker.addListener(op.getStackListener());
         InstrumentationHandler.staticFactory = op.getTickFactory();
 

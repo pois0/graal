@@ -100,26 +100,15 @@ public final class SLIfNode extends SLStatementNode {
 
     @Override
     public void calcVoidInner(VirtualFrame frame) {
-        ExecutionHistoryOperator op = context.getHistoryOperator();
+        ExecutionHistoryOperator op = getContext().getHistoryOperator();
         if (isNewNode()) {
             op.newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
             return;
         }
 
         final SLExpressionNode conditionNode = this.conditionNode;
-        boolean cond;
-        if (op.shouldReExecute(conditionNode)) {
-            cond = calculateCondition(frame);
-        } else {
-            final Object returnedCache = op.getReturnedValueOrThrow(conditionNode.getNodeIdentifier(), frame);
-            if (returnedCache instanceof Boolean) {
-                cond = (boolean) returnedCache;
-            } else {
-                throw SLException.typeError(this, returnedCache);
-            }
-        }
 
-        if (condition.profile(cond)) {
+        if (op.calcBoolean(frame, this, conditionNode)) {
             op.calcVoid(frame, thenPartNode);
         } else {
             if (elsePartNode != null) {

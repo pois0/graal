@@ -57,6 +57,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
  * Built-in function to create a new object. Objects in SL are simply made up of name/value pairs.
@@ -69,8 +70,8 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
     public Object newObject(SLNull o,
                     @CachedLanguage SLLanguage language,
                     @CachedContext(SLLanguage.class) ContextReference<SLContext> contextRef,
-                    @Cached("contextRef.get().getAllocationReporter()") AllocationReporter reporter) {
-        return language.createObject(reporter);
+                    @Cached("contextRef.get().getHistoryOperator()") ExecutionHistoryOperator historyOperator) {
+        return language.createObject(historyOperator, historyOperator.getExecutionContext(this.getNodeIdentifier()));
     }
 
     @Specialization(guards = "!values.isNull(obj)", limit = "3")

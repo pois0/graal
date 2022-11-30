@@ -55,16 +55,16 @@ import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * The node to normalize any value to an SL value. This is useful to reduce the number of values
  * expression nodes need to expect.
  */
 @TypeSystemReference(SLTypes.class)
-@NodeChild
+@NodeChild("child")
 public abstract class SLUnboxNode extends SLExpressionNode {
+
+    protected abstract SLExpressionNode getChild();
 
     static final int LIMIT = 5;
 
@@ -119,7 +119,7 @@ public abstract class SLUnboxNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
+        return getContext().getHistoryOperator().calcGeneric(frame, getChild());
     }
 
     @Override
@@ -130,6 +130,6 @@ public abstract class SLUnboxNode extends SLExpressionNode {
 
     @Override
     protected boolean hasNewChildNode() {
-        return true;
+        return getChild().hasNewNode();
     }
 }

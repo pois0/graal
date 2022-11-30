@@ -50,7 +50,6 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
@@ -59,6 +58,7 @@ import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import org.graalvm.collections.Pair;
 
 /**
  * The node for function invocation in SL. Since SL has first class functions, the {@link SLFunction
@@ -102,25 +102,28 @@ public final class SLInvokeNode extends SLExpressionNode {
         }
 
         try {
-            context.getHistoryOperator().onEnterFunction(getNodeIdentifier());
+            getContext().getHistoryOperator().onEnterFunction(getNodeIdentifier(), ((SLFunction) function).getName(), false);
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, function);
         } finally {
-            context.getHistoryOperator().onExitFunction(getNodeIdentifier());
+            getContext().getHistoryOperator().onExitFunction(getNodeIdentifier());
         }
     }
 
     @ExplodeLoop
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
+        final SLContext context = getContext();
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
             return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
         }
-        final Object function = op.calcGeneric(frame, functionNode);
+        final Pair<Object, Boolean> functionPair = op.calcGenericParameter(frame, functionNode);
+        final Object function = functionPair.getLeft();
+        boolean shouldRecalc = functionPair.getRight();
 
         /*
          * The number of arguments is constant for one invoke node. During compilation, the loop is
@@ -132,19 +135,29 @@ public final class SLInvokeNode extends SLExpressionNode {
 
         final int argumentLength = argumentNodes.length;
         Object[] argumentValues = new Object[argumentLength + 1];
+        boolean[] argumentFlags = new boolean[argumentLength];
         argumentValues[argumentLength] = FunctionCallSpecialParameter.CALC;
         for (int i = 0; i < argumentNodes.length; i++) {
-            argumentValues[i] = argumentNodes[i].calcGeneric(frame);
+            final Pair<Object, Boolean> parameter = op.calcGenericParameter(frame, argumentNodes[i]);
+            argumentValues[i] = parameter.getLeft();
+            argumentFlags[i] = parameter.getRight();
+            shouldRecalc |= argumentFlags[i];
+        }
+
+        if (!shouldRecalc && !context.getHistoryOperator().checkContainsNewNodeInFunctionCalls(getNodeIdentifier())) {
+            return op.getReturnedValueOrThrow(identifier);
         }
 
         try {
-            context.getHistoryOperator().onEnterFunction(identifier);
+            op.onEnterFunction(identifier, ((SLFunction) function).getName(), true);
+            op.pushArgumentFlags(argumentFlags);
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, function);
         } finally {
-            context.getHistoryOperator().onExitFunction(identifier);
+            op.onExitFunction(identifier);
+            op.popArgumentFlags();
         }
     }
 
@@ -170,12 +183,6 @@ public final class SLInvokeNode extends SLExpressionNode {
 
     @Override
     protected boolean hasNewChildNode() {
-        if (functionNode.hasNewNode()) return true;
-
-        for (SLExpressionNode argNode: argumentNodes) {
-            if (argNode.hasNewNode()) return true;
-        }
-
-        return false;
+        return true;
     }
 }

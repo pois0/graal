@@ -47,6 +47,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
@@ -77,27 +78,20 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
-        final Object[] args = frame.getArguments();
-        if (args.length == 0) {
-            throw new RuntimeException("No argument");
-        }
-
-        final Object arg = args[args.length - 1];
-        if (!(arg instanceof FunctionCallSpecialParameter)) {
-            throw new RuntimeException("The last argument is not a instance of FunctionCallSpecialParameter");
-        }
-
-        if (arg == FunctionCallSpecialParameter.EXEC) {
-            return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
-        } else {
-            assert arg == FunctionCallSpecialParameter.CALC;
-
-            // return calcGeneric(frame);
-            return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
-        }
-    }
-
-    public Object executeGenericInner(VirtualFrame frame) {
+//        final Object[] args = frame.getArguments();
+//        if (args.length == 0) {
+//            throw new RuntimeException("No argument");
+//        }
+//
+//        final Object arg = args[args.length - 1];
+//        if (!(arg instanceof FunctionCallSpecialParameter)) {
+//            throw new RuntimeException("The last argument is not a instance of FunctionCallSpecialParameter");
+//        }
+//
+//        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
+//    }
+//
+//    public Object executeGenericInner(VirtualFrame frame) {
         try {
             /* Execute the function body. */
             bodyNode.executeVoid(frame);
@@ -123,7 +117,14 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        throw new RuntimeException("Never called this method");
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
+        try {
+            op.calcVoid(frame, bodyNode);
+        } catch (SLReturnException ex) {
+            return ex.getResult();
+        }
+
+        return SLNull.SINGLETON;
     }
 
     @Override

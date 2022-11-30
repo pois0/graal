@@ -77,7 +77,7 @@ public abstract class SLLessThanNode extends SLBinaryNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
         if (isNewNode()) {
             try {

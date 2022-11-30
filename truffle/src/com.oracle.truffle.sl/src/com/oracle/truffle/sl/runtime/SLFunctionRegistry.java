@@ -43,9 +43,11 @@ package com.oracle.truffle.sl.runtime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
@@ -53,6 +55,7 @@ import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.parser.SimpleLanguageParser;
+import org.graalvm.collections.Pair;
 
 /**
  * Manages the mapping from function names to {@link SLFunction function objects}.
@@ -62,6 +65,7 @@ public final class SLFunctionRegistry {
     private final SLLanguage language;
     private final FunctionsObject functionsObject = new FunctionsObject();
     private final Map<Map<String, RootCallTarget>, Void> registeredFunctions = new IdentityHashMap<>();
+    private final Set<String> functionContainsNewNode = new HashSet<>();
 
     public SLFunctionRegistry(SLLanguage language) {
         this.language = language;
@@ -103,7 +107,7 @@ public final class SLFunctionRegistry {
      * functions might not get registered.
      */
     @TruffleBoundary
-    public void register(Map<String, RootCallTarget> newFunctions) {
+    public void register(Map<String, RootCallTarget> newFunctions, Set<String> functionContainsNewNode) {
         if (registeredFunctions.containsKey(newFunctions)) {
             return;
         }
@@ -111,10 +115,12 @@ public final class SLFunctionRegistry {
             register(entry.getKey(), entry.getValue());
         }
         registeredFunctions.put(newFunctions, null);
+        this.functionContainsNewNode.addAll(functionContainsNewNode);
     }
 
     public void register(Source newFunctions) {
-        register(SimpleLanguageParser.parseSL(language, newFunctions));
+        final Pair<Map<String, RootCallTarget>, Set<String>> ff = SimpleLanguageParser.parseSL(language, newFunctions);
+        register(ff.getLeft(), ff.getRight());
     }
 
     public SLFunction getFunction(String name) {
@@ -138,4 +144,7 @@ public final class SLFunctionRegistry {
         return functionsObject;
     }
 
+    public boolean containNewNode(String functionName) {
+        return functionContainsNewNode.contains(functionName);
+    }
 }

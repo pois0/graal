@@ -74,7 +74,7 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         op.startNewExecution(frame, identifier);
         final Object result = executeGeneric(frame);

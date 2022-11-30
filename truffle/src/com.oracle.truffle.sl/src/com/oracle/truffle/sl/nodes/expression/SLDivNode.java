@@ -85,7 +85,7 @@ public abstract class SLDivNode extends SLBinaryNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {
@@ -112,7 +112,7 @@ public abstract class SLDivNode extends SLBinaryNode {
 
     @Override
     public long calcLongInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
         if (isNewNode()) {

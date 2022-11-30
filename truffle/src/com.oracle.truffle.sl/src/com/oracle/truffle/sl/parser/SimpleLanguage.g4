@@ -213,9 +213,7 @@ expression returns [SLExpressionNode result]
 u='delete'
 '('
 (
-   from=NUMERIC_LITERAL
-   ','
-   to=NUMERIC_LITERAL                           { $result = factory.createDelete($from, $to); }
+   deleted=NUMERIC_LITERAL                           { $result = factory.createDelete($deleted); }
 )
 ')'
 |
@@ -229,11 +227,9 @@ u='insert'
 u='replace'
 '('
 (
-   from=NUMERIC_LITERAL
-   ','
-   to=NUMERIC_LITERAL
+   deleted=NUMERIC_LITERAL
    ','                                          { factory.startNewExp(); }
-   logic_big_term                               { $result = factory.createReplace($from, $to, $logic_big_term.result); }
+   logic_big_term                               { $result = factory.createReplace($deleted, $logic_big_term.result); }
 )                                               { factory.endNewExp(); }
 ')'
 |

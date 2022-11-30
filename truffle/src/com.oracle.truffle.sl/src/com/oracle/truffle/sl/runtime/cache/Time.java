@@ -43,7 +43,10 @@ public class Time implements Comparable<Time>{
         int[] thatRaw = o.raw;
 
         for (int i = 0; true; i++) {
-            if (i == thisRaw.length) return -1;
+            if (i == thisRaw.length) {
+                if (i == thatRaw.length) return 0;
+                return -1;
+            }
             if (i == thatRaw.length) return 1;
 
             int cmp = Integer.compare(thisRaw[i], thatRaw[i]);

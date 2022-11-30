@@ -37,4 +37,12 @@ public class ExecutionContext {
         result = 31 * result + currentNodeIdentifier.hashCode();
         return result;
     }
+
+    @Override
+    public String toString() {
+        return "ExecutionContext{" +
+                "callContext=" + Arrays.toString(callContext) +
+                ", currentNodeIdentifier=" + currentNodeIdentifier +
+                '}';
+    }
 }

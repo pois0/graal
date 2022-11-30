@@ -42,11 +42,9 @@ package com.oracle.truffle.sl.nodes.local;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.profiles.BranchProfile;
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.parser.SLNodeFactory;
-import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
@@ -62,7 +60,6 @@ public class SLReadArgumentNode extends SLExpressionNode {
 
     /** The argument number, i.e., the index into the array of arguments. */
     private final int index;
-    private final Object argumentIdentifier;
 
     /**
      * Profiling information, collected by the interpreter, capturing whether the function was
@@ -70,19 +67,15 @@ public class SLReadArgumentNode extends SLExpressionNode {
      */
     private final BranchProfile outOfBoundsTaken = BranchProfile.create();
 
-    public SLReadArgumentNode(int index, Object argumentIdentifier) {
+    public SLReadArgumentNode(int index) {
         this.index = index;
-        this.argumentIdentifier = argumentIdentifier;
     }
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
         Object[] args = frame.getArguments();
         if (index < args.length) {
-            Object argumentIdentifier = this.argumentIdentifier;
-            if (argumentIdentifier != null) {
-                context.getHistoryOperator().onReadArgument(argumentIdentifier);
-            }
+            getContext().getHistoryOperator().onReadArgument(index);
             return args[index];
         } else {
             /* In the interpreter, record profiling information that the branch was used. */
@@ -94,7 +87,7 @@ public class SLReadArgumentNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         op.startNewExecution(frame, identifier);
         try {

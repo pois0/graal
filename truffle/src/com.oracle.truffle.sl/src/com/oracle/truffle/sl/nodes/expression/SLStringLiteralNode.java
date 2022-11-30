@@ -42,10 +42,7 @@ package com.oracle.truffle.sl.nodes.expression;
 
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Constant literal for a String value.
@@ -66,7 +63,7 @@ public final class SLStringLiteralNode extends SLLiteralNode {
 
     @Override
     public String calcGenericInner(VirtualFrame frame) {
-        return context.getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
+        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
     }
 
     @Override

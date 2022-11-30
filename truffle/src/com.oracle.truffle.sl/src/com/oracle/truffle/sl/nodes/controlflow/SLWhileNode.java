@@ -44,18 +44,16 @@ import com.oracle.truffle.api.Truffle;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.LoopNode;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
-import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
+import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.CALC;
+import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.EXEC;
+
 @NodeInfo(shortName = "while", description = "The node implementing a while loop")
 public final class SLWhileNode extends SLStatementNode {
-    static final int EXECUTE = 0;
-    static final int CALC = 1;
-
     @SuppressWarnings("FieldMayBeFinal")
     @Child private LoopNode loopNode;
 
@@ -65,10 +63,10 @@ public final class SLWhileNode extends SLStatementNode {
 
     @Override
     public void executeVoid(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.onEnterLoop(getNodeIdentifier());
         try {
-            loopNode.execute(frame, EXECUTE);
+            loopNode.execute(frame, EXEC);
         } finally {
             op.onExitLoop(getNodeIdentifier());
         }
@@ -76,7 +74,7 @@ public final class SLWhileNode extends SLStatementNode {
 
     @Override
     public void calcVoidInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
             op.newExecutionVoid(identifier, frame, this::executeVoid);

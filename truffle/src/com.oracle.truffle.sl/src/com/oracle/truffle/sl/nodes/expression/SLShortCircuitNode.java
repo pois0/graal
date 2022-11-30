@@ -46,7 +46,6 @@ import com.oracle.truffle.api.profiles.ConditionProfile;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Logical operations in SL use short circuit evaluation: if the evaluation of the left operand
@@ -102,7 +101,7 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = context.getHistoryOperator();
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         if (isNewNode()) {
             return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeBoolean);
         }
@@ -113,7 +112,7 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
     }
 
     private boolean calcSubNode(SLExpressionNode node, VirtualFrame frame) {
-        return context.getHistoryOperator().calcBoolean(frame, this, node);
+        return getContext().getHistoryOperator().calcBoolean(frame, this, node);
     }
 
     /**

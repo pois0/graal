@@ -42,7 +42,6 @@ package com.oracle.truffle.sl.nodes;
 
 import com.oracle.truffle.api.dsl.TypeSystemReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.instrumentation.GenerateWrapper;
 import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.Tag;
@@ -56,7 +55,6 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
  */
 @TypeSystemReference(SLTypes.class)
 @NodeInfo(description = "The abstract base node for all expressions")
-@GenerateWrapper
 public abstract class SLExpressionNode extends SLStatementNode {
 
     private boolean hasExpressionTag;
@@ -73,7 +71,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
         try {
             return calcGenericInner(frame);
         } finally {
-            context.getHistoryOperator().finishCalc(getNodeIdentifier());
+            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
         }
     }
 
@@ -129,7 +127,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
         try {
             return calcLongInner(frame);
         } finally {
-            context.getHistoryOperator().finishCalc(getNodeIdentifier());
+            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
         }
     }
 
@@ -145,7 +143,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
         try {
             return calcBooleanInner(frame);
         } finally {
-            context.getHistoryOperator().finishCalc(getNodeIdentifier());
+            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
         }
     }
 }

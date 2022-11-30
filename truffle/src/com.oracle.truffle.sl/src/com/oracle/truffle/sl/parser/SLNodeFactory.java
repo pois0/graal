@@ -43,8 +43,10 @@ package com.oracle.truffle.sl.parser;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.oracle.truffle.sl.nodes.cache.DeleteNode;
 import com.oracle.truffle.sl.nodes.cache.NewNode;
@@ -126,10 +128,12 @@ public class SLNodeFactory {
     /* State while parsing a source unit. */
     private final Source source;
     private final Map<String, RootCallTarget> allFunctions;
+    private final Set<String> functionContainsNewNode;
 
     /* State while parsing a function. */
     private int functionStartPos;
     private String functionName;
+    private boolean containsNewNode;
     private int functionBodyStartPos; // includes parameter list
     private int parameterCount;
     private FrameDescriptor frameDescriptor;
@@ -146,10 +150,15 @@ public class SLNodeFactory {
         this.language = language;
         this.source = source;
         this.allFunctions = new HashMap<>();
+        this.functionContainsNewNode = new HashSet<>();
     }
 
     public Map<String, RootCallTarget> getAllFunctions() {
         return allFunctions;
+    }
+
+    public Set<String> getFunctionContainsNewNode() {
+        return functionContainsNewNode;
     }
 
     public void startFunction(Token nameToken, Token bodyStartToken) {
@@ -168,6 +177,7 @@ public class SLNodeFactory {
         expNumber = 0;
         newExpNumber = 0;
         inNewExp = false;
+        containsNewNode = false;
         startBlock();
     }
 
@@ -177,7 +187,7 @@ public class SLNodeFactory {
          * ensures that accesses to parameters are specialized the same way as local variables are
          * specialized.
          */
-        final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount, nameToken.getText());
+        final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount);
         readArg.setSourceSection(nameToken.getStartIndex(), nameToken.getText().length());
         SLExpressionNode assignment = createAssignment(createStringLiteral(nameToken, false), readArg, parameterCount);
         methodNodes.add(assignment);
@@ -201,6 +211,7 @@ public class SLNodeFactory {
 
             final SLRootNode rootNode = new SLRootNode(language, frameDescriptor, functionBodyNode, functionSrc, functionName);
             allFunctions.put(functionName, Truffle.getRuntime().createCallTarget(rootNode));
+            if (containsNewNode) functionContainsNewNode.add(functionName);
         }
 
         functionStartPos = 0;
@@ -372,7 +383,9 @@ public class SLNodeFactory {
             return null;
         }
         final SLExpressionNode leftUnboxed = SLUnboxNodeGen.create(leftNode);
+        setIdentifier(leftUnboxed);
         final SLExpressionNode rightUnboxed = SLUnboxNodeGen.create(rightNode);
+        setIdentifier(rightUnboxed);
 
         final SLExpressionNode result;
         switch (opToken.getText()) {
@@ -618,27 +631,30 @@ public class SLNodeFactory {
         return result;
     }
 
-    public SLExpressionNode createDelete(Token from, Token to) {
-        final int fromNum = Integer.parseInt(from.getText());
-        final int toNum = Integer.parseInt(to.getText());
-        final SLExpressionNode result = new DeleteNode(new NodeIdentifier(functionName, fromNum), new NodeIdentifier(functionName, toNum));
+    public SLExpressionNode createDelete(Token deletedNum) {
+        final int deleted = Integer.parseInt(deletedNum.getText());
+        final SLExpressionNode result = new DeleteNode(new NodeIdentifier(functionName, deleted));
         inNewExp = true;
         setIdentifier(result);
         inNewExp = false;
+        containsNewNode = true;
         return result;
     }
 
     public SLExpressionNode createInsert(SLExpressionNode node) {
+        node.setNewNode();
         final NewNode result = new NewNode(node);
         setIdentifier(result);
+        containsNewNode = true;
         return result;
     }
 
-    public SLExpressionNode createReplace(Token from, Token to, SLExpressionNode node) {
-        final int fromNum = Integer.parseInt(from.getText());
-        final int toNum = Integer.parseInt(to.getText());
-        final SLExpressionNode result = new ReplaceNode(node, new NodeIdentifier(functionName, fromNum), new NodeIdentifier(functionName, toNum));
+    public SLExpressionNode createReplace(Token deleted, SLExpressionNode node) {
+        final int deletedNum = Integer.parseInt(deleted.getText());
+        node.setNewNode();
+        final SLExpressionNode result = new ReplaceNode(node, new NodeIdentifier(functionName, deletedNum));
         setIdentifier(result);
+        containsNewNode = true;
         return result;
     }
 

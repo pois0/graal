@@ -3,17 +3,15 @@ package com.oracle.truffle.sl.runtime.cache;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.instrumentation.AllocationReporter;
 import com.oracle.truffle.api.instrumentation.ExecutionEventNode;
 import com.oracle.truffle.api.instrumentation.ExecutionEventNodeFactory;
-import com.oracle.truffle.api.instrumentation.ObjectChangeEvent;
-import com.oracle.truffle.api.instrumentation.ObjectChangeListener;
 import com.oracle.truffle.api.instrumentation.StackListener;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.LibraryFactory;
+import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.sl.SLException;
@@ -21,8 +19,11 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
+import com.oracle.truffle.sl.runtime.SLFunction;
+import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import org.graalvm.collections.Pair;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -32,73 +33,72 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 public final class ExecutionHistoryOperator {
     private static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY_ = LibraryFactory.resolve(InteropLibrary.class);
+    private static final ExecutionHistory rootHistory = new ExecutionHistory();
+    private static boolean isInitialExecution = true;
 
     private final SLLanguage language;
-    private final AllocationReporter allocationReporter;
+    private final SLFunctionRegistry functionRegistry;
 
     private Time currentTime = Time.zero().subdivide();
     private boolean isInExec = false;
     private ExecutionContext lastCalcCtx = null;
     private ExecutionHistory currentHistory;
-    private final ExecutionHistory rootHistory;
     private final ArrayDeque<HashSet<Object>> localVarFlagStack = new ArrayDeque<>();
-    private final HashMap<Integer, HashSet<Object>> objectFieldFlags = new HashMap<>();
+    private final ArrayDeque<boolean[]> parameterFlagStack = new ArrayDeque<>();
+    private final HashMap<ExecutionContext, HashSet<Object>> objectFieldFlags = new HashMap<>();
     private final ArrayDeque<CallContextElement> currentStack = new ArrayDeque<>();
-    private HashMap<Integer, WeakReference<Object>> objectHolder = new HashMap<>(); // hash -> weak reference of object
+    private HashMap<ExecutionContext, WeakReference<Object>> ctxToObj = new HashMap<>(); // hash -> weak reference of object
+    private WeakHashMap<Object, ExecutionContext> objToCtx = new WeakHashMap<>();
 
     // Caches
     private CallContextElement[] callContextCache = null;
     private CallContextElement.FunctionCallArray callArrayCache = null;
     private HashSet<Object> localVarFlagCache = null;
 
-    private final ObjectChangeListener objectChangeListener = new ObjectChangeListener() {
-        @Override
-        public void onFieldAssigned(ObjectChangeEvent e) {
-            int objectHash = e.getObject().hashCode();
-            String key = (String) e.getKey();
-
-            objectFieldFlags.computeIfAbsent(objectHash, it -> new HashSet<>())
-                    .add(key);
-            currentHistory.onUpdateObjectWithHash(currentTime, objectHash, key, e.getValue());
-        }
-    };
-
     private final StackListener stackListener = new StackListener() {
         @Override
         public void onObjectSet(FrameSlot slot, Object value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), replaceReference(value));
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onBooleanSet(FrameSlot slot, boolean value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onByteSet(FrameSlot slot, byte value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onIntSet(FrameSlot slot, int value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onLongSet(FrameSlot slot, long value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onFloatSet(FrameSlot slot, float value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
 
         @Override
         public void onDoubleSet(FrameSlot slot, double value) {
+            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
             getLocalVarFlagCache().add(slot.getIdentifier());
         }
     };
@@ -112,19 +112,12 @@ public final class ExecutionHistoryOperator {
         return null;
     };
 
-    public ExecutionHistoryOperator(SLLanguage language, AllocationReporter allocationReporter, ExecutionHistory prevHistory) {
+    public ExecutionHistoryOperator(SLLanguage language, SLFunctionRegistry functionRegistry) {
         this.language = language;
-        this.allocationReporter = allocationReporter;
-        this.currentHistory = prevHistory;
-        this.rootHistory = currentHistory;
-    }
+        this.functionRegistry = functionRegistry;
+        this.currentHistory = rootHistory;
 
-    public ExecutionHistoryOperator(SLLanguage language, AllocationReporter reporter) {
-        this(language, reporter, new ExecutionHistory());
-    }
-
-    public ObjectChangeListener getObjectChangeListener() {
-        return objectChangeListener;
+        localVarFlagStack.add(new HashSet<>());
     }
 
     public StackListener getStackListener() {
@@ -135,8 +128,32 @@ public final class ExecutionHistoryOperator {
         return tickFactory;
     }
 
-    public void onReadArgument(Object argumentName) {
-        currentHistory.onReadArgument(currentTime, getCallContext(), argumentName);
+    public boolean checkInitialExecution() {
+        final boolean isInitialExecution = ExecutionHistoryOperator.isInitialExecution;
+        if (isInitialExecution) {
+            ExecutionHistoryOperator.isInitialExecution = false;
+            isInExec = true;
+        }
+        return isInitialExecution;
+    }
+
+    public boolean checkContainsNewNodeInFunctionCalls(NodeIdentifier identifier) {
+        final ExecutionHistory.TimePair tp = currentHistory.getTime(lastCalcCtx);
+        assert tp != null;
+        final Time from = tp.getEnd();
+        final ExecutionHistory.TimePair tp2 = currentHistory.getTime(getExecutionContext(identifier));
+        assert tp2 != null;
+        final Time end = tp2.getEnd();
+        final Iterator<ItemWithTime<String>> iter = currentHistory.getFunctionEnters(from, end);
+        while (iter.hasNext()) {
+            final String funcName = iter.next().getItem();
+            if (functionRegistry.containNewNode(funcName)) return true;
+        }
+        return false;
+    }
+
+    public void onReadArgument(int argIndex) {
+        currentHistory.onReadArgument(currentTime, getFunctionCallArray(), argIndex);
     }
 
     public void onReadLocalVariable(Object variableName) {
@@ -144,13 +161,19 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onReadObjectField(Object object, Object field) {
-        currentHistory.onReadObjectField(currentTime, object, field);
+        currentHistory.onReadObjectField(currentTime, objToCtx.get(object), field);
     }
 
-    public void onEnterFunction(NodeIdentifier identifier) {
+    public void onEnterFunction(NodeIdentifier identifier, String funcName, boolean isCalc) {
         invalidateCache();
         currentStack.push(new CallContextElement.FunctionCall(identifier));
         localVarFlagStack.push(new HashSet<>());
+        final Time time = isCalc ? currentHistory.getTime(lastCalcCtx).getEnd() : currentTime;
+        currentHistory.onEnterFunction(time, funcName);
+    }
+
+    public void pushArgumentFlags(boolean[] flags) {
+        parameterFlagStack.push(flags);
     }
 
     public void onExitFunction(NodeIdentifier identifier) {
@@ -158,6 +181,10 @@ public final class ExecutionHistoryOperator {
         CallContextElement elem = currentStack.pop();
         assert elem instanceof CallContextElement.FunctionCall && elem.getNodeIdentifier() == identifier;
         localVarFlagStack.pop();
+    }
+
+    public void popArgumentFlags() {
+        parameterFlagStack.pop();
     }
 
     public void onEnterLoop(NodeIdentifier identifier) {
@@ -178,139 +205,209 @@ public final class ExecutionHistoryOperator {
         assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
     }
 
-    public boolean shouldReExecute(SLStatementNode node) {
-        if (node.hasNewNode()) return true;
+    public void onGenerateObject(SLObject object, ExecutionContext execCtx) {
+        objToCtx.put(object, execCtx);
+        ctxToObj.put(execCtx, new WeakReference<>(object));
+    }
+
+    public void onObjectUpdated(Object object, String fldName, Object newValue) {
+        final ExecutionContext objGenCtx = objToCtx.get(object);
+        currentHistory.onUpdateObjectWithHash(currentTime, objGenCtx, fldName, replaceReference(newValue));
+        objectFieldFlags.computeIfAbsent(objGenCtx, it -> new HashSet<>())
+                .add(fldName);
+    }
+
+    public ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
+        if (node.hasNewNode()) return ShouldReExecuteResult.RE_EXECUTE;
         final NodeIdentifier identifier = node.getNodeIdentifier();
         Iterator<ItemWithTime<ExecutionHistory.ReadContent>> iter = getReadContentIterator(identifier);
+
+        if (iter == null) return ShouldReExecuteResult.NEW_EXECUTE;
 
         while (iter.hasNext()) {
             ExecutionHistory.ReadContent readContent = iter.next().getItem();
             if (readContent instanceof ExecutionHistory.ReadArgument) {
-
+                ExecutionHistory.ReadArgument content = (ExecutionHistory.ReadArgument) readContent;
+                if (!content.getCallContext().equals(getFunctionCallArray())) continue;
+                final int argIndex = content.getArgIndex();
+                if (parameterFlagStack.peek()[argIndex]) return ShouldReExecuteResult.RE_EXECUTE;
             } else if (readContent instanceof ExecutionHistory.ReadLocalVariable) {
                 ExecutionHistory.ReadLocalVariable content = (ExecutionHistory.ReadLocalVariable) readContent;
                 if (Arrays.equals(content.getCallContext(), getCallContext()) && getLocalVarFlagCache().contains(content.getVariableName())) {
-                    return true;
+                    return ShouldReExecuteResult.RE_EXECUTE;
                 }
             } else if (readContent instanceof ExecutionHistory.ReadObjectField) {
                 ExecutionHistory.ReadObjectField content = (ExecutionHistory.ReadObjectField) readContent;
-                HashSet<Object> fields = objectFieldFlags.get(content.getObjectId());
+                HashSet<Object> fields = objectFieldFlags.get(content.getObjGenCtx());
                 if (fields != null && fields.contains(content.getFieldName())) {
-                    return true;
+                    return ShouldReExecuteResult.RE_EXECUTE;
                 }
             }
         }
 
-        return false;
+        return ShouldReExecuteResult.USE_CACHE;
     }
 
-    public Object getReturnedValueOrThrow(NodeIdentifier identifier, VirtualFrame frame) {
-        ExecutionContext execCtx = getExecutionContext(identifier);
+    public Object getReturnedValueOrThrow(NodeIdentifier identifier) {
+        final ExecutionContext execCtx = getExecutionContext(identifier);
+        return getReturnedValueOrThrow(execCtx);
+    }
 
-        Iterator<ItemWithTime<ExecutionHistory.ObjectUpdate>> updateContentIterator = getObjectUpdatesIterator(execCtx);
-        ItemWithTime<ExecutionHistory.ObjectUpdate> it = updateContentIterator.next();
-        while (it != null) {
-            ExecutionHistory.ObjectUpdate item = it.getItem();
+    public Object getReturnedValueOrThrow(ExecutionContext execCtx) {
+        final ExecutionHistory.TimePair tp = currentHistory.getTime(execCtx);
+        assert tp != null;
+        System.out.println("Skipped from " + tp.getStart() + " to " + tp.getEnd());
+        final Object value = currentHistory.getReturnedValueOrThrow(tp.getEnd());
+        return revertObject(value);
+    }
 
-            Object obj = objectHolder.get(item.getObjectId()).get();
-            InteropLibrary library = INTEROP_LIBRARY_.getUncached(obj);
-            try {
-                library.writeMember(obj, item.getFieldName(), revertObject(item.getNewValue()));
-            } catch (UnsupportedMessageException | UnknownIdentifierException | UnsupportedTypeException e) {
-                throw new RuntimeException(e);
-            }
+    public Object getVariableValue(Object varName, NodeIdentifier identifier) {
+        final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
+        final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(getFunctionCallArray()).get((String) varName);
+        final int i = ItemWithTime.binarySearch(varHistory, time);
+        return varHistory.get(i);
+    }
 
-            it = updateContentIterator.next();
-        }
+    public Object getFieldValue(Object obj, String fieldName, NodeIdentifier identifier) {
+        final ExecutionContext objGenCtx = objToCtx.get(obj);
+        final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
+        final HashMap<String, ArrayList<ItemWithTime<Object>>> objectHistory = currentHistory.getObjectHistory(objGenCtx);
+        final ArrayList<ItemWithTime<Object>> fieldHistory = objectHistory.get(fieldName);
+        final int i = ItemWithTime.binarySearch(fieldHistory, time);
+        final Object value = fieldHistory.get(i).getItem();
+        return revertObject(value);
+    }
 
-        Time finishedTime = currentHistory.getFinishedTime(execCtx);
-        assert finishedTime != null;
-        return currentHistory.getReturnedValueOrThrow(finishedTime);
+    public void deleteHistory(NodeIdentifier identifier) {
+        currentHistory.deleteRecords(getExecutionContext(identifier));
     }
 
     public Object calcGeneric(VirtualFrame frame, SLExpressionNode node) {
         try {
-            if (shouldReExecute(node)) {
-                return node.calcGenericInner(frame);
-            } else {
-                return getReturnedValueOrThrow(node.getNodeIdentifier(), frame);
+            switch (shouldReExecute(node)) {
+                case USE_CACHE:
+                    return getReturnedValueOrThrow(node.getNodeIdentifier());
+                case RE_EXECUTE:
+                    return node.calcGenericInner(frame);
+                case NEW_EXECUTE:
+                    return newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric);
             }
         } finally {
             finishCalc(node.getNodeIdentifier());
         }
+
+        throw new RuntimeException("Never reach here");
     }
 
-    public boolean calcBoolean(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
+    public Pair<Object, Boolean> calcGenericParameter(VirtualFrame frame, SLExpressionNode node) {
         try {
-            if (shouldReExecute(node)) {
-                return node.calcBooleanInner(frame);
-            } else {
-                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier(), frame);
+            switch (shouldReExecute(node)) {
+                case USE_CACHE:
+                    return Pair.create(getReturnedValueOrThrow(node.getNodeIdentifier()), false);
+                case RE_EXECUTE:
+                    return Pair.create(node.calcGenericInner(frame), true);
+                case NEW_EXECUTE:
+                    return Pair.create(newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric), true);
+            }
+        } finally {
+            finishCalc(node.getNodeIdentifier());
+        }
+
+        throw new RuntimeException("Never reach here");
+    }
+
+    public boolean calcBoolean(VirtualFrame frame, Node currentNode, SLExpressionNode node) {
+        try {
+            switch (shouldReExecute(node)) {
+            case USE_CACHE:
+                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
                 if (obj instanceof Boolean) {
                     return (boolean) obj;
                 } else {
                     throw new UnexpectedResultException(obj);
                 }
+            case RE_EXECUTE:
+                return node.calcBooleanInner(frame);
+            case NEW_EXECUTE:
+                return newExecutionBoolean(node.getNodeIdentifier(), frame, node::executeBoolean);
             }
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
+        } finally {
+            finishCalc(node.getNodeIdentifier());
         }
+
+        throw new RuntimeException("Never reach here");
     }
 
     public long calcLong(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
         try {
-            if (shouldReExecute(node)) {
-                try {
-                    return node.calcLongInner(frame);
-                } finally {
-                    finishCalc(node.getNodeIdentifier());
-                }
-            } else {
-                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier(), frame);
+            switch (shouldReExecute(node)) {
+            case USE_CACHE:
+                final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
                 if (obj instanceof Long) {
-                    return (Long) obj;
+                    return (long) obj;
                 } else {
                     throw new UnexpectedResultException(obj);
                 }
+            case RE_EXECUTE:
+                return node.calcLongInner(frame);
+            case NEW_EXECUTE:
+                return newExecutionLong(node.getNodeIdentifier(), frame, node::executeLong);
             }
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
+        } finally {
+            finishCalc(node.getNodeIdentifier());
         }
+
+        throw new RuntimeException("Never reach here");
     }
 
     public void calcVoid(VirtualFrame frame, SLStatementNode node) {
-        if (shouldReExecute(node)) {
-            node.calcVoidInner(frame);
+        try {
+            switch (shouldReExecute(node)) {
+            case USE_CACHE:
+                getReturnedValueOrThrow(node.getNodeIdentifier());
+                return;
+            case RE_EXECUTE:
+                node.calcVoidInner(frame);
+                return;
+            case NEW_EXECUTE:
+                newExecutionVoid(node.getNodeIdentifier(), frame, node::executeVoid);
+                return;
+            }
+        } finally {
             finishCalc(node.getNodeIdentifier());
-        } else {
-            getReturnedValueOrThrow(node.getNodeIdentifier(), frame);
         }
+
+        throw new RuntimeException("Never reach here");
     }
 
-    public Object calcFunction(VirtualFrame frame, SLStatementNode node) {
-        // TODO
-        return null;
-    }
-
-    public Iterator<ItemWithTime<ExecutionHistory.ReadContent>> getReadContentIterator(NodeIdentifier identifier) {
+    private Iterator<ItemWithTime<ExecutionHistory.ReadContent>> getReadContentIterator(NodeIdentifier identifier) {
         return currentHistory.getReadOperations(getExecutionContext(identifier));
     }
 
-    public Iterator<ItemWithTime<ExecutionHistory.ObjectUpdate>> getObjectUpdatesIterator(NodeIdentifier identifier) {
-        return currentHistory.getObjectUpdates(getExecutionContext(identifier));
-    }
-
-    public Iterator<ItemWithTime<ExecutionHistory.ObjectUpdate>> getObjectUpdatesIterator(ExecutionContext execCtx) {
+    public Iterator<ItemWithTime<ObjectUpdate>> getObjectUpdatesIterator(ExecutionContext execCtx) {
         return currentHistory.getObjectUpdates(execCtx);
     }
 
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
         isInExec = true;
+        final ExecutionHistory history = currentHistory;
+        final ExecutionHistory.TimePair time = history.getTime(getExecutionContext(identifier));
+        if (time != null) {
+            history.deleteRecords(time.getStart(), time.getEnd());
+        }
         final ExecutionContext lastCalcCtx = this.lastCalcCtx;
         if (lastCalcCtx != null) {
-
-            currentTime = currentHistory.getTime(lastCalcCtx).getEnd().subdivide();
+            final ExecutionHistory.TimePair tp = history.getTime(lastCalcCtx);
+            if (tp == null) {
+                currentTime.inc();
+            } else {
+                currentTime = tp.getEnd().subdivide();
+            }
         }
         constructFrameAndObjects(currentTime, frame);
         currentHistory = new ExecutionHistory();
@@ -411,9 +508,11 @@ public final class ExecutionHistoryOperator {
     private void constructFrameAndObjects(Time time, VirtualFrame frame) {
         ExecutionHistory history = currentHistory;
         HashMap<String, ArrayList<ItemWithTime<Object>>> local = history.getLocalHistory(getFunctionCallArray());
+        if (local == null) return;
         FrameDescriptor descriptor = frame.getFrameDescriptor();
 
-        HashMap<Integer, WeakReference<Object>> hashToObj = new HashMap<>();
+        final HashMap<ExecutionContext, WeakReference<Object>> ctxToObj = new HashMap<>();
+        final WeakHashMap<Object, ExecutionContext> objToCtx = new WeakHashMap<>();
 
         for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : local.entrySet()) {
             String name = entry.getKey();
@@ -429,20 +528,22 @@ public final class ExecutionHistoryOperator {
             } else if (value instanceof SLBigNumber || value instanceof String) {
                 frame.setObject(slot, value);
             } else if (value instanceof ExecutionHistory.ObjectReference) {
-                Object obj = constructObjects(time, ((ExecutionHistory.ObjectReference) value).getReferenceHash(), history, hashToObj);
+                Object obj = constructObjects(time, ((ExecutionHistory.ObjectReference) value).getObjGenCtx(), history, ctxToObj, objToCtx);
                 frame.setObject(slot, obj);
+            } else if (value instanceof FunctionReference) {
+                frame.setObject(slot, getFunction(((FunctionReference) value).getFunctionName()));
             } else {
                 throw new RuntimeException("Unknown value type: " + value.getClass().getName());
             }
         }
 
-        objectHolder = hashToObj;
+        this.ctxToObj = ctxToObj;
+        this.objToCtx = objToCtx;
     }
 
-    private Object constructObjects(Time time, int idHash, ExecutionHistory history, HashMap<Integer, WeakReference<Object>> hashToObj) {
-        SLObject newObject = language.createObject(allocationReporter);
-        hashToObj.put(idHash, new WeakReference<>(newObject));
-        HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(idHash);
+    private Object constructObjects(Time time, ExecutionContext objGenCtx, ExecutionHistory history, HashMap<ExecutionContext, WeakReference<Object>> ctxToObj, WeakHashMap<Object, ExecutionContext> objToCtx) {
+        SLObject newObject = language.createObject(this, objGenCtx);
+        HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(objGenCtx);
         if (currentObjectHistory != null) {
             InteropLibrary library = INTEROP_LIBRARY_.create(newObject);
             for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : currentObjectHistory.entrySet()) {
@@ -459,15 +560,17 @@ public final class ExecutionHistoryOperator {
                             || value instanceof String) {
                         library.writeMember(newObject, name, value);
                     } else if (value instanceof ExecutionHistory.ObjectReference) {
-                        int valueObjIdHash = ((ExecutionHistory.ObjectReference) value).getReferenceHash();
-                        WeakReference<Object> objRef = hashToObj.get(valueObjIdHash);
+                        ExecutionContext valueGenCtx = ((ExecutionHistory.ObjectReference) value).getObjGenCtx();
+                        WeakReference<Object> objRef = ctxToObj.get(valueGenCtx);
                         Object newValue;
                         if (objRef == null) {
-                            newValue = constructObjects(time, valueObjIdHash, history, hashToObj);
+                            newValue = constructObjects(time, valueGenCtx, history, ctxToObj, objToCtx);
                         } else {
                             newValue = objRef.get();
                         }
                         library.writeMember(newObject, name, newValue);
+                    } else if (value instanceof FunctionReference) {
+                        library.writeMember(newObject, name, getFunction(((FunctionReference) value).getFunctionName()));
                     } else {
                         throw new RuntimeException("Unknown value type: " + value.getClass().getName());
                     }
@@ -484,7 +587,7 @@ public final class ExecutionHistoryOperator {
         return currentTime = currentTime.inc();
     }
 
-    private ExecutionContext getExecutionContext(NodeIdentifier identifier) {
+    public ExecutionContext getExecutionContext(NodeIdentifier identifier) {
         return new ExecutionContext(getCallContext(), identifier);
     }
 
@@ -498,7 +601,7 @@ public final class ExecutionHistoryOperator {
                 }
             }
 
-            callArray = new CallContextElement.FunctionCallArray(functionCalls.toArray(new CallContextElement.FunctionCall[0]));
+            this.callArrayCache = callArray = new CallContextElement.FunctionCallArray(functionCalls.toArray(new CallContextElement.FunctionCall[0]));
         }
 
         return callArray;
@@ -528,23 +631,115 @@ public final class ExecutionHistoryOperator {
         localVarFlagCache = null;
     }
 
+    private void invalidateCallArrayCache() {
+        callArrayCache = null;
+    }
+
     private void invalidateCache() {
         invalidateCallContextCache();
         invalidateLocalVarFlagCache();
+        invalidateCallArrayCache();
     }
 
-    private Object revertObject(Time time, ExecutionHistory history, Object value) {
+    private Object revertObject(Object value) {
         if (value instanceof Long
                 || value instanceof Boolean
                 || value instanceof SLBigNumber
                 || value instanceof String) {
             return value;
         } else if (value instanceof ExecutionHistory.ObjectReference) {
-            int hash = ((ExecutionHistory.ObjectReference) value).getReferenceHash();
-            WeakReference<Object> objRef = objectHolder.get(hash);
-            return objRef == null ? constructObjects(time, hash, history, objectHolder) : objRef.get();
+            return ctxToObj.computeIfAbsent(
+                        ((ExecutionHistory.ObjectReference) value).getObjGenCtx(),
+                        objGenCtx -> new WeakReference<>(language.createObject(this, objGenCtx))
+                    )
+                    .get();
+        } else if (value instanceof FunctionReference) {
+            final FunctionReference funcRef = (FunctionReference) value;
+            final SLFunction function = getFunction(funcRef.getFunctionName());
+            assert function != null : "Unknown function: " + funcRef.functionName;
+            return function;
+        } else if (value == null) {
+            return null;
         } else {
             throw new RuntimeException("Invalid type: " + value.getClass().getName());
+        }
+    }
+
+    private Object getObject(Time time, ExecutionHistory.ObjectReference ref) {
+        ExecutionContext objGenCtx = ref.getObjGenCtx();
+        WeakReference<Object> objRef = ctxToObj.get(objGenCtx);
+        return objRef == null ? constructObjects(time, objGenCtx, currentHistory, ctxToObj, objToCtx) : objRef.get();
+    }
+
+    private SLFunction getFunction(String functionName) {
+        return functionRegistry.getFunction(functionName);
+    }
+
+    private Object replaceReference(Object value) {
+        Object saveNewValue;
+        if (value == null
+                || value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long
+                || value instanceof Float
+                || value instanceof Double
+                || value instanceof Character
+                || value instanceof String
+                || value instanceof SLBigNumber
+        ) {
+            saveNewValue = value;
+        } else if (value instanceof SLFunction) {
+            saveNewValue = new FunctionReference(((SLFunction) value).getName());
+        } else {
+            saveNewValue = new ExecutionHistory.ObjectReference(objToCtx.get(value));
+        }
+
+        return saveNewValue;
+    }
+
+    public final static class ObjectUpdate {
+        private final ExecutionContext objectGenCtx;
+        private final String fieldName;
+        private final Object newValue;
+
+        public ObjectUpdate(ExecutionContext objectGenCtx, String fieldName, Object newValue) {
+            this.objectGenCtx = objectGenCtx;
+            this.fieldName = fieldName;
+            this.newValue = newValue;
+        }
+
+        public ExecutionContext getObjectGenCtx() {
+            return objectGenCtx;
+        }
+
+        public String getFieldName() {
+            return fieldName;
+        }
+
+        public Object getNewValue() {
+            return newValue;
+        }
+
+        @Override
+        public String toString() {
+            return "ObjectUpdate{" +
+                    "objectGenCtx=" + objectGenCtx +
+                    ", fieldName='" + fieldName + '\'' +
+                    ", newValue=" + newValue +
+                    '}';
+        }
+    }
+
+    public final static class FunctionReference {
+        private final String functionName;
+
+        public FunctionReference(String functionName) {
+            this.functionName = functionName;
+        }
+
+        public String getFunctionName() {
+            return functionName;
         }
     }
 
@@ -563,7 +758,8 @@ public final class ExecutionHistoryOperator {
 
         @Override
         protected void onReturnValue(VirtualFrame frame, Object result) {
-            currentHistory.onReturnValue(startTime.pop(), getAndIncrementTime(), getExecutionContext(identifier), result);
+            currentHistory.onReturnValue(startTime.pop(), getAndIncrementTime(), getExecutionContext(identifier), replaceReference(result));
+//            System.out.println("time: " + currentTime + "/ identifier: " + identifier + "/ object: " + result);
         }
 
         @Override
@@ -588,5 +784,9 @@ public final class ExecutionHistoryOperator {
 
     public interface VoidTask {
         void invokeVoid(VirtualFrame frame);
+    }
+
+    private static enum ShouldReExecuteResult {
+        USE_CACHE, RE_EXECUTE, NEW_EXECUTE
     }
 }
