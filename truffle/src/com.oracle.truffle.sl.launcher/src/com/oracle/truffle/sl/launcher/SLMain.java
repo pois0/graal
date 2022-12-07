@@ -78,10 +78,13 @@ public final class SLMain {
             source = Source.newBuilder(SL, new InputStreamReader(System.in), "<stdin>").build();
             // @formatter:on
         } else {
-            for (String file : files) {
-                System.out.println("execute: " + file);
-                source = Source.newBuilder(SL, new File(file)).build();
-                executeSource(source, System.in, System.out, options);
+            for (int i = 0; i < 50; i++) {
+                for (String file : files) {
+                    System.out.println("execute: " + file);
+                    source = Source.newBuilder(SL, new File(file)).build();
+                    executeSource(source, System.in, System.out, options);
+                }
+                System.gc();
             }
         }
 

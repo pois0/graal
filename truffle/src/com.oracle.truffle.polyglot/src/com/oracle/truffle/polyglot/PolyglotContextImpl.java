@@ -938,7 +938,9 @@ final class PolyglotContextImpl extends AbstractContextImpl implements com.oracl
             languageContext.checkAccess(null);
             languageContext.ensureInitialized(null);
             CallTarget target = languageContext.parseCached(null, source, null);
+            long l = System.nanoTime();
             Object result = target.call(PolyglotImpl.EMPTY_ARGS);
+            System.out.println("\u001B[31m ExecutionTime: " + (System.nanoTime() - l) + "ns\u001B[m");
             Value hostValue;
             try {
                 hostValue = languageContext.asValue(result);

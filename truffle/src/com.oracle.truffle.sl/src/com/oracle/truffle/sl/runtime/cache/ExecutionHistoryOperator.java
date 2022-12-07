@@ -37,8 +37,9 @@ import java.util.WeakHashMap;
 
 public final class ExecutionHistoryOperator {
     private static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY_ = LibraryFactory.resolve(InteropLibrary.class);
-    private static final ExecutionHistory rootHistory = new ExecutionHistory();
+    private static ExecutionHistory rootHistory = new ExecutionHistory();
     private static boolean isInitialExecution = true;
+    private static boolean rotate = true;
 
     private final SLLanguage language;
     private final SLFunctionRegistry functionRegistry;
@@ -115,6 +116,10 @@ public final class ExecutionHistoryOperator {
     public ExecutionHistoryOperator(SLLanguage language, SLFunctionRegistry functionRegistry) {
         this.language = language;
         this.functionRegistry = functionRegistry;
+        if (rotate) {
+            rootHistory = new ExecutionHistory();
+        }
+        rotate = !rotate;
         this.currentHistory = rootHistory;
 
         localVarFlagStack.add(new HashSet<>());
@@ -230,6 +235,7 @@ public final class ExecutionHistoryOperator {
                 ExecutionHistory.ReadArgument content = (ExecutionHistory.ReadArgument) readContent;
                 if (!content.getCallContext().equals(getFunctionCallArray())) continue;
                 final int argIndex = content.getArgIndex();
+                //noinspection DataFlowIssue
                 if (parameterFlagStack.peek()[argIndex]) return ShouldReExecuteResult.RE_EXECUTE;
             } else if (readContent instanceof ExecutionHistory.ReadLocalVariable) {
                 ExecutionHistory.ReadLocalVariable content = (ExecutionHistory.ReadLocalVariable) readContent;
