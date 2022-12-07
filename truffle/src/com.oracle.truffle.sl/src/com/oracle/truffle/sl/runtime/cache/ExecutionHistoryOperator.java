@@ -59,48 +59,42 @@ public final class ExecutionHistoryOperator {
     private CallContextElement[] callContextCache = null;
     private CallContextElement.FunctionCallArray callArrayCache = null;
     private HashSet<Object> localVarFlagCache = null;
+    private ExecutionHistory.LocalVarOperator localVarOp = null;
 
     private final StackListener stackListener = new StackListener() {
         @Override
         public void onObjectSet(FrameSlot slot, Object value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), replaceReference(value));
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), replaceReference(value));
         }
 
         @Override
         public void onBooleanSet(FrameSlot slot, boolean value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
 
         @Override
         public void onByteSet(FrameSlot slot, byte value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
 
         @Override
         public void onIntSet(FrameSlot slot, int value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
 
         @Override
         public void onLongSet(FrameSlot slot, long value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
 
         @Override
         public void onFloatSet(FrameSlot slot, float value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
 
         @Override
         public void onDoubleSet(FrameSlot slot, double value) {
-            currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) slot.getIdentifier(), value);
-            getLocalVarFlagCache().add(slot.getIdentifier());
+            onUpdateLocalVar(slot.getIdentifier(), value);
         }
     };
 
@@ -122,7 +116,7 @@ public final class ExecutionHistoryOperator {
         rotate = !rotate;
         this.currentHistory = rootHistory;
 
-        localVarFlagStack.add(new HashSet<>());
+        localVarFlagStack.push(new HashSet<>());
     }
 
     public StackListener getStackListener() {
@@ -390,6 +384,17 @@ public final class ExecutionHistoryOperator {
         throw new RuntimeException("Never reach here");
     }
 
+    private void onUpdateLocalVar(Object identifier, Object value) {
+        ExecutionHistory.LocalVarOperator localVarOp = this.localVarOp;
+        if (localVarOp != null) {
+            localVarOp.onUpdateLocalVariable(currentTime, (String) identifier, value);
+        } else {
+            this.localVarOp = currentHistory.onUpdateLocalVariable(currentTime, getFunctionCallArray(), (String) identifier, value);
+        }
+
+        getLocalVarFlagCache().add(identifier);
+    }
+
     private Iterator<ItemWithTime<ExecutionHistory.ReadContent>> getReadContentIterator(NodeIdentifier identifier) {
         return currentHistory.getReadOperations(getExecutionContext(identifier));
     }
@@ -641,10 +646,15 @@ public final class ExecutionHistoryOperator {
         callArrayCache = null;
     }
 
+    private void invalidateLocalVarOp() {
+        localVarOp = null;
+    }
+
     private void invalidateCache() {
         invalidateCallContextCache();
         invalidateLocalVarFlagCache();
         invalidateCallArrayCache();
+        invalidateLocalVarOp();
     }
 
     private Object revertObject(Object value) {
@@ -792,7 +802,7 @@ public final class ExecutionHistoryOperator {
         void invokeVoid(VirtualFrame frame);
     }
 
-    private static enum ShouldReExecuteResult {
+    private enum ShouldReExecuteResult {
         USE_CACHE, RE_EXECUTE, NEW_EXECUTE
     }
 }

@@ -91,22 +91,22 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
      * therefore a Truffle DSL {@link #isLongOrIllegal(VirtualFrame) custom guard} is specified.
      */
     @Specialization(guards = "isLongOrIllegal(frame)")
-    protected long writeLong(VirtualFrame frame, long value, @CachedContext(SLLanguage.class) SLContext context) {
+    protected long writeLong(VirtualFrame frame, long value) {
         /* Initialize type on first write of the local variable. No-op if kind is already Long. */
         frame.getFrameDescriptor().setFrameSlotKind(getSlot(), FrameSlotKind.Long);
 
         frame.setLong(getSlot(), value);
-        context.getStackTracker().notifyLongSet(getSlot(), value);
+        getContext().getStackTracker().notifyLongSet(getSlot(), value);
         return value;
     }
 
     @Specialization(guards = "isBooleanOrIllegal(frame)")
-    protected boolean writeBoolean(VirtualFrame frame, boolean value, @CachedContext(SLLanguage.class) SLContext context) {
+    protected boolean writeBoolean(VirtualFrame frame, boolean value) {
         /* Initialize type on first write of the local variable. No-op if kind is already Long. */
         frame.getFrameDescriptor().setFrameSlotKind(getSlot(), FrameSlotKind.Boolean);
 
         frame.setBoolean(getSlot(), value);
-        context.getStackTracker().notifyBooleanSet(getSlot(), value);
+        getContext().getStackTracker().notifyBooleanSet(getSlot(), value);
         return value;
     }
 
@@ -121,7 +121,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
      * node will never be re-specialized.
      */
     @Specialization(replaces = {"writeLong", "writeBoolean"})
-    protected Object write(VirtualFrame frame, Object value, @CachedContext(SLLanguage.class) SLContext context) {
+    protected Object write(VirtualFrame frame, Object value) {
         /*
          * Regardless of the type before, the new and final type of the local variable is Object.
          * Changing the slot kind also discards compiled code, because the variable type is
@@ -132,7 +132,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         frame.getFrameDescriptor().setFrameSlotKind(getSlot(), FrameSlotKind.Object);
 
         frame.setObject(getSlot(), value);
-        context.getStackTracker().notifyObjectSet(getSlot(), value);
+        getContext().getStackTracker().notifyObjectSet(getSlot(), value);
         return value;
     }
 

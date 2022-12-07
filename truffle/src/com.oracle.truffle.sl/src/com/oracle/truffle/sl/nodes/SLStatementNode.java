@@ -143,10 +143,22 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         return sourceLength;
     }
 
-    protected SLContext getContext() {
+    private TruffleLanguage.ContextReference<SLContext> initContextRef() {
+        Node parent = getParent();
+        if (parent instanceof SLStatementNode) {
+            return this.contextRef = ((SLStatementNode) parent).getContextRef();
+        } else {
+            return this.contextRef = lookupContextReference(SLLanguage.class);
+        }
+    }
+
+    private TruffleLanguage.ContextReference<SLContext> getContextRef() {
         TruffleLanguage.ContextReference<SLContext> contextRef = this.contextRef;
-        if (contextRef == null) contextRef = this.contextRef = lookupContextReference(SLLanguage.class);
-        return contextRef.get();
+        return contextRef != null ? contextRef : initContextRef();
+    }
+
+    protected SLContext getContext() {
+        return getContextRef().get();
     }
 
     // invoked by the parser to set the source

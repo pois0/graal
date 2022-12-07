@@ -17,8 +17,8 @@ public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> objectUpdateList = new ArrayList<>();
     private final HashMap<CallContextElement.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> localVariableUpdateMap = new HashMap<>();
     private final HashMap<CallContextElement.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> localVariableUpdateList = new HashMap<>();
-    final ArrayList<ItemWithTime<String>> functionCalls = new ArrayList<>();
-    final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
+    private final ArrayList<ItemWithTime<String>> functionCalls = new ArrayList<>();
+    private final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
 
     public void onReturnValue(Time startTime, Time endTime, ExecutionContext ctx, Object value) {
         timeToContext.add(new ItemWithTime<>(endTime, ctx));
@@ -50,12 +50,12 @@ public final class ExecutionHistory {
         onUpdateObjectInner(time, objGenCtx, fieldName, newValue);
     }
 
-    public void onUpdateLocalVariable(Time time, CallContextElement.FunctionCallArray ctx, String variableName, Object newValue) {
-        localVariableUpdateMap.computeIfAbsent(ctx, it -> new HashMap<>())
-                .computeIfAbsent(variableName, it -> new ArrayList<>())
-                .add(new ItemWithTime<>(time, newValue));
-        localVariableUpdateList.computeIfAbsent(ctx, it -> new ArrayList<>())
-                .add(new ItemWithTime<>(time, new LocalVariableUpdate(variableName, newValue)));
+    public LocalVarOperator onUpdateLocalVariable(Time time, CallContextElement.FunctionCallArray ctx, String variableName, Object newValue) {
+        LocalVarOperator op = new LocalVarOperator(
+                localVariableUpdateMap.computeIfAbsent(ctx, it -> new HashMap<>()),
+                localVariableUpdateList.computeIfAbsent(ctx, it1 -> new ArrayList<>()));
+        op.onUpdateLocalVariable(time, variableName, newValue);
+        return op;
     }
 
     public void onEnterFunction(Time time, String funcName) {
@@ -280,7 +280,7 @@ public final class ExecutionHistory {
 
     public static abstract class ReadContent {}
 
-    public static class ReadArgument extends ReadContent {
+    public final static class ReadArgument extends ReadContent {
         private final CallContextElement.FunctionCallArray callContext;
         private final int argIndex;
 
@@ -306,7 +306,7 @@ public final class ExecutionHistory {
         }
     }
 
-    public static class ReadLocalVariable extends ReadContent {
+    public final static class ReadLocalVariable extends ReadContent {
         private final CallContextElement[] callContext;
         private final Object variableName;
 
@@ -332,7 +332,7 @@ public final class ExecutionHistory {
         }
     }
 
-    public static class ReadObjectField extends ReadContent {
+    public final static class ReadObjectField extends ReadContent {
         private final ExecutionContext objGenCtx;
         private final Object fieldName;
 
@@ -376,7 +376,7 @@ public final class ExecutionHistory {
         }
     }
 
-    public static class ObjectReference {
+    public final static class ObjectReference {
         private final ExecutionContext objGenCtx;
 
         public ObjectReference(ExecutionContext objGenCtx) {
@@ -388,7 +388,23 @@ public final class ExecutionHistory {
         }
     }
 
-    private static class ItemsWithTimeIterator<T> implements Iterator<ItemWithTime<T>> {
+    public final static class LocalVarOperator {
+        private final HashMap<String, ArrayList<ItemWithTime<Object>>> map;
+        private final ArrayList<ItemWithTime<LocalVariableUpdate>> list;
+
+        public LocalVarOperator(HashMap<String, ArrayList<ItemWithTime<Object>>> map, ArrayList<ItemWithTime<LocalVariableUpdate>> list) {
+            this.map = map;
+            this.list = list;
+        }
+
+        public void onUpdateLocalVariable(Time time, String variableName, Object newValue) {
+            map.computeIfAbsent(variableName, it -> new ArrayList<>())
+                    .add(new ItemWithTime<>(time, newValue));
+            list.add(new ItemWithTime<>(time, new LocalVariableUpdate(variableName, newValue)));
+        }
+    }
+
+    private final static class ItemsWithTimeIterator<T> implements Iterator<ItemWithTime<T>> {
         private final ArrayList<ItemWithTime<T>> items;
         private int cursor;
         private ItemWithTime<T> currentItem;
