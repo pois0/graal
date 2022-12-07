@@ -21,6 +21,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
+import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import org.graalvm.collections.Pair;
@@ -28,11 +29,11 @@ import org.graalvm.collections.Pair;
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
 
 public final class ExecutionHistoryOperator {
@@ -51,13 +52,12 @@ public final class ExecutionHistoryOperator {
     private final ArrayDeque<HashSet<Object>> localVarFlagStack = new ArrayDeque<>();
     private final ArrayDeque<boolean[]> parameterFlagStack = new ArrayDeque<>();
     private final HashMap<ExecutionContext, HashSet<Object>> objectFieldFlags = new HashMap<>();
-    private final ArrayDeque<CallContextElement> currentStack = new ArrayDeque<>();
+    private CallContext currentStack = null;
     private HashMap<ExecutionContext, WeakReference<Object>> ctxToObj = new HashMap<>(); // hash -> weak reference of object
     private WeakHashMap<Object, ExecutionContext> objToCtx = new WeakHashMap<>();
 
     // Caches
-    private CallContextElement[] callContextCache = null;
-    private CallContextElement.FunctionCallArray callArrayCache = null;
+    private CallContext.FunctionCallArray callArrayCache = null;
     private HashSet<Object> localVarFlagCache = null;
     private ExecutionHistory.LocalVarOperator localVarOp = null;
 
@@ -156,7 +156,7 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onReadLocalVariable(Object variableName) {
-        currentHistory.onReadLocalVariable(currentTime, getCallContext(), variableName);
+        currentHistory.onReadLocalVariable(currentTime, currentStack, variableName);
     }
 
     public void onReadObjectField(Object object, Object field) {
@@ -165,7 +165,7 @@ public final class ExecutionHistoryOperator {
 
     public void onEnterFunction(NodeIdentifier identifier, String funcName, boolean isCalc) {
         invalidateCache();
-        currentStack.push(new CallContextElement.FunctionCall(identifier));
+        currentStack = new CallContext.FunctionCall(currentStack, identifier);
         localVarFlagStack.push(new HashSet<>());
         final Time time = isCalc ? currentHistory.getTime(lastCalcCtx).getEnd() : currentTime;
         currentHistory.onEnterFunction(time, funcName);
@@ -177,9 +177,9 @@ public final class ExecutionHistoryOperator {
 
     public void onExitFunction(NodeIdentifier identifier) {
         invalidateCache();
-        CallContextElement elem = currentStack.pop();
-        assert elem instanceof CallContextElement.FunctionCall && elem.getNodeIdentifier() == identifier;
-        localVarFlagStack.pop();
+        CallContext elem = currentStack;
+        assert elem instanceof CallContext.FunctionCall && elem.getNodeIdentifier() == identifier;
+        currentStack = elem.getRoot();
     }
 
     public void popArgumentFlags() {
@@ -187,21 +187,19 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onEnterLoop(NodeIdentifier identifier) {
-        invalidateCallContextCache();
-        currentStack.push(new CallContextElement.Loop(identifier, 0));
+        currentStack = new CallContext.Loop(currentStack, identifier);
     }
 
     public void onGotoNextIteration(NodeIdentifier identifier) {
-        invalidateCallContextCache();
-        CallContextElement elem = currentStack.pop();
-        assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
-        currentStack.push(((CallContextElement.Loop) elem).increment());
+        CallContext elem = currentStack;
+        assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
+        currentStack = ((CallContext.Loop) elem).increment();
     }
 
     public void onExitLoop(NodeIdentifier identifier) {
-        invalidateCallContextCache();
-        CallContextElement elem = currentStack.pop();
-        assert elem instanceof CallContextElement.Loop && elem.getNodeIdentifier() == identifier;
+        CallContext elem = currentStack;
+        assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
+        currentStack = elem.getRoot();
     }
 
     public void onGenerateObject(SLObject object, ExecutionContext execCtx) {
@@ -233,7 +231,7 @@ public final class ExecutionHistoryOperator {
                 if (parameterFlagStack.peek()[argIndex]) return ShouldReExecuteResult.RE_EXECUTE;
             } else if (readContent instanceof ExecutionHistory.ReadLocalVariable) {
                 ExecutionHistory.ReadLocalVariable content = (ExecutionHistory.ReadLocalVariable) readContent;
-                if (Arrays.equals(content.getCallContext(), getCallContext()) && getLocalVarFlagCache().contains(content.getVariableName())) {
+                if (Objects.equals(content.getCallContext(), currentStack) && getLocalVarFlagCache().contains(content.getVariableName())) {
                     return ShouldReExecuteResult.RE_EXECUTE;
                 }
             } else if (readContent instanceof ExecutionHistory.ReadObjectField) {
@@ -536,7 +534,7 @@ public final class ExecutionHistoryOperator {
                 frame.setLong(slot, (Long) value);
             } else if (value instanceof Boolean) {
                 frame.setBoolean(slot, (Boolean) value);
-            } else if (value instanceof SLBigNumber || value instanceof String) {
+            } else if (value instanceof SLBigNumber || value instanceof String || value == SLNull.SINGLETON) {
                 frame.setObject(slot, value);
             } else if (value instanceof ExecutionHistory.ObjectReference) {
                 Object obj = constructObjects(time, ((ExecutionHistory.ObjectReference) value).getObjGenCtx(), history, ctxToObj, objToCtx);
@@ -568,7 +566,8 @@ public final class ExecutionHistoryOperator {
                     if (value instanceof Long
                             || value instanceof SLBigNumber
                             || value instanceof Boolean
-                            || value instanceof String) {
+                            || value instanceof String
+                            || value == SLNull.SINGLETON) {
                         library.writeMember(newObject, name, value);
                     } else if (value instanceof ExecutionHistory.ObjectReference) {
                         ExecutionContext valueGenCtx = ((ExecutionHistory.ObjectReference) value).getObjGenCtx();
@@ -599,31 +598,23 @@ public final class ExecutionHistoryOperator {
     }
 
     public ExecutionContext getExecutionContext(NodeIdentifier identifier) {
-        return new ExecutionContext(getCallContext(), identifier);
+        return new ExecutionContext(currentStack, identifier);
     }
 
-    private CallContextElement.FunctionCallArray getFunctionCallArray() {
-        CallContextElement.FunctionCallArray callArray = this.callArrayCache;
+    private CallContext.FunctionCallArray getFunctionCallArray() {
+        CallContext.FunctionCallArray callArray = this.callArrayCache;
         if (callArrayCache == null) {
-            ArrayList<CallContextElement.FunctionCall> functionCalls = new ArrayList<>(currentStack.size());
-            for (CallContextElement elem : currentStack) {
-                if (elem instanceof CallContextElement.FunctionCall) {
-                    functionCalls.add((CallContextElement.FunctionCall) elem);
-                }
+            ArrayList<NodeIdentifier> functionCalls = new ArrayList<>();
+            CallContext.FunctionCall call = CallContext.latestFunctionCall(currentStack);
+            while (call != null) {
+                functionCalls.add(call.nodeIdentifier);
+                call = call.calledFrom;
             }
 
-            this.callArrayCache = callArray = new CallContextElement.FunctionCallArray(functionCalls.toArray(new CallContextElement.FunctionCall[0]));
+            this.callArrayCache = callArray = new CallContext.FunctionCallArray(functionCalls.toArray(new NodeIdentifier[0]));
         }
 
         return callArray;
-    }
-
-    private CallContextElement[] getCallContext() {
-        CallContextElement[] callContext = this.callContextCache;
-        if (callContext == null) {
-            callContext = this.callContextCache = currentStack.toArray(new CallContextElement[0]);
-        }
-        return callContext;
     }
 
     private HashSet<Object> getLocalVarFlagCache() {
@@ -632,10 +623,6 @@ public final class ExecutionHistoryOperator {
             localVarFlag = this.localVarFlagCache = localVarFlagStack.peek();
         }
         return localVarFlag;
-    }
-
-    private void invalidateCallContextCache() {
-        callContextCache = null;
     }
 
     private void invalidateLocalVarFlagCache() {
@@ -651,7 +638,6 @@ public final class ExecutionHistoryOperator {
     }
 
     private void invalidateCache() {
-        invalidateCallContextCache();
         invalidateLocalVarFlagCache();
         invalidateCallArrayCache();
         invalidateLocalVarOp();
@@ -661,7 +647,8 @@ public final class ExecutionHistoryOperator {
         if (value instanceof Long
                 || value instanceof Boolean
                 || value instanceof SLBigNumber
-                || value instanceof String) {
+                || value instanceof String
+                || value == SLNull.SINGLETON) {
             return value;
         } else if (value instanceof ExecutionHistory.ObjectReference) {
             return ctxToObj.computeIfAbsent(
@@ -694,15 +681,11 @@ public final class ExecutionHistoryOperator {
     private Object replaceReference(Object value) {
         Object saveNewValue;
         if (value == null
-                || value instanceof Byte
-                || value instanceof Short
-                || value instanceof Integer
                 || value instanceof Long
-                || value instanceof Float
-                || value instanceof Double
-                || value instanceof Character
+                || value instanceof Boolean
                 || value instanceof String
                 || value instanceof SLBigNumber
+                || value == SLNull.SINGLETON
         ) {
             saveNewValue = value;
         } else if (value instanceof SLFunction) {

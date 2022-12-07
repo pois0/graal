@@ -1,17 +1,17 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-import java.util.Arrays;
+import java.util.Objects;
 
 public class ExecutionContext {
-    private final CallContextElement[] callContext;
+    private final CallContext callContext;
     private final NodeIdentifier currentNodeIdentifier;
 
-    public ExecutionContext(CallContextElement[] callContext, NodeIdentifier currentNodeIdentifier) {
+    public ExecutionContext(CallContext callContext, NodeIdentifier currentNodeIdentifier) {
         this.callContext = callContext;
         this.currentNodeIdentifier = currentNodeIdentifier;
     }
 
-    public CallContextElement[] getCallContext() {
+    public CallContext getCallContext() {
         return callContext;
     }
 
@@ -26,14 +26,14 @@ public class ExecutionContext {
 
         final ExecutionContext that = (ExecutionContext) o;
 
-        // Probably incorrect - comparing Object[] arrays with Arrays.equals
-        if (!Arrays.equals(callContext, that.callContext)) return false;
+        if (!Objects.equals(callContext, that.callContext)) return false;
         return currentNodeIdentifier.equals(that.currentNodeIdentifier);
     }
 
     @Override
     public int hashCode() {
-        int result = Arrays.hashCode(callContext);
+        CallContext callContext = this.callContext;
+        int result = callContext != null ? callContext.hashCode() : 0;
         result = 31 * result + currentNodeIdentifier.hashCode();
         return result;
     }
@@ -41,7 +41,7 @@ public class ExecutionContext {
     @Override
     public String toString() {
         return "ExecutionContext{" +
-                "callContext=" + Arrays.toString(callContext) +
+                "callContext=" + callContext +
                 ", currentNodeIdentifier=" + currentNodeIdentifier +
                 '}';
     }

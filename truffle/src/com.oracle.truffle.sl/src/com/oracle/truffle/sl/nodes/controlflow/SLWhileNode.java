@@ -58,17 +58,26 @@ public final class SLWhileNode extends SLStatementNode {
     @Child private LoopNode loopNode;
 
     public SLWhileNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
-        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode, getNodeIdentifier()));
+        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode));
+    }
+
+    @Override
+    public void setIdentifier(NodeIdentifier identifier) {
+        super.setIdentifier(identifier);
+        ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).setParentIdentifier(identifier);
     }
 
     @Override
     public void executeVoid(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        op.onEnterLoop(getNodeIdentifier());
+        NodeIdentifier identifier = getNodeIdentifier();
+        op.onEnterLoop(identifier);
         try {
             loopNode.execute(frame, EXEC);
+        } catch (Throwable e) {
+            e.printStackTrace();
         } finally {
-            op.onExitLoop(getNodeIdentifier());
+            op.onExitLoop(identifier);
         }
     }
 

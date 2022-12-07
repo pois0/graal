@@ -15,8 +15,8 @@ public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<ReadContent>> readMap = new ArrayList<>();
     private final HashMap<ExecutionContext, HashMap<String, ArrayList<ItemWithTime<Object>>>> objectUpdateMap = new HashMap<>();
     private final ArrayList<ItemWithTime<ExecutionHistoryOperator.ObjectUpdate>> objectUpdateList = new ArrayList<>();
-    private final HashMap<CallContextElement.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> localVariableUpdateMap = new HashMap<>();
-    private final HashMap<CallContextElement.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> localVariableUpdateList = new HashMap<>();
+    private final HashMap<CallContext.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> localVariableUpdateMap = new HashMap<>();
+    private final HashMap<CallContext.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> localVariableUpdateList = new HashMap<>();
     private final ArrayList<ItemWithTime<String>> functionCalls = new ArrayList<>();
     private final ArrayList<ItemWithTime<Object>> returnedValueOrException = new ArrayList<>();
 
@@ -34,11 +34,11 @@ public final class ExecutionHistory {
         returnedValueOrException.add(new ItemWithTime<>(endTime, throwable));
     }
 
-    public void onReadArgument(Time time, CallContextElement.FunctionCallArray ctx, int argIndex) {
+    public void onReadArgument(Time time, CallContext.FunctionCallArray ctx, int argIndex) {
         readMap.add(new ItemWithTime<>(time, new ReadArgument(ctx, argIndex)));
     }
 
-    public void onReadLocalVariable(Time time, CallContextElement[] ctx, Object variableName) {
+    public void onReadLocalVariable(Time time, CallContext ctx, Object variableName) {
         readMap.add(new ItemWithTime<>(time, new ReadLocalVariable(ctx, variableName)));
     }
 
@@ -50,7 +50,7 @@ public final class ExecutionHistory {
         onUpdateObjectInner(time, objGenCtx, fieldName, newValue);
     }
 
-    public LocalVarOperator onUpdateLocalVariable(Time time, CallContextElement.FunctionCallArray ctx, String variableName, Object newValue) {
+    public LocalVarOperator onUpdateLocalVariable(Time time, CallContext.FunctionCallArray ctx, String variableName, Object newValue) {
         LocalVarOperator op = new LocalVarOperator(
                 localVariableUpdateMap.computeIfAbsent(ctx, it -> new HashMap<>()),
                 localVariableUpdateList.computeIfAbsent(ctx, it1 -> new ArrayList<>()));
@@ -97,7 +97,7 @@ public final class ExecutionHistory {
         return getObjectUpdates(timePair.start, timePair.end);
     }
 
-    public Iterator<ItemWithTime<LocalVariableUpdate>> getLocalVariableUpdates(CallContextElement.FunctionCallArray callCtx, ExecutionContext execCtx) {
+    public Iterator<ItemWithTime<LocalVariableUpdate>> getLocalVariableUpdates(CallContext.FunctionCallArray callCtx, ExecutionContext execCtx) {
         TimePair timePair = contextToTime.get(execCtx);
         if (timePair == null) return noElementIterator();
         ArrayList<ItemWithTime<LocalVariableUpdate>> varHistory = localVariableUpdateList.get(callCtx);
@@ -115,7 +115,7 @@ public final class ExecutionHistory {
         return getFunctionEnters(timePair.start, timePair.end);
     }
 
-    public HashMap<String, ArrayList<ItemWithTime<Object>>> getLocalHistory(CallContextElement.FunctionCallArray fca) {
+    public HashMap<String, ArrayList<ItemWithTime<Object>>> getLocalHistory(CallContext.FunctionCallArray fca) {
         return localVariableUpdateMap.get(fca);
     }
 
@@ -197,8 +197,8 @@ public final class ExecutionHistory {
         final int objUpPoint = ItemWithTime.binarySearchWhereInsertTo(objectUpdateList, initialTime);
         objectUpdateList.addAll(objUpPoint, other.objectUpdateList);
 
-        for (Map.Entry<CallContextElement.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> e : localVariableUpdateMap.entrySet()) {
-            CallContextElement.FunctionCallArray fcs = e.getKey();
+        for (Map.Entry<CallContext.FunctionCallArray, HashMap<String, ArrayList<ItemWithTime<Object>>>> e : localVariableUpdateMap.entrySet()) {
+            CallContext.FunctionCallArray fcs = e.getKey();
             HashMap<String, ArrayList<ItemWithTime<Object>>> upMap = e.getValue();
 
             localVariableUpdateMap.merge(fcs, upMap, (thisUpMap, thatUpMap) -> {
@@ -216,8 +216,8 @@ public final class ExecutionHistory {
             });
         }
 
-        for (Map.Entry<CallContextElement.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> entry : localVariableUpdateList.entrySet()) {
-            CallContextElement.FunctionCallArray fcs = entry.getKey();
+        for (Map.Entry<CallContext.FunctionCallArray, ArrayList<ItemWithTime<LocalVariableUpdate>>> entry : localVariableUpdateList.entrySet()) {
+            CallContext.FunctionCallArray fcs = entry.getKey();
             ArrayList<ItemWithTime<LocalVariableUpdate>> upList = entry.getValue();
 
             localVariableUpdateList.merge(fcs, upList, (thisUpList, thatUpList) -> {
@@ -281,15 +281,15 @@ public final class ExecutionHistory {
     public static abstract class ReadContent {}
 
     public final static class ReadArgument extends ReadContent {
-        private final CallContextElement.FunctionCallArray callContext;
+        private final CallContext.FunctionCallArray callContext;
         private final int argIndex;
 
-        public ReadArgument(CallContextElement.FunctionCallArray callContext, int argIndex) {
+        public ReadArgument(CallContext.FunctionCallArray callContext, int argIndex) {
             this.callContext = callContext;
             this.argIndex = argIndex;
         }
 
-        public CallContextElement.FunctionCallArray getCallContext() {
+        public CallContext.FunctionCallArray getCallContext() {
             return callContext;
         }
 
@@ -307,15 +307,15 @@ public final class ExecutionHistory {
     }
 
     public final static class ReadLocalVariable extends ReadContent {
-        private final CallContextElement[] callContext;
+        private final CallContext callContext;
         private final Object variableName;
 
-        public ReadLocalVariable(CallContextElement[] callContext, Object variableName) {
+        public ReadLocalVariable(CallContext callContext, Object variableName) {
             this.callContext = callContext;
             this.variableName = variableName;
         }
 
-        public CallContextElement[] getCallContext() {
+        public CallContext getCallContext() {
             return callContext;
         }
 
@@ -326,7 +326,7 @@ public final class ExecutionHistory {
         @Override
         public String toString() {
             return "ReadLocalVariable{" +
-                    "callContext=" + Arrays.toString(callContext) +
+                    "callContext=" + callContext +
                     ", variableName=" + variableName +
                     '}';
         }

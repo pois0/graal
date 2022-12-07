@@ -40,6 +40,7 @@
  */
 package com.oracle.truffle.sl.nodes.controlflow;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.dsl.UnsupportedSpecializationException;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.LoopNode;
@@ -47,7 +48,6 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RepeatingNode;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.BranchProfile;
-import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
@@ -83,14 +83,18 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     private final BranchProfile continueTaken = BranchProfile.create();
     private final BranchProfile breakTaken = BranchProfile.create();
 
-    private final NodeIdentifier parentIdentifier;
+    @CompilerDirectives.CompilationFinal
+    private NodeIdentifier parentIdentifier;
     private final SLContext context = SLLanguage.getCurrentContext();
     private int hasNewNodeState = -1;
 
-    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode, NodeIdentifier parentIdentifier) {
+    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
         this.bodyNode = bodyNode;
-        this.parentIdentifier =parentIdentifier;
+    }
+
+    public void setParentIdentifier(NodeIdentifier parentIdentifier) {
+        this.parentIdentifier = parentIdentifier;
     }
 
     @Override
