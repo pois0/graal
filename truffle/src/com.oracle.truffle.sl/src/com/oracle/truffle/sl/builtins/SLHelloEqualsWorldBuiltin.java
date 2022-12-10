@@ -49,6 +49,7 @@ import com.oracle.truffle.api.frame.FrameInstance.FrameAccess;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * This builtin sets the variable named "hello" in the caller frame to the string "world".
@@ -70,5 +71,12 @@ public abstract class SLHelloEqualsWorldBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         return that instanceof SLHelloEqualsWorldBuiltin;
 
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("helloEqualsWorld");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

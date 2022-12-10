@@ -116,7 +116,7 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
             try {
                 executeGeneric(frame);
             } finally {
-                op.endNewExecution(identifier);
+                op.endNewExecution();
             }
         }
 

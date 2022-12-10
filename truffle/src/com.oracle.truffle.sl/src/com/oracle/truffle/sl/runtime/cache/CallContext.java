@@ -1,8 +1,6 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-import java.util.Arrays;
-
-public abstract class CallContext {
+public abstract class CallContext implements Comparable<CallContext> {
     protected final NodeIdentifier nodeIdentifier;
     protected final CallContext root;
     protected final FunctionCall calledFrom;
@@ -23,12 +21,8 @@ public abstract class CallContext {
         return nodeIdentifier;
     }
 
-    public FunctionCall getCalledFrom() {
-        return calledFrom;
-    }
-
     public int depth() {
-        return root == null ? 1 : (root.depth() + 1);
+        return root.depth() + 1;
     }
 
     @Override
@@ -36,26 +30,23 @@ public abstract class CallContext {
         return hashCode;
     }
 
-    public static FunctionCall latestFunctionCall(CallContext ctx) {
-        if (ctx == null) return null;
-        if (ctx instanceof FunctionCall) return (FunctionCall) ctx;
-        return ctx.calledFrom;
+    public static ContextBase latestFunctionCall(CallContext ctx) {
+        return ctx.latestFunctionCallInner();
     }
 
-    protected boolean equalsBase(CallContext that) {
-        if (this == that) return true;
-        if (!nodeIdentifier.equals(that.nodeIdentifier)) return false;
-        if (root == null) return that.root == null;
-        if (that.root == null) return false;
-        return root.equalsBase(that.root);
-    }
+    protected abstract ContextBase latestFunctionCallInner();
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof CallContext)) return false;
 
-        return equalsBase((CallContext) o);
+        return equals(this, (CallContext) o);
+    }
+
+    @Override
+    public int compareTo(CallContext o) {
+        return compare(this, o);
     }
 
     protected static int hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
@@ -64,7 +55,79 @@ public abstract class CallContext {
         return result;
     }
 
-    public static final class FunctionCall extends CallContext {
+    public static boolean equals(CallContext e1, CallContext e2) {
+        if (e1 == e2) return true;
+        if (e1 == ExecutionBase.INSTANCE || e2 == ExecutionBase.INSTANCE) return false;
+        if (!e1.nodeIdentifier.equals(e2.nodeIdentifier)) return false;
+        if (e1 instanceof Loop) {
+            if (e2 instanceof Loop) {
+                if (((Loop) e1).loopCount != ((Loop) e2).loopCount) return false;
+            } else {
+                return false;
+            }
+        } else if (e2 instanceof Loop) {
+            return false;
+        }
+
+        return equals(e1.root, e2.root);
+    }
+
+    private static int compare(CallContext e1, CallContext e2) {
+        if (e1 == e2) return 0;
+        if (e1 == ExecutionBase.INSTANCE) return 1;
+        if (e2 == ExecutionBase.INSTANCE) return -1;
+        int niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
+        if (niComp != 0) return niComp;
+        if (e1 instanceof Loop) {
+            if (e2 instanceof Loop) {
+                int loopComp = Integer.compare(((Loop) e1).loopCount, ((Loop) e2).loopCount);
+                if (loopComp != 0) return loopComp;
+            } else {
+                return 1;
+            }
+        } else if (e2 instanceof Loop) {
+            return -1;
+        }
+
+        return e1.root.compareTo(e2.root);
+    }
+
+    public static abstract class ContextBase extends CallContext {
+        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int hashCode) {
+            super(root, nodeIdentifier, calledFrom, hashCode);
+        }
+    }
+
+    public final static class ExecutionBase extends ContextBase {
+        public static final ExecutionBase INSTANCE = new ExecutionBase();
+
+        private ExecutionBase() {
+            super(null, null, null, 0);
+        }
+
+        @Override
+        public int depth() {
+            return 0;
+        }
+
+        @Override
+        protected ContextBase latestFunctionCallInner() {
+            return this;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o == this;
+        }
+
+        @Override
+        public String toString() {
+            return "ExecutionBase{}";
+        }
+
+    }
+
+    public static final class FunctionCall extends ContextBase {
         public FunctionCall(CallContext root, NodeIdentifier nodeIdentifier) {
             super(root,
                     nodeIdentifier,
@@ -73,9 +136,8 @@ public abstract class CallContext {
         }
 
         @Override
-        protected boolean equalsBase(CallContext that) {
-            if (!super.equalsBase(that)) return false;
-            return that instanceof FunctionCall;
+        protected ContextBase latestFunctionCallInner() {
+            return this;
         }
 
         @Override
@@ -115,10 +177,8 @@ public abstract class CallContext {
         }
 
         @Override
-        protected boolean equalsBase(CallContext that) {
-            if (!super.equalsBase(that)) return false;
-            if (!(that instanceof Loop)) return false;
-            return loopCount == ((Loop) that).loopCount;
+        protected ContextBase latestFunctionCallInner() {
+            return calledFrom;
         }
 
         private static int hashCode(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
@@ -133,34 +193,6 @@ public abstract class CallContext {
             sb.append(", root=").append(root);
             sb.append('}');
             return sb.toString();
-        }
-    }
-
-    public final static class FunctionCallArray {
-        private final NodeIdentifier[] raws;
-
-        public FunctionCallArray(NodeIdentifier[] raws) {
-            this.raws = raws;
-        }
-
-        public NodeIdentifier[] getRaws() {
-            return raws;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof FunctionCallArray)) return false;
-
-            FunctionCallArray that = (FunctionCallArray) o;
-
-            // Probably incorrect - comparing Object[] arrays with Arrays.equals
-            return Arrays.equals(raws, that.raws);
-        }
-
-        @Override
-        public int hashCode() {
-            return Arrays.hashCode(raws);
         }
     }
 }

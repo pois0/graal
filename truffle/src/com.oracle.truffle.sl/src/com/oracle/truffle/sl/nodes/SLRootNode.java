@@ -97,10 +97,10 @@ public class SLRootNode extends RootNode {
     public Object execute(VirtualFrame frame) {
         assert lookupContextReference(SLLanguage.class).get() != null;
         final Object[] arguments = frame.getArguments();
-        if (arguments.length == 0 || arguments[arguments.length - 1] == FunctionCallSpecialParameter.EXEC) {
-            return bodyNode.executeGeneric(frame);
+        if (arguments.length != 0 && arguments[arguments.length - 1] == FunctionCallSpecialParameter.CALC) {
+            return bodyNode.calcGeneric(frame);
         } else {
-             return bodyNode.calcGeneric(frame);
+            return bodyNode.executeGeneric(frame);
         }
     }
 

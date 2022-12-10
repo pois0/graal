@@ -129,7 +129,7 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
         try {
             return op.getVariableValue(slotIdentifier, identifier);
         } finally {
-            op.endNewExecution(identifier);
+            op.endNewExecution();
         }
     }
 

@@ -40,7 +40,6 @@
  */
 package com.oracle.truffle.sl.nodes.local;
 
-import com.oracle.truffle.api.dsl.CachedContext;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.NodeField;
@@ -53,11 +52,9 @@ import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
-import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
-import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
@@ -164,7 +161,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         try {
             return executeGeneric(frame);
         } finally {
-            op.endNewExecution(identifier);
+            op.endNewExecution();
         }
     }
 
@@ -176,7 +173,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         try {
             return executeBoolean(frame);
         } finally {
-            op.endNewExecution(identifier);
+            op.endNewExecution();
         }
     }
 
@@ -188,7 +185,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         try {
             return executeLong(frame);
         } finally {
-            op.endNewExecution(identifier);
+            op.endNewExecution();
         }
     }
 

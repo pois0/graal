@@ -79,7 +79,7 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
             } catch (UnexpectedResultException e) {
                 throw new RuntimeException(e);
             } finally {
-                op.endNewExecution(identifier);
+                op.endNewExecution();
             }
         }
 
@@ -93,5 +93,12 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLIsNullBuiltin)) return false;
         return getArguments()[0].isEqualNode(((SLIsNullBuiltin) that).getArguments()[0]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isNull");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

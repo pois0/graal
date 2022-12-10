@@ -48,6 +48,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLType;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Built-in function that returns the type of a guest language value.
@@ -75,5 +76,12 @@ public abstract class SLTypeOfBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLTypeOfBuiltin)) return false;
         return getArguments()[0].isEqualNode(((SLTypeOfBuiltin) that).getArguments()[0]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("typeOf");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

@@ -93,7 +93,7 @@ public class SLReadArgumentNode extends SLExpressionNode {
         try {
             return executeGeneric(frame);
         } finally {
-            op.endNewExecution(identifier);
+            op.endNewExecution();
         }
     }
 

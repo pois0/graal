@@ -54,6 +54,7 @@ import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Returns a string representation of the current stack. This includes the {@link CallTarget}s and
@@ -104,5 +105,12 @@ public abstract class SLStackTraceBuiltin extends SLBuiltinNode {
     @Override
     public boolean isEqualNode(SLStatementNode that) {
         return that instanceof SLStackTraceBuiltin;
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("stackTrace");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

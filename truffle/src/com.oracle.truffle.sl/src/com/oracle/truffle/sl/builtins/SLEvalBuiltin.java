@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Builtin function to evaluate source code in any supported language.
@@ -98,5 +99,12 @@ public abstract class SLEvalBuiltin extends SLBuiltinNode {
         SLExpressionNode[] thatArgs = ((SLEvalBuiltin) that).getArguments();
         return thisArgs[0].isEqualNode(thatArgs[0])
                 && thisArgs[1].isEqualNode(thatArgs[1]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("eval");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

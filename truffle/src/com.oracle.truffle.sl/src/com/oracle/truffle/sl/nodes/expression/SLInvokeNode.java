@@ -95,8 +95,7 @@ public final class SLInvokeNode extends SLExpressionNode {
         CompilerAsserts.compilationConstant(argumentNodes.length);
 
         final int argumentLength = argumentNodes.length;
-        Object[] argumentValues = new Object[argumentLength + 1];
-        argumentValues[argumentLength] = FunctionCallSpecialParameter.EXEC;
+        Object[] argumentValues = new Object[argumentLength];
         for (int i = 0; i < argumentNodes.length; i++) {
             argumentValues[i] = argumentNodes[i].executeGeneric(frame);
         }

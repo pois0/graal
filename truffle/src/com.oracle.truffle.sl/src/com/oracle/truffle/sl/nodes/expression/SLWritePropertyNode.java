@@ -126,7 +126,7 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
             try {
                 executeGeneric(frame);
             } finally {
-                op.endNewExecution(identifier);
+                op.endNewExecution();
             }
         }
 

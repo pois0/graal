@@ -1,6 +1,6 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-public final class NodeIdentifier {
+public final class NodeIdentifier implements Comparable<NodeIdentifier> {
     private final String functionName;
     private final int number;
     private final boolean isNew;
@@ -43,12 +43,21 @@ public final class NodeIdentifier {
     public int hashCode() {
         int result = functionName.hashCode();
         result = 31 * result + number;
-        result = 31 * result + (isNew ? 1 : 0);
-        return result;
+        return 2 * result + (isNew ? 1 : 0);
     }
 
     @Override
     public String toString() {
         return "NodeIdentifier{" + functionName + '/' + isNew + '/' + number + '}';
+    }
+
+    @Override
+    public int compareTo(NodeIdentifier o) {
+        if (this == o) return 0;
+        final int compareNumber = Integer.compare(number, o.number);
+        if (compareNumber != 0) return compareNumber;
+        int compareIsNew = Boolean.compare(isNew, o.isNew);
+        if (compareIsNew != 0) return compareIsNew;
+        return functionName.compareTo(o.functionName);
     }
 }

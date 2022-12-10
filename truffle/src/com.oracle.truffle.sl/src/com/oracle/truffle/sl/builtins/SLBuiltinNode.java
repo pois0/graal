@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Base class for all builtin functions. It contains the Truffle DSL annotation {@link NodeChild}
@@ -102,5 +103,9 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
     @Override
     protected boolean hasNewChildNode() {
         return false;
+    }
+
+    protected static NodeIdentifier generateNodeIdentifierForBuiltin(String functionName) {
+        return new NodeIdentifier(functionName, 0, false);
     }
 }

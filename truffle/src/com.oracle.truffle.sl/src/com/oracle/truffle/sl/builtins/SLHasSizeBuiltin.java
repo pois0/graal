@@ -45,6 +45,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Built-in function that queries if the foreign object has a size. See
@@ -63,5 +64,12 @@ public abstract class SLHasSizeBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLHasSizeBuiltin)) return false;
         return getArguments()[0].isEqualNode(((SLHasSizeBuiltin) that).getArguments()[0]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("hasSize");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

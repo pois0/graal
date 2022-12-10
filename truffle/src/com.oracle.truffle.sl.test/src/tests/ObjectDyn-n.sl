@@ -38,8 +38,17 @@ function main() {
   println(obj5.prop2);
   println(obj5.prop9);
 
+  insert(obj7 = new());
+
 //  obj6 = new();
 //  println(obj6["x"]);
+
+}
+
+function test() {
+    no = new();
+    no["wa"] = 1;
+    println(wa["wa"]);
 }
 
 function mkobj() {

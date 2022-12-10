@@ -49,6 +49,7 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Built-in function that returns true if the given operand is of a given meta-object. Meta-objects
@@ -75,5 +76,12 @@ public abstract class SLIsInstanceBuiltin extends SLBuiltinNode {
         SLExpressionNode[] thatArgs = ((SLIsInstanceBuiltin) that).getArguments();
         return thisArgs[0].isEqualNode(thatArgs[0])
                 && thisArgs[1].isEqualNode(thatArgs[1]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isInstance");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

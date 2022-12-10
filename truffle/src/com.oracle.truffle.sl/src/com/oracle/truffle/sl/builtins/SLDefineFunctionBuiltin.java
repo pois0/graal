@@ -78,7 +78,7 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
         final NodeIdentifier identifier = getNodeIdentifier();
         op.startNewExecution(frame, identifier);
         final Object result = executeGeneric(frame);
-        op.endNewExecution(identifier);
+        op.endNewExecution();
         return result;
     }
 
@@ -86,5 +86,12 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLDefineFunctionBuiltin)) return false;
         return getArguments()[0].isEqualNode(((SLDefineFunctionBuiltin) that).getArguments()[0]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("defineFunction");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

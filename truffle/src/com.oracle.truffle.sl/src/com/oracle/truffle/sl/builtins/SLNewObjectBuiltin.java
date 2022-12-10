@@ -58,20 +58,20 @@ import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Built-in function to create a new object. Objects in SL are simply made up of name/value pairs.
  */
 @NodeInfo(shortName = "new")
 public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
-
     @Specialization
     @SuppressWarnings("unused")
     public Object newObject(SLNull o,
                     @CachedLanguage SLLanguage language,
                     @CachedContext(SLLanguage.class) ContextReference<SLContext> contextRef,
                     @Cached("contextRef.get().getHistoryOperator()") ExecutionHistoryOperator historyOperator) {
-        return language.createObject(historyOperator, historyOperator.getExecutionContext(this.getNodeIdentifier()));
+        return language.createObject(historyOperator, historyOperator.getExecutionContext(getNodeIdentifier()));
     }
 
     @Specialization(guards = "!values.isNull(obj)", limit = "3")
@@ -88,5 +88,12 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLNewObjectBuiltin)) return false;
         return getArguments()[0].isEqualNode(((SLNewObjectBuiltin) that).getArguments()[0]);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("new");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

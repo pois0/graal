@@ -2,7 +2,7 @@ package com.oracle.truffle.sl.runtime.cache;
 
 import java.util.Arrays;
 
-public class Time implements Comparable<Time>{
+public final class Time implements Comparable<Time> {
     private final int[] raw;
 
     private Time(int[] raw) {
@@ -57,7 +57,7 @@ public class Time implements Comparable<Time>{
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof Time)) return false;
 
         Time time = (Time) o;
 
@@ -66,7 +66,6 @@ public class Time implements Comparable<Time>{
 
     @Override
     public int hashCode() {
-        if (raw.length == 0) return 0;
         return Arrays.hashCode(raw);
     }
 

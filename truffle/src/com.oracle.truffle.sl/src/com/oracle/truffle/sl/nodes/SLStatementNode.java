@@ -80,7 +80,7 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     private int hasNewNodeState = -1;
 
     @CompilerDirectives.CompilationFinal
-    private NodeIdentifier identifier = null;
+    protected NodeIdentifier identifier = null;
 
     @CompilerDirectives.CompilationFinal
     private TruffleLanguage.ContextReference<SLContext> contextRef;
