@@ -44,7 +44,6 @@ import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.frame.VirtualFrame;
-import com.oracle.truffle.api.instrumentation.GenerateWrapper;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
 import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.instrumentation.StandardTags;
@@ -197,11 +196,6 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public abstract void executeVoid(VirtualFrame frame);
 
     public abstract void calcVoidInner(VirtualFrame frame);
-
-    public void calcVoid(VirtualFrame frame) {
-        calcVoidInner(frame);
-        getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
-    }
 
     /**
      * Marks this node as being a {@link StandardTags.StatementTag} for instrumentation purposes.

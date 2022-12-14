@@ -56,7 +56,6 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
  * Node to write a local variable to a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -79,6 +78,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
      * the Truffle DSL based on the {@link NodeChild} annotation on the class.
      */
     protected abstract SLExpressionNode getNameNode();
+    protected abstract SLExpressionNode getValueNode();
 
     public abstract boolean isDeclaration();
 
@@ -156,37 +156,25 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeGeneric(frame);
-        } finally {
-            op.endNewExecution();
-        }
+        final Object value = op.calcGeneric(frame, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value, identifier);
+        return value;
     }
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeBoolean(frame);
-        } finally {
-            op.endNewExecution();
-        }
+        final boolean value = op.calcBoolean(frame, this, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value, identifier);
+        return value;
     }
 
     @Override
     public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeLong(frame);
-        } finally {
-            op.endNewExecution();
-        }
+        final long value = op.calcLong(frame, this, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value, identifier);
+        return value;
     }
 
     @Override

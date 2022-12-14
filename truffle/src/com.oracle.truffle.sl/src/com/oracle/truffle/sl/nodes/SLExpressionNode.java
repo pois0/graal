@@ -123,27 +123,11 @@ public abstract class SLExpressionNode extends SLStatementNode {
         return SLTypesGen.expectLong(calcGenericInner(frame));
     }
 
-    public long calcLong(VirtualFrame frame) throws UnexpectedResultException {
-        try {
-            return calcLongInner(frame);
-        } finally {
-            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
-        }
-    }
-
     public boolean executeBoolean(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(executeGeneric(frame));
     }
 
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(calcGenericInner(frame));
-    }
-
-    public boolean calcBoolean(VirtualFrame frame) throws UnexpectedResultException {
-        try {
-            return calcBooleanInner(frame);
-        } finally {
-            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
-        }
     }
 }

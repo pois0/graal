@@ -106,13 +106,9 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
             return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeBoolean);
         }
 
-        boolean leftValue = calcSubNode(left, frame);
-        boolean rightValue = isEvaluateRight(leftValue) && calcSubNode(right, frame);
+        boolean leftValue = op.calcBoolean(frame, this, left);
+        boolean rightValue = isEvaluateRight(leftValue) && op.calcBoolean(frame, this, right);
         return execute(leftValue, rightValue);
-    }
-
-    private boolean calcSubNode(SLExpressionNode node, VirtualFrame frame) {
-        return getContext().getHistoryOperator().calcBoolean(frame, this, node);
     }
 
     /**

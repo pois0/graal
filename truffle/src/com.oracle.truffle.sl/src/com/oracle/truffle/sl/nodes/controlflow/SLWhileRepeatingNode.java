@@ -88,8 +88,9 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     private final SLContext context = SLLanguage.getCurrentContext();
     private int hasNewNodeState = -1;
 
-    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
+    public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode, NodeIdentifier identifier) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
+        this.conditionNode.setIdentifier(identifier);
         this.bodyNode = bodyNode;
     }
 
@@ -124,18 +125,14 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
             }
         }
 
-        if (result) {
-            context.getHistoryOperator().onGotoNextIteration(parentIdentifier);
-        }
+        if (result) context.getHistoryOperator().onGotoNextIteration(parentIdentifier);
 
         return result;
     }
 
     @Override
     public boolean executeRepeating(VirtualFrame frame, int arg) {
-        if (arg == EXEC) {
-            executeRepeating(frame);
-        }
+        if (arg == EXEC) return executeRepeating(frame);
 
         final ExecutionHistoryOperator op = context.getHistoryOperator();
 

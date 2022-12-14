@@ -107,7 +107,7 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     @Override
     public void executeVoid(VirtualFrame frame) {
         if (this.block != null) {
-            this.block.executeVoid(frame, 0);
+            this.block.executeVoid(frame, EXEC);
         }
     }
 
@@ -116,7 +116,7 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
         if (isNewNode()) {
             getContext().getHistoryOperator().newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
         } else {
-            this.block.executeVoid(frame, 1);
+            this.block.executeVoid(frame, CALC);
         }
     }
 
@@ -140,11 +140,6 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     public void executeVoid(VirtualFrame frame, SLStatementNode node, int index, int argument) {
         if (argument == EXEC) {
             node.executeVoid(frame);
-            return;
-        }
-
-        if (hasNewChildNode()) {
-            node.calcVoid(frame);
             return;
         }
 

@@ -188,6 +188,7 @@ public class SLNodeFactory {
          * specialized.
          */
         final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount);
+        setIdentifier(readArg);
         readArg.setSourceSection(nameToken.getStartIndex(), nameToken.getText().length());
         SLExpressionNode assignment = createAssignment(createStringLiteral(nameToken, false), readArg, parameterCount);
         methodNodes.add(assignment);
@@ -322,7 +323,7 @@ public class SLNodeFactory {
         conditionNode.addStatementTag();
         final int start = whileToken.getStartIndex();
         final int end = bodyNode.getSourceEndIndex();
-        final SLWhileNode whileNode = new SLWhileNode(conditionNode, bodyNode);
+        final SLWhileNode whileNode = new SLWhileNode(conditionNode, bodyNode, newIdentifier());
         whileNode.setSourceSection(start, end - start);
         setIdentifier(whileNode);
         return whileNode;
@@ -346,7 +347,7 @@ public class SLNodeFactory {
         conditionNode.addStatementTag();
         final int start = ifToken.getStartIndex();
         final int end = elsePartNode == null ? thenPartNode.getSourceEndIndex() : elsePartNode.getSourceEndIndex();
-        final SLIfNode ifNode = new SLIfNode(conditionNode, thenPartNode, elsePartNode);
+        final SLIfNode ifNode = new SLIfNode(conditionNode, thenPartNode, elsePartNode, newIdentifier());
         ifNode.setSourceSection(start, end - start);
         setIdentifier(ifNode);
         return ifNode;
@@ -667,13 +668,15 @@ public class SLNodeFactory {
     }
 
     private void setIdentifier(SLStatementNode node) {
-        NodeIdentifier identifier;
+        node.setIdentifier(newIdentifier());
+    }
+
+    private NodeIdentifier newIdentifier() {
         if (inNewExp) {
-            identifier = new NodeIdentifier(functionName, newExpNumber++, true);
+            return new NodeIdentifier(functionName, newExpNumber++, true);
         } else {
-            identifier = new NodeIdentifier(functionName, expNumber++);
+            return new NodeIdentifier(functionName, expNumber++);
         }
-        node.setIdentifier(identifier);
     }
 
     /**

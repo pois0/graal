@@ -57,8 +57,8 @@ public final class SLWhileNode extends SLStatementNode {
     @SuppressWarnings("FieldMayBeFinal")
     @Child private LoopNode loopNode;
 
-    public SLWhileNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
-        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode));
+    public SLWhileNode(SLExpressionNode conditionNode, SLStatementNode bodyNode, NodeIdentifier innerIdentifier) {
+        this.loopNode = Truffle.getRuntime().createLoopNode(new SLWhileRepeatingNode(conditionNode, bodyNode, innerIdentifier));
     }
 
     @Override

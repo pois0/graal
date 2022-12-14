@@ -421,6 +421,10 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
         return object;
     }
 
+    public SLObject justCreateObject() {
+        return new SLObject(rootShape);
+    }
+
     public static SLContext getCurrentContext() {
         return getCurrentContext(SLLanguage.class);
     }

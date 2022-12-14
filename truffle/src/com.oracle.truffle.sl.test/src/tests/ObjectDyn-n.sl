@@ -38,7 +38,7 @@ function main() {
   println(obj5.prop2);
   println(obj5.prop9);
 
-  insert(obj7 = new());
+  insert(println(obj5.prop3));
 
 //  obj6 = new();
 //  println(obj6["x"]);

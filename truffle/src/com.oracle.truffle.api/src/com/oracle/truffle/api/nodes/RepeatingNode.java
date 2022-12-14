@@ -110,7 +110,7 @@ public interface RepeatingNode extends NodeInterface {
      * @since 19.3
      */
     default Object executeRepeatingWithValue(VirtualFrame frame, int arg) {
-        if (executeRepeating(frame)) {
+        if (executeRepeating(frame, arg)) {
             return CONTINUE_LOOP_STATUS;
         } else {
             return BREAK_LOOP_STATUS;

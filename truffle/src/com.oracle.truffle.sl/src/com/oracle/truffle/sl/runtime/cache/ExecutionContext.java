@@ -38,7 +38,7 @@ public final class ExecutionContext implements Comparable<ExecutionContext> {
 
     @Override
     public int hashCode() {
-        return 31 * this.callContext.hashCode() + currentNodeIdentifier.hashCode();
+        return 31 * currentNodeIdentifier.hashCode() + this.callContext.hashCode();
     }
 
     @Override

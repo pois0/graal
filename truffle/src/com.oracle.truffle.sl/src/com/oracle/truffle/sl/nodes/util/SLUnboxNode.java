@@ -46,6 +46,7 @@ import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.dsl.TypeSystemReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
@@ -64,7 +65,7 @@ import com.oracle.truffle.sl.runtime.SLNull;
 @NodeChild("child")
 public abstract class SLUnboxNode extends SLExpressionNode {
 
-    protected abstract SLExpressionNode getChild();
+    public abstract SLExpressionNode getChild();
 
     static final int LIMIT = 5;
 

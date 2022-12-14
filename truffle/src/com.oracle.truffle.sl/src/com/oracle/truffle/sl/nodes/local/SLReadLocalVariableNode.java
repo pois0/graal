@@ -123,14 +123,7 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return op.getVariableValue(slotIdentifier, identifier);
-        } finally {
-            op.endNewExecution();
-        }
+        return getContext().getHistoryOperator().getVariableValue(slotIdentifier, getNodeIdentifier());
     }
 
     @Override

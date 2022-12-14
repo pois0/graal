@@ -49,6 +49,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 @NodeInfo(shortName = "if", description = "The node implementing a condional statement")
 public final class SLIfNode extends SLStatementNode {
@@ -75,8 +76,9 @@ public final class SLIfNode extends SLStatementNode {
      */
     private final ConditionProfile condition = ConditionProfile.createCountingProfile();
 
-    public SLIfNode(SLExpressionNode conditionNode, SLStatementNode thenPartNode, SLStatementNode elsePartNode) {
+    public SLIfNode(SLExpressionNode conditionNode, SLStatementNode thenPartNode, SLStatementNode elsePartNode, NodeIdentifier identifier) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
+        this.conditionNode.setIdentifier(identifier);
         this.thenPartNode = thenPartNode;
         this.elsePartNode = elsePartNode;
     }
@@ -143,14 +145,6 @@ public final class SLIfNode extends SLStatementNode {
              * The condition evaluated to a non-boolean result. This is a type error in the SL
              * program.
              */
-            throw SLException.typeError(this, ex.getResult());
-        }
-    }
-
-    private boolean calculateCondition(VirtualFrame frame) {
-        try {
-            return conditionNode.calcBoolean(frame);
-        } catch (UnexpectedResultException ex) {
             throw SLException.typeError(this, ex.getResult());
         }
     }

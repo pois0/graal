@@ -122,15 +122,13 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         if (isNewNode()) {
-            op.startNewExecution(frame, identifier);
-            try {
-                executeGeneric(frame);
-            } finally {
-                op.endNewExecution();
-            }
+            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
         }
-
-        return executeGeneric(frame);
+        final Object receiver = op.calcGeneric(frame, getReceiverNode());
+        final Object name = op.calcGeneric(frame, getNameNode());
+        final Object value = op.calcGeneric(frame, getValueNode());
+        op.rewriteObjectField(receiver, (String) name, value, identifier);
+        return value;
     }
 
     @Override

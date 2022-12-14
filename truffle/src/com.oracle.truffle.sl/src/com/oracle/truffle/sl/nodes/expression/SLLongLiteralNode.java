@@ -65,22 +65,8 @@ public final class SLLongLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) {
-        try {
-            return getContext().getHistoryOperator().newExecutionLong(getNodeIdentifier(), frame, (it) -> value);
-        } catch (UnexpectedResultException e) {
-            throw new RuntimeException("Never reach here");
-        }
-    }
-
-    @Override
     public Object executeGeneric(VirtualFrame frame) {
         return value;
-    }
-
-    @Override
-    public Long calcGenericInner(VirtualFrame frame) {
-        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
     }
 
     @Override

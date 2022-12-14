@@ -62,11 +62,6 @@ public final class SLStringLiteralNode extends SLLiteralNode {
     }
 
     @Override
-    public String calcGenericInner(VirtualFrame frame) {
-        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, (it) -> value);
-    }
-
-    @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLStringLiteralNode)) return false;
         return value.equals(((SLStringLiteralNode) that).value);

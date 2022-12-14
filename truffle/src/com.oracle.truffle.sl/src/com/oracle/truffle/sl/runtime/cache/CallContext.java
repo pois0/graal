@@ -56,40 +56,47 @@ public abstract class CallContext implements Comparable<CallContext> {
     }
 
     public static boolean equals(CallContext e1, CallContext e2) {
-        if (e1 == e2) return true;
-        if (e1 == ExecutionBase.INSTANCE || e2 == ExecutionBase.INSTANCE) return false;
-        if (!e1.nodeIdentifier.equals(e2.nodeIdentifier)) return false;
-        if (e1 instanceof Loop) {
-            if (e2 instanceof Loop) {
-                if (((Loop) e1).loopCount != ((Loop) e2).loopCount) return false;
-            } else {
+        do {
+            if (e1 == e2) return true;
+            if (!e1.nodeIdentifier.equals(e2.nodeIdentifier)) return false;
+            if (e1 instanceof Loop) {
+                if (e2 instanceof Loop) {
+                    if (((Loop) e1).loopCount != ((Loop) e2).loopCount) return false;
+                } else {
+                    return false;
+                }
+            } else if (e2 instanceof Loop) {
                 return false;
             }
-        } else if (e2 instanceof Loop) {
-            return false;
-        }
 
-        return equals(e1.root, e2.root);
+            e1 = e1.root;
+            e2 = e2.root;
+        } while (e1 != null && e2 != null);
+
+        return e1 == e2;
     }
 
     private static int compare(CallContext e1, CallContext e2) {
-        if (e1 == e2) return 0;
-        if (e1 == ExecutionBase.INSTANCE) return 1;
-        if (e2 == ExecutionBase.INSTANCE) return -1;
-        int niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
-        if (niComp != 0) return niComp;
-        if (e1 instanceof Loop) {
-            if (e2 instanceof Loop) {
-                int loopComp = Integer.compare(((Loop) e1).loopCount, ((Loop) e2).loopCount);
-                if (loopComp != 0) return loopComp;
-            } else {
-                return 1;
+        do {
+            if (e1 == e2) return 0;
+            int niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
+            if (niComp != 0) return niComp;
+            if (e1 instanceof Loop) {
+                if (e2 instanceof Loop) {
+                    int loopComp = Integer.compare(((Loop) e1).loopCount, ((Loop) e2).loopCount);
+                    if (loopComp != 0) return loopComp;
+                } else {
+                    return 1;
+                }
+            } else if (e2 instanceof Loop) {
+                return -1;
             }
-        } else if (e2 instanceof Loop) {
-            return -1;
-        }
 
-        return e1.root.compareTo(e2.root);
+            e1 = e1.root;
+            e2 = e2.root;
+        } while (e1 != null && e2 != null);
+
+        return e1 == null ? e2 == null ? 0 : 1 : -1;
     }
 
     public static abstract class ContextBase extends CallContext {
@@ -122,7 +129,7 @@ public abstract class CallContext implements Comparable<CallContext> {
 
         @Override
         public String toString() {
-            return "ExecutionBase{}";
+            return "ExecutionBase";
         }
 
     }
@@ -132,7 +139,7 @@ public abstract class CallContext implements Comparable<CallContext> {
             super(root,
                     nodeIdentifier,
                     root instanceof FunctionCall ? (FunctionCall) root : root.calledFrom,
-                    hashCode(root, nodeIdentifier));
+                    31 * hashCode(root, nodeIdentifier));
         }
 
         @Override
@@ -182,7 +189,7 @@ public abstract class CallContext implements Comparable<CallContext> {
         }
 
         private static int hashCode(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
-            return 31 * CallContext.hashCode(root, nodeIdentifier) + loopCount;
+            return 31 * CallContext.hashCode(root, nodeIdentifier) + loopCount + 1;
         }
 
         @Override

@@ -87,13 +87,14 @@ public class SLReadArgumentNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        op.startNewExecution(frame, identifier);
-        try {
-            return executeGeneric(frame);
-        } finally {
-            op.endNewExecution();
+        Object[] args = frame.getArguments();
+        if (index < args.length) {
+            return args[index];
+        } else {
+            /* In the interpreter, record profiling information that the branch was used. */
+            outOfBoundsTaken.enter();
+            /* Use the default null value. */
+            return SLNull.SINGLETON;
         }
     }
 
