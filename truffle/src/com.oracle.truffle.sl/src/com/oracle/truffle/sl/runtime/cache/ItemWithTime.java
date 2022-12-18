@@ -1,8 +1,6 @@
 package com.oracle.truffle.sl.runtime.cache;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 public class ItemWithTime<T> {
@@ -30,27 +28,6 @@ public class ItemWithTime<T> {
                 '}';
     }
 
-    // TODO: Should be tested
-    // FIXME: low = -1 and check boundary in caller
-    public static <T> int binarySearch(ArrayList<ItemWithTime<T>> list, Time time) {
-        int low = 0;
-        int high = list.size() - 1;
-
-        while (low <= high) {
-            final int mid = (low + high) >>> 1;
-            final Time midVal = list.get(mid).time;
-            int cmp = midVal.compareTo(time);
-
-            if (cmp < 0)
-                low = mid + 1;
-            else if (cmp > 0)
-                high = mid - 1;
-            else
-                return mid; // key found
-        }
-        return low;
-    }
-
     public static <T> int binarySearchWhereInsertTo(ArrayList<ItemWithTime<T>> list, Time time) {
         int low = 0;
         int high = list.size() - 1;
@@ -71,7 +48,27 @@ public class ItemWithTime<T> {
         return low;
     }
 
-    public static <T> int binarySearchAccurate(ArrayList<ItemWithTime<T>> list, Time time) {
+    public static <T> int binarySearchNext(ArrayList<ItemWithTime<T>> list, Time time) {
+        int low = 0;
+        int high = list.size() - 1;
+
+        while (low <= high) {
+            final int mid = (low + high) >>> 1;
+            final Time midVal = list.get(mid).time;
+            int cmp = midVal.compareTo(time);
+
+            if (cmp < 0)
+                low = mid + 1;
+            else if (cmp > 0)
+                high = mid - 1;
+            else
+                return mid + 1; // key found
+        }
+
+        return low;
+    }
+
+    public static <T> int binarySearchApproximately(ArrayList<ItemWithTime<T>> list, Time time) {
         int low = 0;
         int high = list.size()-1;
 
@@ -129,9 +126,16 @@ public class ItemWithTime<T> {
         return null;
     }
 
-    public static <T> List<ItemWithTime<T>> subList(ArrayList<ItemWithTime<T>> list, Time startTIme, Time endTime) {
-        int startIndex = binarySearch(list, startTIme);
-        int endIndex = binarySearch(list, endTime);
-        return list.subList(startIndex, endIndex);
+    public static <T> List<ItemWithTime<T>> subList(ArrayList<ItemWithTime<T>> list, Time startTime, Time endTime) {
+        final int start = binarySearchWhereInsertTo(list, startTime);
+        final int end = binarySearchNext(list, endTime);
+        return list.subList(start, end);
+    }
+
+    public static <T> ArrayList<ItemWithTime<T>> merge(ArrayList<ItemWithTime<T>> base, ArrayList<ItemWithTime<T>> newList, Time initialTime) {
+        if (newList.isEmpty()) return base;
+        final int i = binarySearchWhereInsertTo(newList, initialTime);
+        base.addAll(i, newList);
+        return base;
     }
 }

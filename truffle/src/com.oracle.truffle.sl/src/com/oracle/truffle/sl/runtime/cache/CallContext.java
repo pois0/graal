@@ -1,5 +1,8 @@
 package com.oracle.truffle.sl.runtime.cache;
 
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+
 public abstract class CallContext implements Comparable<CallContext> {
     protected final NodeIdentifier nodeIdentifier;
     protected final CallContext root;
@@ -30,11 +33,7 @@ public abstract class CallContext implements Comparable<CallContext> {
         return hashCode;
     }
 
-    public static ContextBase latestFunctionCall(CallContext ctx) {
-        return ctx.latestFunctionCallInner();
-    }
-
-    protected abstract ContextBase latestFunctionCallInner();
+    public abstract ContextBase getBase();
 
     @Override
     public boolean equals(Object o) {
@@ -49,16 +48,15 @@ public abstract class CallContext implements Comparable<CallContext> {
         return compare(this, o);
     }
 
-    protected static int hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
-        int result = nodeIdentifier.hashCode();
-        result = 31 * result + (root != null ? root.hashCode() : 0);
-        return result;
+    protected static Hasher hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
+        return nodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())
+                .putInt(root != null ? root.hashCode() : 0);
     }
 
     public static boolean equals(CallContext e1, CallContext e2) {
         do {
             if (e1 == e2) return true;
-            if (!e1.nodeIdentifier.equals(e2.nodeIdentifier)) return false;
+            if (!NodeIdentifier.equals(e1.nodeIdentifier, e2.nodeIdentifier)) return false;
             if (e1 instanceof Loop) {
                 if (e2 instanceof Loop) {
                     if (((Loop) e1).loopCount != ((Loop) e2).loopCount) return false;
@@ -73,7 +71,7 @@ public abstract class CallContext implements Comparable<CallContext> {
             e2 = e2.root;
         } while (e1 != null && e2 != null);
 
-        return e1 == e2;
+        return e1 == e2; // check both are null
     }
 
     private static int compare(CallContext e1, CallContext e2) {
@@ -118,7 +116,7 @@ public abstract class CallContext implements Comparable<CallContext> {
         }
 
         @Override
-        protected ContextBase latestFunctionCallInner() {
+        public ContextBase getBase() {
             return this;
         }
 
@@ -139,21 +137,20 @@ public abstract class CallContext implements Comparable<CallContext> {
             super(root,
                     nodeIdentifier,
                     root instanceof FunctionCall ? (FunctionCall) root : root.calledFrom,
-                    31 * hashCode(root, nodeIdentifier));
+                    hashCode(root, nodeIdentifier).putInt(0).hash().asInt());
         }
 
         @Override
-        protected ContextBase latestFunctionCallInner() {
+        public ContextBase getBase() {
             return this;
         }
 
         @Override
         public String toString() {
-            final StringBuilder sb = new StringBuilder("FunctionCall{");
-            sb.append("nodeIdentifier=").append(nodeIdentifier);
-            sb.append(", root=").append(root);
-            sb.append('}');
-            return sb.toString();
+            return "FunctionCall{" +
+                    "nodeIdentifier=" + nodeIdentifier +
+                    ", root=" + root +
+                    '}';
         }
     }
 
@@ -184,12 +181,12 @@ public abstract class CallContext implements Comparable<CallContext> {
         }
 
         @Override
-        protected ContextBase latestFunctionCallInner() {
+        public ContextBase getBase() {
             return calledFrom;
         }
 
         private static int hashCode(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
-            return 31 * CallContext.hashCode(root, nodeIdentifier) + loopCount + 1;
+            return hashCode(root, nodeIdentifier).putInt(loopCount + 1).hash().asInt();
         }
 
         @Override

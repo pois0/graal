@@ -59,7 +59,6 @@ public abstract class SLHasSizeBuiltin extends SLBuiltinNode {
         return arrays.hasArrayElements(obj);
     }
 
-
     @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLHasSizeBuiltin)) return false;

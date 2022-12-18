@@ -1,5 +1,7 @@
 package com.oracle.truffle.sl.runtime.cache;
 
+import com.google.common.hash.Hasher;
+
 public final class NodeIdentifier implements Comparable<NodeIdentifier> {
     private final String functionName;
     private final int number;
@@ -27,16 +29,18 @@ public final class NodeIdentifier implements Comparable<NodeIdentifier> {
         return isNew;
     }
 
+    public static boolean equals(NodeIdentifier e1, NodeIdentifier e2) {
+        if (e1.number != e2.number) return false;
+        if (e1.isNew != e2.isNew) return false;
+        return e1.functionName.equals(e2.functionName);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof NodeIdentifier)) return false;
 
-        NodeIdentifier that = (NodeIdentifier) o;
-
-        if (number != that.number) return false;
-        if (isNew != that.isNew) return false;
-        return functionName.equals(that.functionName);
+        return equals(this, (NodeIdentifier) o);
     }
 
     @Override
@@ -44,6 +48,12 @@ public final class NodeIdentifier implements Comparable<NodeIdentifier> {
         int result = functionName.hashCode();
         result = 31 * result + number;
         return 2 * result + (isNew ? 1 : 0);
+    }
+
+    public Hasher hash(Hasher hasher) {
+        return hasher.putInt(functionName.hashCode())
+                .putInt(number)
+                .putBoolean(isNew);
     }
 
     @Override

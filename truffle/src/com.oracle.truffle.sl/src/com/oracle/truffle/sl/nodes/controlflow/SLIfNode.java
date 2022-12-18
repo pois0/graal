@@ -130,7 +130,7 @@ public final class SLIfNode extends SLStatementNode {
 
     @Override
     protected boolean hasNewChildNode() {
-        return conditionNode.hasNewNode() || thenPartNode.hasNewNode() || elsePartNode.hasNewNode();
+        return conditionNode.hasNewNode() || thenPartNode.hasNewNode() || (elsePartNode != null && elsePartNode.hasNewNode());
     }
 
     private boolean evaluateCondition(VirtualFrame frame) {

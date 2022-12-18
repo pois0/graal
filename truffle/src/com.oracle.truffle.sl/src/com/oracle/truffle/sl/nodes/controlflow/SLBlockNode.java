@@ -163,6 +163,8 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
 
     @Override
     protected boolean hasNewChildNode() {
+        final BlockNode<SLStatementNode> block = this.block;
+        if (block == null) return false;
         SLStatementNode[] elements = block.getElements();
         for (SLStatementNode child : elements) {
             if (child.hasNewNode()) return true;

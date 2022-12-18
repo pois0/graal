@@ -99,6 +99,15 @@ suite = {
       }
     },
 
+    "GUAVA": {
+        "sha1" : "60458f877d055d0c9114d9e1a2efb737b4bc282c",
+        "maven": {
+            "groupId": "com.google.guava",
+            "artifactId" : "guava",
+            "version" : "31.1-jre"
+            },
+    },
+
     "ANTLR4_COMPLETE": {
       # original: https://www.antlr.org/download/antlr-4.7.2-complete.jar
       "urls": ["https://lafo.ssw.uni-linz.ac.at/pub/graal-external-deps/antlr-4.7.2-complete.jar"],
@@ -663,6 +672,7 @@ suite = {
       "sourceDirs" : ["src"],
       "dependencies" : [
         "TRUFFLE_API",
+        "GUAVA",
         "truffle:ANTLR4"
       ],
       "javaCompliance" : "8+",
@@ -979,6 +989,7 @@ suite = {
       "distDependencies" : [
           "TRUFFLE_API",
           "TRUFFLE_TCK",
+          "GUAVA",
       ],
       "description" : "Truffle SL is an example language implemented using the Truffle API.",
       "allowsJavadocWarnings": True,

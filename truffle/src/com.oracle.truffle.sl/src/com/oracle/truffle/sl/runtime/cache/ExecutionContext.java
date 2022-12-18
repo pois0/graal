@@ -1,5 +1,7 @@
 package com.oracle.truffle.sl.runtime.cache;
 
+import com.google.common.hash.Hashing;
+
 public final class ExecutionContext implements Comparable<ExecutionContext> {
     private final CallContext callContext;
     private final NodeIdentifier currentNodeIdentifier;
@@ -38,7 +40,9 @@ public final class ExecutionContext implements Comparable<ExecutionContext> {
 
     @Override
     public int hashCode() {
-        return 31 * currentNodeIdentifier.hashCode() + this.callContext.hashCode();
+        return currentNodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())
+                .putInt(callContext.hashCode())
+                .hash().asInt();
     }
 
     @Override

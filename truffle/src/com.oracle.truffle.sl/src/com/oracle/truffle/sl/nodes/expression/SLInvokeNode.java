@@ -101,7 +101,7 @@ public final class SLInvokeNode extends SLExpressionNode {
         }
 
         try {
-            getContext().getHistoryOperator().onEnterFunction(getNodeIdentifier(), ((SLFunction) function).getName(), false);
+            getContext().getHistoryOperator().onEnterFunction(getNodeIdentifier(), ((SLFunction) function).getName(), argumentLength, false);
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
@@ -148,7 +148,7 @@ public final class SLInvokeNode extends SLExpressionNode {
         }
 
         try {
-            op.onEnterFunction(identifier, ((SLFunction) function).getName(), true);
+            op.onEnterFunction(identifier, ((SLFunction) function).getName(), argumentLength, true);
             op.pushArgumentFlags(argumentFlags);
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
@@ -182,6 +182,10 @@ public final class SLInvokeNode extends SLExpressionNode {
 
     @Override
     protected boolean hasNewChildNode() {
-        return true;
+        if (functionNode.hasNewNode()) return true;
+        for (SLExpressionNode argNode : argumentNodes) {
+            if (argNode.hasNewNode()) return true;
+        }
+        return false;
     }
 }

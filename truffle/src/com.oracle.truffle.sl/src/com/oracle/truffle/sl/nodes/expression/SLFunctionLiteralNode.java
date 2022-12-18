@@ -48,10 +48,7 @@ import com.oracle.truffle.api.TruffleLanguage.ContextPolicy;
 import com.oracle.truffle.api.TruffleLanguage.ContextReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
@@ -66,7 +63,7 @@ import java.util.Objects;
  * never changes. This is guaranteed by the {@link SLFunctionRegistry}.
  */
 @NodeInfo(shortName = "func")
-public final class SLFunctionLiteralNode extends SLExpressionNode {
+public final class SLFunctionLiteralNode extends SLLiteralNode {
 
     /** The name of the function. */
     private final String functionName;
@@ -102,22 +99,10 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
     }
 
     @Override
-    public SLFunction calcGenericInner(VirtualFrame frame) {
-        return executeGeneric(frame); // TODO
-    }
-
-    @Override
     public boolean isEqualNode(SLStatementNode that) {
         if (!(that instanceof SLFunctionLiteralNode)) return false;
         SLFunctionLiteralNode thatFunc = (SLFunctionLiteralNode) that;
         return Objects.equals(functionName, thatFunc.functionName); // TODO
-    }
-
-    @Override
-    protected boolean hasNewChildNode() {
-        RootNode rootNode = findFunction().getCallTarget().getRootNode();
-        if (!(rootNode instanceof SLRootNode)) return true;
-        return ((SLRootNode) rootNode).getBodyNode().hasNewNode();
     }
 
     private SLFunction findFunction() {

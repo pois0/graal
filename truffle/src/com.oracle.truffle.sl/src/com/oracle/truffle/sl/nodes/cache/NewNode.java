@@ -10,6 +10,7 @@ public final class NewNode extends SLExpressionNode {
 
     public NewNode(SLExpressionNode delegateNode) {
         this.delegateNode = delegateNode;
+        this.setNewNode();
     }
 
     @Override

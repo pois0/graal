@@ -78,7 +78,7 @@ public final class SLMain {
             source = Source.newBuilder(SL, new InputStreamReader(System.in), "<stdin>").build();
             // @formatter:on
         } else {
-            for (int i = 0; i < 50; i++) {
+            for (int i = 0; i < 100; i++) {
                 for (String file : files) {
                     System.out.println("execute: " + file);
                     source = Source.newBuilder(SL, new File(file)).build();
@@ -87,7 +87,6 @@ public final class SLMain {
                 System.gc();
             }
         }
-
     }
 
     private static int executeSource(Source source, InputStream in, PrintStream out, Map<String, String> options) {

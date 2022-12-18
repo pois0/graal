@@ -266,9 +266,9 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public final boolean hasNewNode() {
         int state = hasNewNodeState;
         if (state < 0) {
-            hasNewNodeState = state = isNewNode() || hasNewChildNode() ? 1 : 0;
+            hasNewNodeState = state = (isNewNode() || hasNewChildNode()) ? 1 : 0;
         }
-        return state == 1;
+        return state != 0;
     }
 
     protected abstract boolean hasNewChildNode();
