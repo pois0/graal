@@ -51,6 +51,9 @@ import java.util.Set;
 import com.oracle.truffle.sl.nodes.cache.DeleteNode;
 import com.oracle.truffle.sl.nodes.cache.NewNode;
 import com.oracle.truffle.sl.nodes.cache.ReplaceNode;
+import com.oracle.truffle.sl.nodes.expression.SLEqualNode;
+import com.oracle.truffle.sl.nodes.expression.SLLessOrEqualNode;
+import com.oracle.truffle.sl.nodes.expression.SLLessThanNode;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.Token;
@@ -409,16 +412,22 @@ public class SLNodeFactory {
                 result = SLLessOrEqualNodeGen.create(leftUnboxed, rightUnboxed);
                 break;
             case ">":
-                result = SLLogicalNotNodeGen.create(SLLessOrEqualNodeGen.create(leftUnboxed, rightUnboxed));
+                final SLLessOrEqualNode leNode = SLLessOrEqualNodeGen.create(leftUnboxed, rightUnboxed);
+                setIdentifier(leNode);
+                result = SLLogicalNotNodeGen.create(leNode);
                 break;
             case ">=":
-                result = SLLogicalNotNodeGen.create(SLLessThanNodeGen.create(leftUnboxed, rightUnboxed));
+                final SLLessThanNode ltNode = SLLessThanNodeGen.create(leftUnboxed, rightUnboxed);
+                setIdentifier(ltNode);
+                result = SLLogicalNotNodeGen.create(ltNode);
                 break;
             case "==":
                 result = SLEqualNodeGen.create(leftUnboxed, rightUnboxed);
                 break;
             case "!=":
-                result = SLLogicalNotNodeGen.create(SLEqualNodeGen.create(leftUnboxed, rightUnboxed));
+                final SLEqualNode eqNode = SLEqualNodeGen.create(leftUnboxed, rightUnboxed);
+                setIdentifier(eqNode);
+                result = SLLogicalNotNodeGen.create(eqNode);
                 break;
             case "&&":
                 result = new SLLogicalAndNode(leftUnboxed, rightUnboxed);

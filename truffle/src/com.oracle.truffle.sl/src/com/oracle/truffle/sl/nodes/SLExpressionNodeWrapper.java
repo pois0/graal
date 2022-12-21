@@ -7,7 +7,7 @@ import com.oracle.truffle.api.nodes.NodeCost;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
-final class SLExpressionNodeWrapper extends SLExpressionNode implements InstrumentableNode.WrapperNode {
+public final class SLExpressionNodeWrapper extends SLExpressionNode implements InstrumentableNode.WrapperNode {
 
     @Child private SLExpressionNode delegateNode;
     @Child private ProbeNode probeNode;

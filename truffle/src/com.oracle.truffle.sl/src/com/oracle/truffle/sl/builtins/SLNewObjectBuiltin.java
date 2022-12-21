@@ -69,9 +69,8 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
     @SuppressWarnings("unused")
     public Object newObject(SLNull o,
                     @CachedLanguage SLLanguage language,
-                    @CachedContext(SLLanguage.class) ContextReference<SLContext> contextRef,
-                    @Cached("contextRef.get().getHistoryOperator()") ExecutionHistoryOperator historyOperator) {
-        return language.createObject(historyOperator, historyOperator.getExecutionContext(getNodeIdentifier()));
+                    @CachedContext(SLLanguage.class) ContextReference<SLContext> contextRef) {
+        return language.createObject(getContext().getHistoryOperator());
     }
 
     @Specialization(guards = "!values.isNull(obj)", limit = "3")

@@ -415,9 +415,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
      * Allocate an empty object. All new objects initially have no properties. Properties are added
      * when they are first stored, i.e., the store triggers a shape change of the object.
      */
-    public SLObject createObject(ExecutionHistoryOperator execOperator, ExecutionContext execCtx) {
+    public SLObject createObject(ExecutionHistoryOperator execOperator) {
         SLObject object = new SLObject(rootShape);
-        execOperator.onGenerateObject(object, execCtx);
+        execOperator.onGenerateObject(object);
         return object;
     }
 

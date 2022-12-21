@@ -1,6 +1,8 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-import java.lang.reflect.Array;
+import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -54,15 +56,15 @@ public final class Time implements Comparable<Time> {
         int[] thisRaw = this.raw;
         int[] thatRaw = o.raw;
 
-        for (int i = 0; true; i++) {
-            if (i == thisRaw.length) {
-                if (i == thatRaw.length) return 0;
-                return -1;
-            }
-            if (i == thatRaw.length) return 1;
-
-            int cmp = Integer.compare(thisRaw[i], thatRaw[i]);
-            if (cmp != 0) return cmp;
+        final int mismatch = Arrays.mismatch(thisRaw, thatRaw);
+        if (mismatch < 0) {
+            return 0;
+        } else if (mismatch == thisRaw.length) {
+            return -1;
+        } else if (mismatch == thatRaw.length) {
+            return 1;
+        } else {
+            return Integer.compare(thisRaw[mismatch], thatRaw[mismatch]);
         }
     }
 
@@ -78,7 +80,9 @@ public final class Time implements Comparable<Time> {
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(raw);
+        final Hasher hasher = Hashing.murmur3_32_fixed().newHasher();
+        for (int e : raw) hasher.putInt(e);
+        return hasher.hash().asInt();
     }
 
     @Override
@@ -88,12 +92,12 @@ public final class Time implements Comparable<Time> {
                 '}';
     }
 
-    public static <T> int binarySearchWhereInsertTo(ArrayList<Time> list, Time time) {
+    public static int binarySearchWhereInsertTo(ArrayList<Time> list, Time time) {
         final int i = Collections.binarySearch(list, time);
         return i < 0 ? -i - 1 : i;
     }
 
-    public static <T> int binarySearchNext(ArrayList<Time> list, Time time) {
+    public static int binarySearchNext(ArrayList<Time> list, Time time) {
         final int i = Collections.binarySearch(list, time);
         return i < 0 ? -i - 1 : i + 1;
     }

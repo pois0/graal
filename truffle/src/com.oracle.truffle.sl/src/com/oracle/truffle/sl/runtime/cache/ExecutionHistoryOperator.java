@@ -52,10 +52,10 @@ public final class ExecutionHistoryOperator {
     private ExecutionHistory currentHistory;
     private final ArrayDeque<HashSet<String>> localVarFlagStack = new ArrayDeque<>();
     private final ArrayDeque<boolean[]> parameterFlagStack = new ArrayDeque<>();
-    private final HashMap<ExecutionContext, HashSet<Object>> objectFieldFlags = new HashMap<>();
-    private CallContext currentStack = CallContext.ExecutionBase.INSTANCE;
-    private HashMap<ExecutionContext, WeakReference<SLObject>> ctxToObj = new HashMap<>();
-    private WeakHashMap<SLObject, ExecutionContext> objToCtx = new WeakHashMap<>();
+    private final HashMap<Time, HashSet<Object>> objectFieldFlags = new HashMap<>();
+    private CallContext currentContext = CallContext.ExecutionBase.INSTANCE;
+    private HashMap<Time, WeakReference<SLObject>> ctxToObj = new HashMap<>();
+    private WeakHashMap<SLObject, Time> objToCtx = new WeakHashMap<>();
     private final LocalVarOperatorHolder localVarOperatorHolder;
 
     private final StackListener stackListener = new StackListener() {
@@ -143,8 +143,8 @@ public final class ExecutionHistoryOperator {
         final ExecutionHistory.TimeInfo tp2 = currentHistory.getTime(getExecutionContext(identifier));
         assert tp2 != null;
         final Time end = tp2.getEnd();
-        for (ItemWithTime<String> funcName : currentHistory.getFunctionEnters(from, end)) {
-            if (functionRegistry.containNewNode(funcName.getItem())) return true;
+        for (ItemWithTime<Pair<CallContext.ContextBase, String>> entry : currentHistory.getFunctionEnters(from, end)) {
+            if (functionRegistry.containNewNode(entry.getItem().getRight())) return true;
         }
         return false;
     }
@@ -163,12 +163,12 @@ public final class ExecutionHistoryOperator {
 
     public void onEnterFunction(NodeIdentifier identifier, String funcName, int paramLen, boolean isCalc) {
         final ExecutionHistory currentHistory = this.currentHistory;
-        CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentStack, identifier);
-        this.currentStack = currentStack;
+        CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, identifier);
+        this.currentContext = currentStack;
         localVarFlagStack.push(new HashSet<>());
         localVarOperatorHolder.push(paramLen, currentStack);
         final Time time = isCalc ? currentHistory.getTime(lastCalcCtx).getEnd() : currentTime;
-        currentHistory.onEnterFunction(time, funcName);
+        currentHistory.onEnterFunction(time, funcName, currentStack);
     }
 
     public void pushArgumentFlags(boolean[] flags) {
@@ -176,9 +176,9 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onExitFunction(NodeIdentifier identifier) {
-        CallContext elem = currentStack;
+        CallContext elem = currentContext;
         assert elem instanceof CallContext.FunctionCall && elem.getNodeIdentifier() == identifier;
-        currentStack = elem.getRoot();
+        currentContext = elem.getRoot();
         localVarOperatorHolder.pop();
         localVarFlagStack.pop();
     }
@@ -188,30 +188,31 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onEnterLoop(NodeIdentifier identifier) {
-        currentStack = new CallContext.Loop(currentStack, identifier);
+        this.currentContext = new CallContext.Loop(this.currentContext, identifier);
     }
 
     public void onGotoNextIteration(NodeIdentifier identifier) {
-        CallContext elem = currentStack;
+        CallContext elem = currentContext;
         assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
-        currentStack = ((CallContext.Loop) elem).increment();
+        currentContext = ((CallContext.Loop) elem).increment();
     }
 
     public void onExitLoop(NodeIdentifier identifier) {
-        CallContext elem = currentStack;
+        CallContext elem = currentContext;
         assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
-        currentStack = elem.getRoot();
+        currentContext = elem.getRoot();
     }
 
-    public void onGenerateObject(SLObject object, ExecutionContext execCtx) {
-        objToCtx.put(object, execCtx);
-        ctxToObj.put(execCtx, new WeakReference<>(object));
+    public void onGenerateObject(SLObject object) {
+        objToCtx.put(object, currentTime);
+        ctxToObj.put(currentTime, new WeakReference<>(object));
+        currentHistory.onCreateObject(currentTime);
     }
 
     public void onObjectUpdated(Object object, String fldName, Object newValue) {
-        final ExecutionContext objGenCtx = objToCtx.get((SLObject) object);
-        currentHistory.onUpdateObjectWithHash(currentTime, objGenCtx, fldName, replaceReference(newValue));
-        objectFieldFlags.computeIfAbsent(objGenCtx, it -> new HashSet<>())
+        final Time objGenTime = objToCtx.get((SLObject) object);
+        currentHistory.onUpdateObjectWithHash(currentTime, objGenTime, fldName, replaceReference(newValue));
+        objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fldName);
     }
 
@@ -225,7 +226,9 @@ public final class ExecutionHistoryOperator {
         ExecutionHistory.TimeInfo tp = currentHistory.getTime(execCtx);
         if (tp == null) return ShouldReExecuteResult.NEW_EXECUTE;
 
-        if (checkFromList(currentHistory.getFunctionEnters(tp.getStart(), tp.getEnd()), functionRegistry::containNewNode)) return ShouldReExecuteResult.RE_EXECUTE;
+        if (checkFromList(currentHistory.getFunctionEnters(tp.getStart(), tp.getEnd()), it -> functionRegistry.containNewNode(it.getRight()))) {
+            return ShouldReExecuteResult.RE_EXECUTE;
+        }
 
         ExecutionHistory.LocalVarOperator op = localVarOperatorHolder.peek();
 
@@ -233,7 +236,7 @@ public final class ExecutionHistoryOperator {
         assert localVarFlags != null;
         for (String varName : localVarFlags) {
             ArrayList<Time> readVarHistory = op.getReadVar(varName);
-            if (readVarHistory.isEmpty()) continue;
+            if (readVarHistory == null || readVarHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
             final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
             if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
@@ -264,7 +267,6 @@ public final class ExecutionHistoryOperator {
     }
 
     private final static int STREAM_THRESHOLD = 10_000;
-
     private <T> boolean checkFromList(List<ItemWithTime<T>> list, Predicate<T> pred) {
         if (list.size() > STREAM_THRESHOLD) {
             return list.parallelStream().map(ItemWithTime::getItem).anyMatch(pred);
@@ -288,14 +290,14 @@ public final class ExecutionHistoryOperator {
     public Object getVariableValue(Object varName, NodeIdentifier identifier) {
         final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
         //noinspection DataFlowIssue
-        final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(currentStack.getBase()).get((String) varName);
-        return varHistory.get(ItemWithTime.binarySearchApply(varHistory, time));
+        final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get((String) varName);
+        return varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).getItem();
     }
 
     public Object getFieldValue(Object obj, String fieldName, NodeIdentifier identifier) {
-        final ExecutionContext objGenCtx = objToCtx.get((SLObject) obj);
+        final Time objGenTime = objToCtx.get((SLObject) obj);
         final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
-        final HashMap<String, ArrayList<ItemWithTime<Object>>> objectHistory = currentHistory.getObjectHistory(objGenCtx);
+        final HashMap<String, ArrayList<ItemWithTime<Object>>> objectHistory = currentHistory.getObjectHistory(objGenTime);
         final ArrayList<ItemWithTime<Object>> fieldHistory = objectHistory.get(fieldName);
         final Object value = fieldHistory.get(ItemWithTime.binarySearchApply(fieldHistory, time)).getItem();
         return revertObject(value);
@@ -309,9 +311,9 @@ public final class ExecutionHistoryOperator {
     }
 
     public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier) {
-        final ExecutionContext objGenCtx = objToCtx.get((SLObject) receiver);
-        currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenCtx, fieldName, replaceReference(value));
-        objectFieldFlags.computeIfAbsent(objGenCtx, it -> new HashSet<>())
+        final Time objGenTime = objToCtx.get((SLObject) receiver);
+        currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenTime, fieldName, replaceReference(value));
+        objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
     }
 
@@ -591,16 +593,16 @@ public final class ExecutionHistoryOperator {
 
     private void constructFrameAndObjects(Time time, VirtualFrame frame) {
         ExecutionHistory history = currentHistory;
-        HashMap<String, ArrayList<ItemWithTime<Object>>> local = history.getLocalHistory(currentStack.getBase());
+        HashMap<String, ArrayList<ItemWithTime<Object>>> local = history.getLocalHistory(currentContext.getBase());
         if (local == null) return;
         FrameDescriptor descriptor = frame.getFrameDescriptor();
 
-        final HashMap<ExecutionContext, WeakReference<SLObject>> ctxToObj = new HashMap<>(this.ctxToObj);
-        final WeakHashMap<SLObject, ExecutionContext> objToCtx = new WeakHashMap<>(this.objToCtx);
+        final HashMap<Time, WeakReference<SLObject>> ctxToObj = new HashMap<>(this.ctxToObj);
+        final WeakHashMap<SLObject, Time> objToCtx = new WeakHashMap<>(this.objToCtx);
 
-        for (Map.Entry<SLObject, ExecutionContext> entry : this.objToCtx.entrySet()) {
+        for (Map.Entry<SLObject, Time> entry : this.objToCtx.entrySet()) {
             final SLObject obj = entry.getKey();
-            final ExecutionContext objGenCtx = entry.getValue();
+            final Time objGenCtx = entry.getValue();
             constructObjects(time, objGenCtx, obj, history, ctxToObj, objToCtx);
         }
 
@@ -634,13 +636,13 @@ public final class ExecutionHistoryOperator {
 
     private SLObject constructObjects(
             Time time,
-            ExecutionContext objGenCtx,
+            Time objGenTime,
             SLObject newObject,
             ExecutionHistory history,
-            HashMap<ExecutionContext, WeakReference<SLObject>> ctxToObj,
-            WeakHashMap<SLObject, ExecutionContext> objToCtx
+            HashMap<Time, WeakReference<SLObject>> ctxToObj,
+            WeakHashMap<SLObject, Time> objToCtx
     ) {
-        HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(objGenCtx);
+        HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(objGenTime);
         if (currentObjectHistory != null) {
             InteropLibrary library = INTEROP_LIBRARY_.create(newObject);
             for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : currentObjectHistory.entrySet()) {
@@ -659,11 +661,11 @@ public final class ExecutionHistoryOperator {
                             || value == SLNull.SINGLETON) {
                         library.writeMember(newObject, name, value);
                     } else if (value instanceof ExecutionHistory.ObjectReference) {
-                        ExecutionContext valueGenCtx = ((ExecutionHistory.ObjectReference) value).getObjGenCtx();
-                        WeakReference<SLObject> objRef = ctxToObj.get(valueGenCtx);
+                        Time valueGenTime = ((ExecutionHistory.ObjectReference) value).getObjGenCtx();
+                        WeakReference<SLObject> objRef = ctxToObj.get(valueGenTime);
                         Object newValue;
                         if (objRef == null) {
-                            newValue = constructObjects(time, valueGenCtx, history, ctxToObj, objToCtx);
+                            newValue = constructObjects(time, valueGenTime, history, ctxToObj, objToCtx);
                         } else {
                             newValue = objRef.get();
                         }
@@ -684,15 +686,16 @@ public final class ExecutionHistoryOperator {
 
     private SLObject constructObjects(
             Time time,
-            ExecutionContext objGenCtx,
+            Time objGenTime,
             ExecutionHistory history,
-            HashMap<ExecutionContext,WeakReference<SLObject>> ctxToObj, WeakHashMap<SLObject, ExecutionContext> objToCtx
+            HashMap<Time,WeakReference<SLObject>> ctxToObj,
+            WeakHashMap<SLObject, Time> objToCtx
     ) {
         SLObject newObject = language.justCreateObject();
-        ctxToObj.put(objGenCtx, new WeakReference<>(newObject));
-        objToCtx.put(newObject, objGenCtx);
+        ctxToObj.put(objGenTime, new WeakReference<>(newObject));
+        objToCtx.put(newObject, objGenTime);
 
-        return constructObjects(time, objGenCtx, newObject, history, ctxToObj, objToCtx);
+        return constructObjects(time, objGenTime, newObject, history, ctxToObj, objToCtx);
     }
 
     private Time getAndIncrementTime() {
@@ -702,7 +705,7 @@ public final class ExecutionHistoryOperator {
     }
 
     public ExecutionContext getExecutionContext(NodeIdentifier identifier) {
-        return new ExecutionContext(currentStack, identifier);
+        return new ExecutionContext(currentContext, identifier);
     }
 
     private Object revertObject(Object value) {
@@ -750,8 +753,10 @@ public final class ExecutionHistoryOperator {
             saveNewValue = value;
         } else if (value instanceof SLFunction) {
             saveNewValue = new FunctionReference(((SLFunction) value).getName());
-        } else {
+        } else if (value instanceof SLObject) {
             saveNewValue = new ExecutionHistory.ObjectReference(objToCtx.get((SLObject) value));
+        } else {
+            throw new RuntimeException("Unavailable object: " + value.getClass().getName());
         }
 
         return saveNewValue;

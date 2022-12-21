@@ -144,11 +144,12 @@ public final class SLInvokeNode extends SLExpressionNode {
         }
 
         if (!shouldRecalc && !context.getHistoryOperator().checkContainsNewNodeInFunctionCalls(getNodeIdentifier())) {
-            return op.getReturnedValueOrThrow(identifier);
+            final Object returnedValueOrThrow = op.getReturnedValueOrThrow(identifier);
+            return returnedValueOrThrow;
         }
 
+        op.onEnterFunction(identifier, ((SLFunction) function).getName(), argumentLength, true);
         try {
-            op.onEnterFunction(identifier, ((SLFunction) function).getName(), argumentLength, true);
             op.pushArgumentFlags(argumentFlags);
             return library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {

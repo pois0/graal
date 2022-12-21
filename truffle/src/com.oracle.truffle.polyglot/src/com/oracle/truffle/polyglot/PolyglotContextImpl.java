@@ -97,6 +97,8 @@ import com.oracle.truffle.polyglot.PolyglotEngineImpl.StableLocalLocations;
 import com.oracle.truffle.polyglot.PolyglotLocals.LocalLocation;
 
 final class PolyglotContextImpl extends AbstractContextImpl implements com.oracle.truffle.polyglot.PolyglotImpl.VMObject {
+    private static int executed = 0;
+    private static long prevElapsed = 0;
 
     private static final TruffleLogger LOG = TruffleLogger.getLogger(PolyglotEngineImpl.OPTION_GROUP_ENGINE, PolyglotContextImpl.class);
     private static final InteropLibrary UNCACHED = InteropLibrary.getFactory().getUncached();
@@ -940,7 +942,15 @@ final class PolyglotContextImpl extends AbstractContextImpl implements com.oracl
             CallTarget target = languageContext.parseCached(null, source, null);
             long l = System.nanoTime();
             Object result = target.call(PolyglotImpl.EMPTY_ARGS);
-            System.out.println("\u001B[31mExecutionTime: " + (System.nanoTime() - l) + "ns\u001B[m");
+            final long elapsed = System.nanoTime() - l;
+            executed++;
+            if (executed > 90) {
+                if (executed % 2 == 0) {
+                    System.err.println("" + prevElapsed + "," + elapsed);
+                } else {
+                    prevElapsed = elapsed;
+                }
+            }
             Value hostValue;
             try {
                 hostValue = languageContext.asValue(result);
