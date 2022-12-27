@@ -43,7 +43,6 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 /**
  * Constant literal for a primitive {@code long} value. The unboxed value can be returned when the
@@ -69,9 +68,4 @@ public final class SLLongLiteralNode extends SLLiteralNode {
         return value;
     }
 
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLLongLiteralNode)) return false;
-        return value == ((SLLongLiteralNode) that).value;
-    }
 }

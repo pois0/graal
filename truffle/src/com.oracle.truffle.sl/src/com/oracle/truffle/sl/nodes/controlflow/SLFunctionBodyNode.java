@@ -48,7 +48,6 @@ import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
  * The body of a user-defined SL function. This is the node referenced by a {@link SLRootNode} for
@@ -125,12 +124,6 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
         }
 
         return SLNull.SINGLETON;
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLFunctionBodyNode)) return false;
-        return bodyNode.isEqualNode(((SLFunctionBodyNode) that).bodyNode);
     }
 
     @Override

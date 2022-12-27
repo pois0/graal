@@ -71,11 +71,6 @@ public class SLDebuggerNode extends SLStatementNode {
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return that instanceof SLDebuggerNode;
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return false;
     }

@@ -120,15 +120,6 @@ public final class SLIfNode extends SLStatementNode {
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLIfNode)) return false;
-        SLIfNode thatIf = (SLIfNode) that;
-        return conditionNode.isEqualNode(thatIf.conditionNode)
-                && thenPartNode.isEqualNode(thatIf.thenPartNode)
-                && (elsePartNode == null ? thatIf.elsePartNode == null : elsePartNode.isEqualNode(thatIf.elsePartNode));
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return conditionNode.hasNewNode() || thenPartNode.hasNewNode() || (elsePartNode != null && elsePartNode.hasNewNode());
     }

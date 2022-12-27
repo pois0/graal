@@ -51,7 +51,6 @@ import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
@@ -167,18 +166,6 @@ public final class SLInvokeNode extends SLExpressionNode {
             return true;
         }
         return super.hasTag(tag);
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLInvokeNode)) return false;
-        SLInvokeNode thatInvoke = (SLInvokeNode) that;
-        if (!functionNode.isEqualNode(thatInvoke.functionNode) || argumentNodes.length != thatInvoke.argumentNodes.length) return false;
-        for (int i = 0; i < argumentNodes.length; i++) {
-            if (!argumentNodes[i].isEqualNode(thatInvoke.argumentNodes[i])) return false;
-        }
-
-        return true;
     }
 
     @Override

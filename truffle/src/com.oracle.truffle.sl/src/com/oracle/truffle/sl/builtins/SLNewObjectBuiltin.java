@@ -41,11 +41,9 @@
 package com.oracle.truffle.sl.builtins;
 
 import com.oracle.truffle.api.TruffleLanguage.ContextReference;
-import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.CachedContext;
 import com.oracle.truffle.api.dsl.CachedLanguage;
 import com.oracle.truffle.api.dsl.Specialization;
-import com.oracle.truffle.api.instrumentation.AllocationReporter;
 import com.oracle.truffle.api.interop.ArityException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
@@ -53,11 +51,9 @@ import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -81,12 +77,6 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
             /* Foreign access was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, obj);
         }
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLNewObjectBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLNewObjectBuiltin) that).getArguments()[0]);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("new");

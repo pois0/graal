@@ -47,7 +47,6 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
@@ -87,12 +86,6 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
         final Object o = op.calcGeneric(frame, arg);
 
         return INTEROP_LIBRARY.getUncached(o).isNull(o);
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLIsNullBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLIsNullBuiltin) that).getArguments()[0]);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isNull");

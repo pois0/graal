@@ -109,6 +109,14 @@ public interface RepeatingNode extends NodeInterface {
      *         complete the loop and any other value if it must not.
      * @since 19.3
      */
+    default Object executeRepeatingWithValue(VirtualFrame frame) {
+        if (executeRepeating(frame)) {
+            return CONTINUE_LOOP_STATUS;
+        } else {
+            return BREAK_LOOP_STATUS;
+        }
+    }
+
     default Object executeRepeatingWithValue(VirtualFrame frame, int arg) {
         if (executeRepeating(frame, arg)) {
             return CONTINUE_LOOP_STATUS;

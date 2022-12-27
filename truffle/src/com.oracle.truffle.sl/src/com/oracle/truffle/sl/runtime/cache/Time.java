@@ -31,7 +31,7 @@ public final class Time implements Comparable<Time> {
             newRaw[newLength - 1]++;
             return new Time(newRaw);
         } else if (raw.length < next.raw.length) {
-            final int mismatch = Arrays.mismatch(raw, next.raw);
+            final int mismatch = mismatch(raw, next.raw);
             final int[] newRaw = Arrays.copyOf(raw, mismatch + 2);
             if (mismatch == raw.length) {
                 newRaw[mismatch] = next.raw[mismatch] - 1;
@@ -40,7 +40,7 @@ public final class Time implements Comparable<Time> {
             }
             return new Time(newRaw);
         } else {
-            final int mismatch = Arrays.mismatch(raw, next.raw);
+            final int mismatch = mismatch(raw, next.raw);
             if (mismatch < 0) {
                 return new Time(Arrays.copyOf(raw, raw.length + 1));
             } else {
@@ -56,7 +56,7 @@ public final class Time implements Comparable<Time> {
         int[] thisRaw = this.raw;
         int[] thatRaw = o.raw;
 
-        final int mismatch = Arrays.mismatch(thisRaw, thatRaw);
+        final int mismatch = mismatch(thisRaw, thatRaw);
         if (mismatch < 0) {
             return 0;
         } else if (mismatch == thisRaw.length) {
@@ -107,5 +107,11 @@ public final class Time implements Comparable<Time> {
         final int i = binarySearchWhereInsertTo(newList, initialTime);
         base.addAll(i, newList);
         return base;
+    }
+
+    private static int mismatch(int[] a, int[] b) {
+        int minLength = Math.min(a.length, b.length);
+        for (int i = 0; i < minLength; i++) if (a[i] != b[i]) return i;
+        return a.length == b.length ? -1 : minLength;
     }
 }

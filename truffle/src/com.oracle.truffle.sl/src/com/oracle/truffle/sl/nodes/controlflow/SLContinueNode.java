@@ -64,11 +64,6 @@ public final class SLContinueNode extends SLStatementNode {
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return that instanceof SLContinueNode;
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return false;
     }

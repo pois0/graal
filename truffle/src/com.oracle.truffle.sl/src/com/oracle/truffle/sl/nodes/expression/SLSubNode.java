@@ -50,10 +50,8 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
@@ -113,11 +111,4 @@ public abstract class SLSubNode extends SLBinaryNode {
         throw SLException.typeError(this, left, right);
     }
 
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLSubNode)) return false;
-        final SLSubNode thatSub = (SLSubNode) that;
-        return getLeftNode().isEqualNode(thatSub.getLeftNode())
-                && getRightNode().isEqualNode(thatSub.getRightNode());
-    }
 }

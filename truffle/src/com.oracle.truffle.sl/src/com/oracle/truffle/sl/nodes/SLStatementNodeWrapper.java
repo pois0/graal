@@ -59,11 +59,6 @@ final class SLStatementNodeWrapper extends SLStatementNode implements WrapperNod
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return this.delegateNode.isEqualNode(that);
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return this.delegateNode.hasNewNode();
     }

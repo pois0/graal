@@ -3,7 +3,6 @@ package com.oracle.truffle.sl.nodes.cache;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 public final class NewNode extends SLExpressionNode {
     @Child private SLExpressionNode delegateNode;
@@ -41,11 +40,6 @@ public final class NewNode extends SLExpressionNode {
     @Override
     public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         return getContext().getHistoryOperator().newExecutionLong(getNodeIdentifier(), frame, this::executeLong);
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return false;
     }
 
     @Override

@@ -48,7 +48,6 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**
@@ -95,12 +94,6 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
     @Fallback
     protected Object typeError(Object value) {
         throw SLException.typeError(this, value);
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLLogicalNotNode)) return false;
-        return getValueNode().isEqualNode(((SLLogicalNotNode) that).getValueNode());
     }
 
     @Override

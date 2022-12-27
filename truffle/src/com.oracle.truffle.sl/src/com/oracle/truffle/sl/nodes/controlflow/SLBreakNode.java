@@ -65,11 +65,6 @@ public final class SLBreakNode extends SLStatementNode {
 
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return that instanceof SLBreakNode;
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return false;
     }

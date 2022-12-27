@@ -47,8 +47,6 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLLanguageView;
 
@@ -71,12 +69,6 @@ public abstract class SLPrintlnBuiltin extends SLBuiltinNode {
                     @CachedContext(SLLanguage.class) SLContext context) {
         context.getOutput().println(interop.toDisplayString(SLLanguageView.forValue(value)));
         return value;
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLPrintlnBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLPrintlnBuiltin) that).getArguments()[0]);
     }
 
 }

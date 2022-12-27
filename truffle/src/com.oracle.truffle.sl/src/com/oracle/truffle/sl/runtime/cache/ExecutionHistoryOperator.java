@@ -1,5 +1,6 @@
 package com.oracle.truffle.sl.runtime.cache;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -149,18 +150,22 @@ public final class ExecutionHistoryOperator {
         return false;
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onReadArgument(int argIndex) {
         localVarOperatorHolder.onReadParam(currentTime, argIndex);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onReadLocalVariable(Object variableName) {
         localVarOperatorHolder.onReadVariable(currentTime, (String) variableName);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onReadObjectField(Object object, Object field) {
         currentHistory.onReadObjectField(currentTime, objToCtx.get((SLObject) object), field);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onEnterFunction(NodeIdentifier identifier, String funcName, int paramLen, boolean isCalc) {
         final ExecutionHistory currentHistory = this.currentHistory;
         CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, identifier);
@@ -171,10 +176,12 @@ public final class ExecutionHistoryOperator {
         currentHistory.onEnterFunction(time, funcName, currentStack);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void pushArgumentFlags(boolean[] flags) {
         parameterFlagStack.push(flags);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onExitFunction(NodeIdentifier identifier) {
         CallContext elem = currentContext;
         assert elem instanceof CallContext.FunctionCall && elem.getNodeIdentifier() == identifier;
@@ -183,32 +190,38 @@ public final class ExecutionHistoryOperator {
         localVarFlagStack.pop();
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void popArgumentFlags() {
         parameterFlagStack.pop();
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onEnterLoop(NodeIdentifier identifier) {
         this.currentContext = new CallContext.Loop(this.currentContext, identifier);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onGotoNextIteration(NodeIdentifier identifier) {
         CallContext elem = currentContext;
         assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
         currentContext = ((CallContext.Loop) elem).increment();
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onExitLoop(NodeIdentifier identifier) {
         CallContext elem = currentContext;
         assert elem instanceof CallContext.Loop && elem.getNodeIdentifier() == identifier;
         currentContext = elem.getRoot();
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onGenerateObject(SLObject object) {
         objToCtx.put(object, currentTime);
         ctxToObj.put(currentTime, new WeakReference<>(object));
         currentHistory.onCreateObject(currentTime);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void onObjectUpdated(Object object, String fldName, Object newValue) {
         final Time objGenTime = objToCtx.get((SLObject) object);
         currentHistory.onUpdateObjectWithHash(currentTime, objGenTime, fldName, replaceReference(newValue));

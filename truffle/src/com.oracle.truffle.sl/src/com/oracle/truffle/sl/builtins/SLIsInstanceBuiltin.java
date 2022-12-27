@@ -47,8 +47,6 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -67,15 +65,6 @@ public abstract class SLIsInstanceBuiltin extends SLBuiltinNode {
         } catch (UnsupportedMessageException e) {
             throw shouldNotReachHere(e);
         }
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLIsInstanceBuiltin)) return false;
-        SLExpressionNode[] thisArgs = getArguments();
-        SLExpressionNode[] thatArgs = ((SLIsInstanceBuiltin) that).getArguments();
-        return thisArgs[0].isEqualNode(thatArgs[0])
-                && thisArgs[1].isEqualNode(thatArgs[1]);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isInstance");

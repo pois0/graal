@@ -54,7 +54,6 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
@@ -129,15 +128,6 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
         final Object value = op.calcGeneric(frame, getValueNode());
         op.rewriteObjectField(receiver, (String) name, value, identifier);
         return value;
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLWritePropertyNode)) return false;
-        final SLWritePropertyNode thatWP = (SLWritePropertyNode) that;
-        return getReceiverNode().isEqualNode(thatWP.getReceiverNode())
-                && getNameNode().isEqualNode(thatWP.getNameNode())
-                && getValueNode().isEqualNode(thatWP.getValueNode());
     }
 
     @Override

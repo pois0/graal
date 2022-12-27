@@ -52,7 +52,6 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
@@ -187,11 +186,4 @@ public abstract class SLEqualNode extends SLBinaryNode {
         return doGeneric(left, right, INTEROP_LIBRARY.getUncached(left), INTEROP_LIBRARY.getUncached(right));
     }
 
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLEqualNode)) return false;
-        SLEqualNode thatAdd = (SLEqualNode) that;
-        return getLeftNode().isEqualNode(thatAdd.getLeftNode())
-                && getRightNode().isEqualNode(thatAdd.getRightNode());
-    }
 }

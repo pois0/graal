@@ -47,7 +47,6 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
@@ -80,12 +79,6 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
         final Object result = executeGeneric(frame);
         op.endNewExecution();
         return result;
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLDefineFunctionBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLDefineFunctionBuiltin) that).getArguments()[0]);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("defineFunction");

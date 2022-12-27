@@ -147,21 +147,6 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLBlockNode)) return false;
-        SLBlockNode thatNode = (SLBlockNode) that;
-        SLStatementNode[] thisChildren = block.getElements();
-        SLStatementNode[] thatChildren = thatNode.block.getElements();
-        if (thisChildren.length != thatChildren.length) return false;
-
-        for (int i = 0; i < thisChildren.length; i++) {
-            if (!thisChildren[i].isEqualNode(thatChildren[i])) return false;
-        }
-
-        return true;
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         final BlockNode<SLStatementNode> block = this.block;
         if (block == null) return false;

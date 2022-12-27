@@ -44,7 +44,6 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -57,12 +56,6 @@ public abstract class SLIsExecutableBuiltin extends SLBuiltinNode {
     @Specialization(limit = "3")
     public boolean isExecutable(Object obj, @CachedLibrary("obj") InteropLibrary executables) {
         return executables.isExecutable(obj);
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLIsExecutableBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLIsExecutableBuiltin) that).getArguments()[0]);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isExecutable");

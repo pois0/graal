@@ -49,7 +49,6 @@ import com.oracle.truffle.api.library.ExportMessage;
 import com.oracle.truffle.api.library.Message;
 import com.oracle.truffle.api.library.ReflectionLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
 /**
@@ -86,12 +85,6 @@ public abstract class SLWrapPrimitiveBuiltin extends SLBuiltinNode {
 
     }
 
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLWrapPrimitiveBuiltin)) return false;
-        return getArguments()[0].isEqualNode(((SLWrapPrimitiveBuiltin) that).getArguments()[0]);
-    }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("wrapPrimitive");
 

@@ -3,7 +3,6 @@ package com.oracle.truffle.sl.nodes.cache;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
@@ -50,10 +49,6 @@ public final class ReplaceNode extends SLExpressionNode {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
         return op.newExecutionLong(getNodeIdentifier(), frame, this::executeLong);
-    }
-
-    public boolean isEqualNode(SLStatementNode that) {
-        return false;
     }
 
     @Override

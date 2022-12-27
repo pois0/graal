@@ -49,12 +49,9 @@ import com.oracle.truffle.api.TruffleLanguage.ContextReference;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
-
-import java.util.Objects;
 
 /**
  * Constant literal for a {@link SLFunction function} value, created when a function name occurs as
@@ -96,13 +93,6 @@ public final class SLFunctionLiteralNode extends SLLiteralNode {
     @Override
     public SLFunction executeGeneric(VirtualFrame frame) {
         return findFunction();
-    }
-
-    @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        if (!(that instanceof SLFunctionLiteralNode)) return false;
-        SLFunctionLiteralNode thatFunc = (SLFunctionLiteralNode) that;
-        return Objects.equals(functionName, thatFunc.functionName); // TODO
     }
 
     private SLFunction findFunction() {

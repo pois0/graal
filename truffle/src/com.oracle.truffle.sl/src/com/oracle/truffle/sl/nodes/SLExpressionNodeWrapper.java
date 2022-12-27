@@ -149,11 +149,6 @@ public final class SLExpressionNodeWrapper extends SLExpressionNode implements I
     }
 
     @Override
-    public boolean isEqualNode(SLStatementNode that) {
-        return this.delegateNode.isEqualNode(that);
-    }
-
-    @Override
     protected boolean hasNewChildNode() {
         return this.delegateNode.hasNewNode();
     }
