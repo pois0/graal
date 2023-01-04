@@ -38,6 +38,7 @@ public final class ExecutionContext implements Comparable<ExecutionContext> {
         return CallContext.equals(callContext, that.callContext);
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     @Override
     public int hashCode() {
         return currentNodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())

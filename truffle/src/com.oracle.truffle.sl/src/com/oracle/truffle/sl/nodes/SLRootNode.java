@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
@@ -59,6 +60,7 @@ import com.oracle.truffle.sl.nodes.controlflow.SLBlockNode;
 import com.oracle.truffle.sl.nodes.controlflow.SLFunctionBodyNode;
 import com.oracle.truffle.sl.nodes.local.SLReadArgumentNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
@@ -81,6 +83,9 @@ public class SLRootNode extends RootNode {
 
     @CompilerDirectives.CompilationFinal(dimensions = 1) private volatile SLWriteLocalVariableNode[] argumentNodesCache;
 
+    @CompilerDirectives.CompilationFinal
+    private TruffleLanguage.ContextReference<SLContext> contextRef;
+
     public SLRootNode(SLLanguage language, FrameDescriptor frameDescriptor, SLExpressionNode bodyNode, SourceSection sourceSection, String name) {
         super(language, frameDescriptor);
         this.bodyNode = bodyNode;
@@ -98,7 +103,11 @@ public class SLRootNode extends RootNode {
         assert lookupContextReference(SLLanguage.class).get() != null;
         final Object[] arguments = frame.getArguments();
         if (arguments.length != 0 && arguments[arguments.length - 1] == FunctionCallSpecialParameter.CALC) {
-            return bodyNode.calcGeneric(frame);
+            try {
+                return bodyNode.calcGenericInner(frame);
+            } finally {
+                bodyNode.getContext().getHistoryOperator().finishCalc(bodyNode.getNodeIdentifier());
+            }
         } else {
             return bodyNode.executeGeneric(frame);
         }

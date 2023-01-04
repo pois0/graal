@@ -78,6 +78,7 @@ public final class Time implements Comparable<Time> {
         return Arrays.equals(raw, time.raw);
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     @Override
     public int hashCode() {
         final Hasher hasher = Hashing.murmur3_32_fixed().newHasher();

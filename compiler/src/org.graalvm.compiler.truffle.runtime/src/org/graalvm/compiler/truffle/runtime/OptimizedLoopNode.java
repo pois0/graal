@@ -64,6 +64,22 @@ public final class OptimizedLoopNode extends LoopNode {
         }
     }
 
+    @Override
+    public Object execute(VirtualFrame frame, int arg) {
+        Object status;
+        int loopCount = 0;
+        try {
+            while (repeatingNode.shouldContinue(status = repeatingNode.executeRepeatingWithValue(frame, arg))) {
+                if (CompilerDirectives.inInterpreter() || GraalCompilerDirectives.inFirstTier()) {
+                    loopCount++;
+                }
+            }
+            return status;
+        } finally {
+            reportLoopCount(this, loopCount);
+        }
+    }
+
     static LoopNode create(RepeatingNode repeatingNode) {
         return new OptimizedLoopNode(repeatingNode);
     }

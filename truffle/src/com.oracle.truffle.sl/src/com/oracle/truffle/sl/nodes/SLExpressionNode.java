@@ -67,14 +67,6 @@ public abstract class SLExpressionNode extends SLStatementNode {
 
     public abstract Object calcGenericInner(VirtualFrame frame);
 
-    public Object calcGeneric(VirtualFrame frame) {
-        try {
-            return calcGenericInner(frame);
-        } finally {
-            getContext().getHistoryOperator().finishCalc(getNodeIdentifier());
-        }
-    }
-
     /**
      * When we use an expression at places where a {@link SLStatementNode statement} is already
      * sufficient, the return value is just discarded.

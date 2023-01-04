@@ -48,6 +48,7 @@ public abstract class CallContext implements Comparable<CallContext> {
         return compare(this, o);
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     protected static Hasher hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
         return nodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())
                 .putInt(root != null ? root.hashCode() : 0);

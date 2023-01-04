@@ -178,7 +178,6 @@ public abstract class SLEqualNode extends SLBinaryNode {
             } catch (UnexpectedResultException e) {
                 throw new RuntimeException("Never reach here");
             }
-
         }
 
         final Object left = op.calcGeneric(frame, getLeftNode());

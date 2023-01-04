@@ -111,9 +111,13 @@ public final class SLIfNode extends SLStatementNode {
         final SLExpressionNode conditionNode = this.conditionNode;
 
         if (op.calcBoolean(frame, this, conditionNode)) {
+            if (elsePartNode != null) {
+                op.deleteHistory(elsePartNode.getNodeIdentifier());
+            }
             op.calcVoid(frame, thenPartNode);
         } else {
             if (elsePartNode != null) {
+                op.deleteHistory(thenPartNode.getNodeIdentifier());
                 op.calcVoid(frame, elsePartNode);
             }
         }

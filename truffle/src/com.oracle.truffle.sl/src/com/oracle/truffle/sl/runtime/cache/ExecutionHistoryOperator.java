@@ -12,12 +12,16 @@ import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.library.LibraryFactory;
+import com.oracle.truffle.api.nodes.ControlFlowException;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.nodes.controlflow.SLBreakException;
+import com.oracle.truffle.sl.nodes.controlflow.SLContinueException;
+import com.oracle.truffle.sl.nodes.controlflow.SLReturnException;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
@@ -296,7 +300,7 @@ public final class ExecutionHistoryOperator {
     }
 
     public Object getReturnedValueOrThrow(ExecutionContext execCtx) {
-        System.out.println("Skipped " + execCtx);
+//        System.out.println("Skipped " + execCtx);
         return revertObject(currentHistory.getReturnedValueOrThrow(execCtx));
     }
 
@@ -345,6 +349,8 @@ public final class ExecutionHistoryOperator {
                 case NEW_EXECUTE:
                     return newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric);
             }
+        } catch (SLReturnException | SLBreakException | SLContinueException e) {
+
         } finally {
             finishCalc(node.getNodeIdentifier());
         }
@@ -440,12 +446,14 @@ public final class ExecutionHistoryOperator {
         throw new RuntimeException("Never reach here");
     }
 
+    @CompilerDirectives.TruffleBoundary
     private void onUpdateLocalVar(String identifier, Object value) {
         localVarOperatorHolder.onUpdateVariable(currentTime, identifier, value);
         //noinspection DataFlowIssue
         localVarFlagStack.peek().add(identifier);
     }
 
+    @CompilerDirectives.TruffleBoundary
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
         isInExec = true;
@@ -808,7 +816,7 @@ public final class ExecutionHistoryOperator {
 
         @Override
         protected void onReturnExceptional(VirtualFrame frame, Throwable exception) {
-            if (exception instanceof RuntimeException) {
+            if (exception instanceof ControlFlowException) {
                 currentHistory.onReturnExceptional(startTime.pop(), getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
             }
         }

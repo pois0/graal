@@ -74,8 +74,10 @@ public final class ExecutionHistory {
 
     public void onUpdateObjectWithHash(Time time, Time objGenTime, String fieldName, Object newValue) {
         if (newValue instanceof ItemWithTime) throw new RuntimeException();
+        HashMap<String, ArrayList<ItemWithTime<Object>>> stringArrayListHashMap = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
+        if (stringArrayListHashMap == null) System.out.println("objGenTime: " + objGenTime + "/ fieldName: " + fieldName + "/ newValue: " + newValue);
         //noinspection DataFlowIssue
-        ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime)
+        stringArrayListHashMap
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
                 .add(new ItemWithTime<>(time, newValue));
         objectUpdateList.add(new ItemWithTime<>(time, new ObjectUpdate(objGenTime, fieldName, newValue)));
