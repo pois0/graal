@@ -90,7 +90,7 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        return executeGeneric(frame); // TODO
+        return executeGeneric(frame);
     }
 
     @Override

@@ -133,6 +133,16 @@ public final class ExecutionHistory {
         deleteRecords(tp.start, tp.end);
     }
 
+    public void deleteRecords(ExecutionContext exclusiveStart, ExecutionContext exclusiveEnd) {
+        final Time startNext = contextToTime.get(exclusiveStart).getEnd();
+        final int startI = ItemWithTime.binarySearchNext(timeToContext, startNext);
+        final Time startTime = timeToContext.get(startI).getTime();
+        final Time endPrev = contextToTime.get(exclusiveEnd).getEnd();
+        final int endI = ItemWithTime.binarySearchPrev(timeToContext, endPrev);
+        final Time endTime = timeToContext.get(endI).getTime();
+        deleteRecords(startTime, endTime);
+    }
+
     /**
      * @param startTime inclusive
      * @param endTime inclusive
@@ -185,7 +195,22 @@ public final class ExecutionHistory {
     private void deleteFromLocalVarOperator(ItemWithTime<Pair<CallContext.ContextBase, String>> entry, Time startTime, Time endTime) {
         final LocalVarOperator op = localVarInfo.get(entry.getItem().getLeft());
         if (op == null) return;
-        // TODO
+        final List<ItemWithTime<LocalVariableUpdate>> writeVarList = ItemWithTime.subList(op.writeVarList, startTime, endTime);
+        final HashSet<String> vars = new HashSet<>();
+        for (ItemWithTime<LocalVariableUpdate> e : writeVarList) {
+            final LocalVariableUpdate item = e.getItem();
+            vars.add(item.varName);
+        }
+        writeVarList.clear();
+        for (String varName : vars) {
+            ItemWithTime.subList(op.writeVarMap.get(varName), startTime, endTime).clear();
+        }
+        for (Map.Entry<String, ArrayList<Time>> e : op.readVariable.entrySet()) {
+            Time.subList(e.getValue(), startTime, endTime).clear();
+        }
+        for (ArrayList<Time> times : op.readParam) {
+            Time.subList(times, startTime, endTime).clear();
+        }
     }
 
     public ExecutionHistory merge(ExecutionHistory other) {

@@ -6,6 +6,7 @@ import com.google.common.hash.Hashing;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 public final class Time implements Comparable<Time> {
     private final int[] raw;
@@ -101,6 +102,12 @@ public final class Time implements Comparable<Time> {
     public static int binarySearchNext(ArrayList<Time> list, Time time) {
         final int i = Collections.binarySearch(list, time);
         return i < 0 ? -i - 1 : i + 1;
+    }
+
+    public static List<Time> subList(ArrayList<Time> list, Time startTime, Time endTime) {
+        final int start = binarySearchWhereInsertTo(list, startTime);
+        final int end = binarySearchNext(list, endTime);
+        return list.subList(start, end);
     }
 
     public static ArrayList<Time> merge(ArrayList<Time> base, ArrayList<Time> newList, Time initialTime) {

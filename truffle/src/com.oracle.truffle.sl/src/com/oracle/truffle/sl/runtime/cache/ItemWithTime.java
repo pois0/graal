@@ -68,6 +68,26 @@ public class ItemWithTime<T> {
         return low;
     }
 
+    public static <T> int binarySearchPrev(ArrayList<ItemWithTime<T>> list, Time time) {
+        int low = 0;
+        int high = list.size() - 1;
+
+        while (low <= high) {
+            final int mid = (low + high) >>> 1;
+            final Time midVal = list.get(mid).time;
+            int cmp = midVal.compareTo(time);
+
+            if (cmp < 0)
+                low = mid + 1;
+            else if (cmp > 0)
+                high = mid - 1;
+            else
+                return mid - 1; // key found
+        }
+
+        return low - 1;
+    }
+
     public static <T> int binarySearchApproximately(ArrayList<ItemWithTime<T>> list, Time time) {
         int low = 0;
         int high = list.size()-1;

@@ -350,7 +350,8 @@ public final class ExecutionHistoryOperator {
                     return newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric);
             }
         } catch (SLReturnException | SLBreakException | SLContinueException e) {
-
+            currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
+            throw e;
         } finally {
             finishCalc(node.getNodeIdentifier());
         }
@@ -439,6 +440,9 @@ public final class ExecutionHistoryOperator {
                 newExecutionVoid(node.getNodeIdentifier(), frame, node::executeVoid);
                 return;
             }
+        } catch (SLReturnException | SLBreakException | SLContinueException e) {
+            currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
+            throw e;
         } finally {
             finishCalc(node.getNodeIdentifier());
         }
@@ -453,7 +457,6 @@ public final class ExecutionHistoryOperator {
         localVarFlagStack.peek().add(identifier);
     }
 
-    @CompilerDirectives.TruffleBoundary
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
         isInExec = true;
