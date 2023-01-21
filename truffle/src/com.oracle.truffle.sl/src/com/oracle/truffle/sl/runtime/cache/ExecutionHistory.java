@@ -10,34 +10,36 @@ import java.util.Map;
 
 public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<ExecutionContext>> timeToContext = new ArrayList<>(100_000);
-    private final HashMap<ExecutionContext, TimeInfo> contextToTime = new HashMap<>(100_000);
+    private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo>> contextToTime = new HashMap<>();
     private final ArrayList<ItemWithTime<ReadObjectField>> objectReadList = new ArrayList<>(100_000);
     private final ArrayList<ItemWithTime<HashMap<String, ArrayList<ItemWithTime<Object>>>>> objectUpdateMap = new ArrayList<>(100_000);
     private final ArrayList<ItemWithTime<ObjectUpdate>> objectUpdateList = new ArrayList<>(100_000);
     private final HashMap<CallContext.ContextBase, LocalVarOperator> localVarInfo = new HashMap<>(10_000);
-    private final ArrayList<ItemWithTime<Pair<CallContext.ContextBase, String>>>  functionCalls = new ArrayList<>(2_500);
+    private final ArrayList<ItemWithTime<Pair<CallContext.ContextBase, String>>> functionCalls = new ArrayList<>(2_500);
 
     public void onReturnValue(Time startTime, Time endTime, ExecutionContext ctx, Object value) {
         if (value instanceof ItemWithTime) throw new RuntimeException();
         timeToContext.add(new ItemWithTime<>(endTime, ctx));
-        contextToTime.put(ctx, new TimeInfo(startTime, endTime, value));
+        contextToTime.computeIfAbsent(ctx.getCurrentNodeIdentifier(), it -> new HashMap<>())
+                .put(ctx.getCallContext(), new TimeInfo(startTime, endTime, value));
     }
 
     public void onReturnExceptional(Time startTime, Time endTime, ExecutionContext ctx, RuntimeException throwable) {
         timeToContext.add(new ItemWithTime<>(endTime, ctx));
-        contextToTime.put(ctx, new TimeInfo(startTime, endTime, throwable));
+        contextToTime.computeIfAbsent(ctx.getCurrentNodeIdentifier(), it -> new HashMap<>())
+                .put(ctx.getCallContext(), new TimeInfo(startTime, endTime, throwable));
     }
 
     public void replaceReturnedValueOrException(ExecutionContext ctx, Object value) {
         if (value instanceof ItemWithTime) throw new RuntimeException();
-        final TimeInfo info = contextToTime.get(ctx);
+        final TimeInfo info = getTime(ctx);
         assert info != null;
         info.setValue(value);
     }
 
     public void rewriteLocalVariable(ExecutionContext ctx, String varName, Object value) {
         if (value instanceof ItemWithTime) throw new RuntimeException();
-        final Time time = contextToTime.get(ctx).getEnd();
+        final Time time = getTime(ctx).getEnd();
         final LocalVarOperator op = localVarInfo.get(ctx.getCallContext().getBase());
         final int i = ItemWithTime.binarySearchApproximately(op.writeVarList, time);
         assert i >= 0;
@@ -51,7 +53,7 @@ public final class ExecutionHistory {
 
     public void rewriteObjectField(ExecutionContext ctx, Time objGenTime, String fieldName, Object value) {
         if (value instanceof ItemWithTime) throw new RuntimeException();
-        final Time time = contextToTime.get(ctx).getEnd();
+        final Time time = getTime(ctx).getEnd();
         final int i = ItemWithTime.binarySearchApproximately(objectUpdateList, time);
         assert i >= 0;
         objectUpdateList.set(i, new ItemWithTime<>(time, new ObjectUpdate(objGenTime, fieldName, value)));
@@ -88,7 +90,7 @@ public final class ExecutionHistory {
     }
 
     public Object getReturnedValueOrThrow(ExecutionContext ctx) {
-        Object result = contextToTime.get(ctx).value;
+        Object result = getTime(ctx).value;
 
         if (result instanceof RuntimeException) throw (RuntimeException) result;
 
@@ -125,19 +127,21 @@ public final class ExecutionHistory {
     }
 
     public TimeInfo getTime(ExecutionContext ctx) {
-        return contextToTime.get(ctx);
+        final HashMap<CallContext, TimeInfo> map = contextToTime.get(ctx.getCurrentNodeIdentifier());
+        if (map == null) return null;
+        return map.get(ctx.getCallContext());
     }
 
     public void deleteRecords(ExecutionContext context) {
-        final TimeInfo tp = contextToTime.get(context);
+        final TimeInfo tp = getTime(context);
         deleteRecords(tp.start, tp.end);
     }
 
     public void deleteRecords(ExecutionContext exclusiveStart, ExecutionContext exclusiveEnd) {
-        final Time startNext = contextToTime.get(exclusiveStart).getEnd();
+        final Time startNext = getTime(exclusiveStart).getEnd();
         final int startI = ItemWithTime.binarySearchNext(timeToContext, startNext);
         final Time startTime = timeToContext.get(startI).getTime();
-        final Time endPrev = contextToTime.get(exclusiveEnd).getEnd();
+        final Time endPrev = getTime(exclusiveEnd).getEnd();
         final int endI = ItemWithTime.binarySearchPrev(timeToContext, endPrev);
         final Time endTime = timeToContext.get(endI).getTime();
         deleteRecords(startTime, endTime);
@@ -150,8 +154,9 @@ public final class ExecutionHistory {
     public void deleteRecords(Time startTime, Time endTime) {
         // delete timeToContext and contextToTime
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
-        for (ItemWithTime<ExecutionContext> ctx : contexts) {
-            contextToTime.remove(ctx.getItem());
+        for (ItemWithTime<ExecutionContext> e : contexts) {
+            final ExecutionContext ctx = e.getItem();
+            contextToTime.get(ctx.getCurrentNodeIdentifier()).remove(ctx.getCallContext());
         }
         contexts.clear();
 
@@ -222,6 +227,12 @@ public final class ExecutionHistory {
         ItemWithTime.merge(timeToContext, other.timeToContext, initialTime);
 
         // merge contextToTime
+        for (Map.Entry<NodeIdentifier, HashMap<CallContext, TimeInfo>> e : other.contextToTime.entrySet()) {
+            contextToTime.merge(e.getKey(), e.getValue(), (base, v) -> {
+                base.putAll(v);
+                return base;
+            });
+        }
         contextToTime.putAll(other.contextToTime);
 
         // merge objectReadList

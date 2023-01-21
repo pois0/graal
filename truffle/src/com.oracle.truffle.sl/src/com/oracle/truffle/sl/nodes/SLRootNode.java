@@ -177,6 +177,7 @@ public class SLRootNode extends RootNode {
     }
 
     public boolean hasNewNode() {
+        if (bodyNode == null) return true;
         return bodyNode.hasNewNode();
     }
 }

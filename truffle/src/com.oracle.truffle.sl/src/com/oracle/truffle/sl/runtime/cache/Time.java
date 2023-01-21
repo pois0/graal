@@ -31,24 +31,18 @@ public final class Time implements Comparable<Time> {
             final int[] newRaw = Arrays.copyOf(raw, newLength);
             newRaw[newLength - 1]++;
             return new Time(newRaw);
-        } else if (raw.length < next.raw.length) {
-            final int mismatch = mismatch(raw, next.raw);
-            final int[] newRaw = Arrays.copyOf(raw, mismatch + 2);
-            if (mismatch == raw.length) {
-                newRaw[mismatch] = next.raw[mismatch] - 1;
-            } else {
-                newRaw[mismatch + 1]++;
-            }
-            return new Time(newRaw);
         } else {
             final int mismatch = mismatch(raw, next.raw);
-            if (mismatch < 0) {
-                return new Time(Arrays.copyOf(raw, raw.length + 1));
-            } else {
-                final int[] newRaw = Arrays.copyOf(raw, mismatch + 1);
-                newRaw[mismatch]++;
-                return new Time(newRaw);
+            final int[] newRaw = Arrays.copyOf(raw, mismatch + 2);
+            switch (raw.length - mismatch) {
+            case 0:
+                newRaw[mismatch] = next.raw[mismatch] - 1;
+                break;
+            case 1:
+                newRaw[mismatch + 1]++;
+                break;
             }
+            return new Time(newRaw);
         }
     }
 

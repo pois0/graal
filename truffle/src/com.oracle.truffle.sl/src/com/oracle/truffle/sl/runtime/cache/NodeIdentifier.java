@@ -1,6 +1,7 @@
 package com.oracle.truffle.sl.runtime.cache;
 
 import com.google.common.hash.Hasher;
+import com.google.common.hash.Hashing;
 
 public final class NodeIdentifier implements Comparable<NodeIdentifier> {
     private final String functionName;
@@ -45,9 +46,7 @@ public final class NodeIdentifier implements Comparable<NodeIdentifier> {
 
     @Override
     public int hashCode() {
-        int result = functionName.hashCode();
-        result = 31 * result + number;
-        return 2 * result + (isNew ? 1 : 0);
+        return hash(Hashing.murmur3_32_fixed().newHasher()).hash().asInt();
     }
 
     public Hasher hash(Hasher hasher) {
