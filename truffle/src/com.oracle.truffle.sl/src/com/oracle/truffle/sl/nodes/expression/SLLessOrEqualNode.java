@@ -81,21 +81,6 @@ public abstract class SLLessOrEqualNode extends SLBinaryNode {
     public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        if (isNewNode()) {
-            try {
-                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
-                    try {
-                        return executeBoolean(f);
-                    } catch (UnexpectedResultException ex) {
-                        throw SLException.typeError(this, ex.getResult());
-                    }
-                });
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException("Never reach here");
-            }
-
-        }
-
         final Object left = op.calcGeneric(frame, getLeftNode());
         final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
         final Object right = op.calcGeneric(frame, getRightNode());
@@ -107,7 +92,8 @@ public abstract class SLLessOrEqualNode extends SLBinaryNode {
             } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
                 return lessOrEqual((SLBigNumber) left, (SLBigNumber) right);
             } else {
-                return (boolean) typeError(left, right);
+                typeError(left, right);
+                return false;
             }
         } catch (UnsupportedMessageException ex) {
             throw shouldNotReachHere(ex);
@@ -118,5 +104,4 @@ public abstract class SLLessOrEqualNode extends SLBinaryNode {
     protected Object typeError(Object left, Object right) {
         throw SLException.typeError(this, left, right);
     }
-
 }

@@ -61,6 +61,7 @@ import com.oracle.truffle.sl.nodes.controlflow.SLFunctionBodyNode;
 import com.oracle.truffle.sl.nodes.local.SLReadArgumentNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 
 /**
@@ -103,11 +104,7 @@ public class SLRootNode extends RootNode {
         assert lookupContextReference(SLLanguage.class).get() != null;
         final Object[] arguments = frame.getArguments();
         if (arguments.length != 0 && arguments[arguments.length - 1] == FunctionCallSpecialParameter.CALC) {
-            try {
-                return bodyNode.calcGenericInner(frame);
-            } finally {
-                bodyNode.getContext().getHistoryOperator().finishCalc(bodyNode.getNodeIdentifier());
-            }
+            return getContext().getHistoryOperator().calcGeneric(frame, bodyNode);
         } else {
             return bodyNode.executeGeneric(frame);
         }
@@ -179,5 +176,14 @@ public class SLRootNode extends RootNode {
     public boolean hasNewNode() {
         if (bodyNode == null) return true;
         return bodyNode.hasNewNode();
+    }
+
+    private TruffleLanguage.ContextReference<SLContext> getContextRef() {
+        TruffleLanguage.ContextReference<SLContext> contextRef = this.contextRef;
+        return contextRef != null ? contextRef : (this.contextRef = lookupContextReference(SLLanguage.class));
+    }
+
+    protected SLContext getContext() {
+        return getContextRef().get();
     }
 }

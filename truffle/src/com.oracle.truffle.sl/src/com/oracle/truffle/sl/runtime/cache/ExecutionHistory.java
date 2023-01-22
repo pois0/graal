@@ -18,7 +18,6 @@ public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<Pair<CallContext.ContextBase, String>>> functionCalls = new ArrayList<>(2_500);
 
     public void onReturnValue(Time startTime, Time endTime, ExecutionContext ctx, Object value) {
-        if (value instanceof ItemWithTime) throw new RuntimeException();
         timeToContext.add(new ItemWithTime<>(endTime, ctx));
         contextToTime.computeIfAbsent(ctx.getCurrentNodeIdentifier(), it -> new HashMap<>())
                 .put(ctx.getCallContext(), new TimeInfo(startTime, endTime, value));
@@ -31,14 +30,12 @@ public final class ExecutionHistory {
     }
 
     public void replaceReturnedValueOrException(ExecutionContext ctx, Object value) {
-        if (value instanceof ItemWithTime) throw new RuntimeException();
         final TimeInfo info = getTime(ctx);
         assert info != null;
         info.setValue(value);
     }
 
     public void rewriteLocalVariable(ExecutionContext ctx, String varName, Object value) {
-        if (value instanceof ItemWithTime) throw new RuntimeException();
         final Time time = getTime(ctx).getEnd();
         final LocalVarOperator op = localVarInfo.get(ctx.getCallContext().getBase());
         final int i = ItemWithTime.binarySearchApproximately(op.writeVarList, time);
@@ -52,7 +49,6 @@ public final class ExecutionHistory {
     }
 
     public void rewriteObjectField(ExecutionContext ctx, Time objGenTime, String fieldName, Object value) {
-        if (value instanceof ItemWithTime) throw new RuntimeException();
         final Time time = getTime(ctx).getEnd();
         final int i = ItemWithTime.binarySearchApproximately(objectUpdateList, time);
         assert i >= 0;
@@ -75,9 +71,7 @@ public final class ExecutionHistory {
     }
 
     public void onUpdateObjectWithHash(Time time, Time objGenTime, String fieldName, Object newValue) {
-        if (newValue instanceof ItemWithTime) throw new RuntimeException();
         HashMap<String, ArrayList<ItemWithTime<Object>>> stringArrayListHashMap = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
-        if (stringArrayListHashMap == null) System.out.println("objGenTime: " + objGenTime + "/ fieldName: " + fieldName + "/ newValue: " + newValue);
         //noinspection DataFlowIssue
         stringArrayListHashMap
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
@@ -134,6 +128,7 @@ public final class ExecutionHistory {
 
     public void deleteRecords(ExecutionContext context) {
         final TimeInfo tp = getTime(context);
+        if (tp == null) return;
         deleteRecords(tp.start, tp.end);
     }
 
@@ -152,6 +147,7 @@ public final class ExecutionHistory {
      * @param endTime inclusive
      */
     public void deleteRecords(Time startTime, Time endTime) {
+        if (startTime.compareTo(endTime) > 0) return; //throw new RuntimeException();
         // delete timeToContext and contextToTime
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
         for (ItemWithTime<ExecutionContext> e : contexts) {
@@ -404,6 +400,7 @@ public final class ExecutionHistory {
         private final Time objGenCtx;
 
         public ObjectReference(Time objGenCtx) {
+            if (objGenCtx == null) throw new RuntimeException();
             this.objGenCtx = objGenCtx;
         }
 
@@ -427,7 +424,6 @@ public final class ExecutionHistory {
         }
 
         public void onUpdateVariable(Time time, String variableName, Object newValue) {
-            if (newValue instanceof ItemWithTime) throw new RuntimeException();
             writeVarMap.computeIfAbsent(variableName, it -> new ArrayList<>())
                     .add(new ItemWithTime<>(time, newValue));
             writeVarList.add(new ItemWithTime<>(time, new LocalVariableUpdate(variableName, newValue)));

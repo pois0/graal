@@ -103,11 +103,6 @@ public final class SLIfNode extends SLStatementNode {
     @Override
     public void calcVoidInner(VirtualFrame frame) {
         ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        if (isNewNode()) {
-            op.newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
-            return;
-        }
-
         final SLExpressionNode conditionNode = this.conditionNode;
 
         if (op.calcBoolean(frame, this, conditionNode)) {

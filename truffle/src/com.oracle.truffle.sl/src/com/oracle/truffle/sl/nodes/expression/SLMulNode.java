@@ -77,16 +77,6 @@ public abstract class SLMulNode extends SLBinaryNode {
     public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        if (isNewNode()) {
-            return op.newExecutionGeneric(getNodeIdentifier(), frame, f -> {
-                try {
-                    return executeBoolean(f);
-                } catch (UnexpectedResultException ex) {
-                    throw SLException.typeError(this, ex.getResult());
-                }
-            });
-        }
-
         final Object left = op.calcGeneric(frame, getLeftNode());
         final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
         final Object right = op.calcGeneric(frame, getRightNode());
@@ -108,21 +98,6 @@ public abstract class SLMulNode extends SLBinaryNode {
     @Override
     public long calcLongInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-
-        if (isNewNode()) {
-            try {
-                return op.newExecutionLong(getNodeIdentifier(), frame, f -> {
-                    try {
-                        return executeLong(f);
-                    } catch (UnexpectedResultException ex) {
-                        throw SLException.typeError(this, ex.getResult());
-                    }
-                });
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException("Never reach here");
-            }
-        }
 
         final long left = op.calcLong(frame, this, getLeftNode());
         final long right = op.calcLong(frame, this, getRightNode());

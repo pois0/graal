@@ -132,11 +132,7 @@ public final class SLFunctionRegistry {
      */
     public List<SLFunction> getFunctions() {
         List<SLFunction> result = new ArrayList<>(functionsObject.functions.values());
-        Collections.sort(result, new Comparator<SLFunction>() {
-            public int compare(SLFunction f1, SLFunction f2) {
-                return f1.toString().compareTo(f2.toString());
-            }
-        });
+        Collections.sort(result, Comparator.comparing(SLFunction::toString));
         return result;
     }
 
@@ -146,5 +142,9 @@ public final class SLFunctionRegistry {
 
     public boolean containNewNode(String functionName) {
         return functionContainsNewNode.contains(functionName);
+    }
+
+    public Set<String> returnModifiedFunctions() {
+        return functionContainsNewNode;
     }
 }

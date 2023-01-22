@@ -75,8 +75,6 @@ public abstract class SLSubNode extends SLBinaryNode {
     public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        if (isNewNode()) return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
-
         final Object left = op.calcGeneric(frame, getLeftNode());
         final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
         final Object right = op.calcGeneric(frame, getRightNode());
@@ -98,8 +96,6 @@ public abstract class SLSubNode extends SLBinaryNode {
     @Override
     public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-
-        if (isNewNode()) return op.newExecutionLong(getNodeIdentifier(), frame, this::executeLong);
 
         final long left = op.calcLong(frame, this, getLeftNode());
         final long right = op.calcLong(frame, this, getRightNode());

@@ -1,6 +1,7 @@
 package com.oracle.truffle.sl.runtime.cache;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class ItemWithTime<T> {
@@ -154,7 +155,7 @@ public class ItemWithTime<T> {
 
     public static <T> ArrayList<ItemWithTime<T>> merge(ArrayList<ItemWithTime<T>> base, ArrayList<ItemWithTime<T>> newList, Time initialTime) {
         if (newList.isEmpty()) return base;
-        final int i = binarySearchWhereInsertTo(newList, initialTime);
+        final int i = binarySearchWhereInsertTo(base, initialTime);
         base.addAll(i, newList);
         return base;
     }

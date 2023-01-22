@@ -114,6 +114,7 @@ import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.cache.ExecutionContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 import org.graalvm.collections.Pair;
 
 /**
@@ -263,7 +264,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * from this array.
          */
         for (int i = 0; i < argumentCount; i++) {
-            argumentNodes[i] = new SLReadArgumentNode(i);
+            final SLReadArgumentNode readArgumentNode = new SLReadArgumentNode(i);
+            readArgumentNode.setIdentifier(new NodeIdentifier("__builtin", i));
+            argumentNodes[i] = readArgumentNode;
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */
         SLBuiltinNode builtinBodyNode = factory.createNode((Object) argumentNodes);

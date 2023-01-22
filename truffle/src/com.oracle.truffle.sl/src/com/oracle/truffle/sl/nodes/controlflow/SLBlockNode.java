@@ -113,11 +113,7 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
 
     @Override
     public void calcVoidInner(VirtualFrame frame) {
-        if (isNewNode()) {
-            getContext().getHistoryOperator().newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
-        } else {
-            this.block.executeVoid(frame, CALC);
-        }
+        this.block.executeVoid(frame, CALC);
     }
 
     public List<SLStatementNode> getStatements() {

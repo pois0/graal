@@ -85,10 +85,6 @@ public final class SLWhileNode extends SLStatementNode {
     public void calcVoidInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        if (isNewNode()) {
-            op.newExecutionVoid(identifier, frame, this::executeVoid);
-            return;
-        }
 
         op.onEnterLoop(identifier);
         try {

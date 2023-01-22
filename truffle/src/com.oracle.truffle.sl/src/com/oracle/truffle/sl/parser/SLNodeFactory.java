@@ -49,7 +49,6 @@ import java.util.Map;
 import java.util.Set;
 
 import com.oracle.truffle.sl.nodes.cache.DeleteNode;
-import com.oracle.truffle.sl.nodes.cache.NewNode;
 import com.oracle.truffle.sl.nodes.cache.ReplaceNode;
 import com.oracle.truffle.sl.nodes.expression.SLEqualNode;
 import com.oracle.truffle.sl.nodes.expression.SLLessOrEqualNode;
@@ -653,10 +652,12 @@ public class SLNodeFactory {
 
     public SLExpressionNode createInsert(SLExpressionNode node) {
         node.setNewNode();
-        final NewNode result = new NewNode(node);
-        setIdentifier(result);
-        containsNewNode = true;
-        return result;
+        return node;
+//        final NewNode result = new NewNode(node);
+//        result.setSourceSection(node.getSourceCharIndex(), node.getSourceLength());
+//        setIdentifier(result);
+//        containsNewNode = true;
+//        return result;
     }
 
     public SLExpressionNode createReplace(Token deleted, SLExpressionNode node) {

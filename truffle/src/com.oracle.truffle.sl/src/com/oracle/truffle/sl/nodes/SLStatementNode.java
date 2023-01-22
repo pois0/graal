@@ -270,4 +270,8 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     }
 
     protected abstract boolean hasNewChildNode();
+
+    public SLStatementNode unwrap() {
+        return null;
+    }
 }

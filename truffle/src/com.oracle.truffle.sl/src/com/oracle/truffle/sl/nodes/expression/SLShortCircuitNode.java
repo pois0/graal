@@ -102,9 +102,6 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        if (isNewNode()) {
-            return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeBoolean);
-        }
 
         boolean leftValue = op.calcBoolean(frame, this, left);
         boolean rightValue = isEvaluateRight(leftValue) && op.calcBoolean(frame, this, right);

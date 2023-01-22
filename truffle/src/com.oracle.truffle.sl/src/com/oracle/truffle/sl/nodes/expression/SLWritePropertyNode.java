@@ -120,9 +120,6 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
     public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        if (isNewNode()) {
-            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
-        }
         final Object receiver = op.calcGeneric(frame, getReceiverNode());
         final Object name = op.calcGeneric(frame, getNameNode());
         final Object value = op.calcGeneric(frame, getValueNode());

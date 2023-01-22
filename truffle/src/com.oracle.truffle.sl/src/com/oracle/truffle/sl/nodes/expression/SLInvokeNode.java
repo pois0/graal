@@ -116,9 +116,6 @@ public final class SLInvokeNode extends SLExpressionNode {
         final SLContext context = getContext();
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        if (isNewNode()) {
-            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
-        }
         final Pair<Object, Boolean> functionPair = op.calcGenericParameter(frame, functionNode);
         final Object function = functionPair.getLeft();
         boolean shouldRecalc = functionPair.getRight();

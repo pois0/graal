@@ -137,7 +137,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
 
         boolean result;
-        if (op.calcBoolean(frame, this, conditionNode)) {
+        if (!op.calcBoolean(frame, this, conditionNode)) {
             result = false;
         } else {
             try {
@@ -172,10 +172,6 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
              */
             throw new UnsupportedSpecializationException(this, new Node[]{conditionNode}, ex.getResult());
         }
-    }
-
-    private boolean calculateCondition(VirtualFrame frame) {
-        return context.getHistoryOperator().calcBoolean(frame, conditionNode, conditionNode);
     }
 
     @Override

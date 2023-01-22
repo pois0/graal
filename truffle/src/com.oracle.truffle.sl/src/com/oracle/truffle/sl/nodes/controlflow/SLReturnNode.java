@@ -80,10 +80,6 @@ public final class SLReturnNode extends SLStatementNode {
     @Override
     public void calcVoidInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        if (isNewNode()) {
-            op.newExecutionVoid(getNodeIdentifier(), frame, this::executeVoid);
-            return;
-        }
 
         Object result;
         if (valueNode != null) {

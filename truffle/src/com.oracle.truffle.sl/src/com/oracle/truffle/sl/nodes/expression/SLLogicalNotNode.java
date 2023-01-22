@@ -72,23 +72,7 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-
-        if (isNewNode()) {
-            try {
-                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
-                    try {
-                        return executeBoolean(f);
-                    } catch (UnexpectedResultException ex) {
-                        throw SLException.typeError(this, ex.getResult());
-                    }
-                });
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException("Never reach here");
-            }
-        }
-
-        return doBoolean(op.calcBoolean(frame, this, getValueNode()));
+        return !getContext().getHistoryOperator().calcBoolean(frame, this, getValueNode());
     }
 
     @Fallback

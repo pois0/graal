@@ -15,6 +15,7 @@ public final class SLExpressionNodeWrapper extends SLExpressionNode implements I
     SLExpressionNodeWrapper(SLExpressionNode delegateNode, ProbeNode probeNode) {
         this.delegateNode = delegateNode;
         this.probeNode = probeNode;
+        if (delegateNode.isNewNode()) setNewNode();
     }
 
     @Override
@@ -161,5 +162,10 @@ public final class SLExpressionNodeWrapper extends SLExpressionNode implements I
     @Override
     public NodeIdentifier getNodeIdentifier() {
         return delegateNode.getNodeIdentifier();
+    }
+
+    @Override
+    public SLExpressionNode unwrap() {
+        return delegateNode;
     }
 }

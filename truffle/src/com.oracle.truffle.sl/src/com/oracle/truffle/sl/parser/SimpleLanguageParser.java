@@ -198,7 +198,7 @@ public class SimpleLanguageParser extends Parser {
 	    parser.factory = new SLNodeFactory(language, source);
 	    parser.source = source;
 	    parser.simplelanguage();
-	    return Pair.create(parser.factory.getAllFunctions(), parser.factory.getFunctionContainsNewNode());
+	    return org.graalvm.collections.Pair.create(parser.factory.getAllFunctions(), parser.factory.getFunctionContainsNewNode());
 	}
 
 	public SimpleLanguageParser(TokenStream input) {

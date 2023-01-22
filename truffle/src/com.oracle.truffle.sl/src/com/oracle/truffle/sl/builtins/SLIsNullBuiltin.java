@@ -70,23 +70,7 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-        if (isNewNode()) {
-            op.startNewExecution(frame, identifier);
-            try {
-                return executeBoolean(frame);
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException(e);
-            } finally {
-                op.endNewExecution();
-            }
-        }
-
-        final SLExpressionNode arg = getArguments()[0];
-        final Object o = op.calcGeneric(frame, arg);
-
-        return INTEROP_LIBRARY.getUncached(o).isNull(o);
+        return frame.getArguments()[0] == SLNull.SINGLETON;
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isNull");

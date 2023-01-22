@@ -49,7 +49,6 @@ import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
@@ -66,8 +65,6 @@ import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 @GenerateNodeFactory
 public abstract class SLBuiltinNode extends SLExpressionNode {
     protected static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY = LibraryFactory.resolve(InteropLibrary.class);
-
-    protected abstract SLExpressionNode[] getArguments();
 
     @Override
     public final Object executeGeneric(VirtualFrame frame) {

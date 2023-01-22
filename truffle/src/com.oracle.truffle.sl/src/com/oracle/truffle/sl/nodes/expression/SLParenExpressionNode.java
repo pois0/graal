@@ -79,38 +79,17 @@ public class SLParenExpressionNode extends SLExpressionNode {
 
     @Override
     public Object calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-
-        if (isNewNode()) {
-            return op.newExecutionGeneric(identifier, frame, this::executeGeneric);
-        }
-
-        return op.calcGeneric(frame, expression);
+        return getContext().getHistoryOperator().calcGeneric(frame, expression);
     }
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-
-        if (isNewNode()) {
-            return op.newExecutionBoolean(identifier, frame, this::executeBoolean);
-        }
-
-        return op.calcBoolean(frame, this, expression);
+        return getContext().getHistoryOperator().calcBoolean(frame, this, expression);
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
-
-        if (isNewNode()) {
-            return op.newExecutionLong(identifier, frame, this::executeLong);
-        }
-
-        return op.calcLong(frame, this, expression);
+    public long calcLongInner(VirtualFrame frame) {
+        return getContext().getHistoryOperator().calcLong(frame, this, expression);
     }
 
     @Override

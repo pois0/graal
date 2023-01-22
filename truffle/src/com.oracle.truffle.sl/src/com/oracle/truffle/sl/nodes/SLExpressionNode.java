@@ -122,4 +122,9 @@ public abstract class SLExpressionNode extends SLStatementNode {
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(calcGenericInner(frame));
     }
+
+    @Override
+    public SLExpressionNode unwrap() {
+        return null;
+    }
 }

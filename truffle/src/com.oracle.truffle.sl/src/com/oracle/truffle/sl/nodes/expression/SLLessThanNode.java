@@ -44,12 +44,16 @@ import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+
+import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
 /**
  * This class is similar to the extensively documented {@link SLAddNode}. The only difference: the
@@ -78,28 +82,22 @@ public abstract class SLLessThanNode extends SLBinaryNode {
     public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        if (isNewNode()) {
-            try {
-                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
-                    try {
-                        return executeBoolean(f);
-                    } catch (UnexpectedResultException ex) {
-                        throw SLException.typeError(this, ex.getResult());
-                    }
-                });
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException("Never reach here");
-            }
-        }
-
         final Object left = op.calcGeneric(frame, getLeftNode());
+        final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
         final Object right = op.calcGeneric(frame, getRightNode());
-        if (left instanceof Long && right instanceof Long) {
-            return lessThan((long) left, (long) right);
-        } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
-            return lessThan((SLBigNumber) left, (SLBigNumber) right);
-        } else {
-            return (boolean) typeError(left, right);
+        final InteropLibrary rightInterop = INTEROP_LIBRARY.getUncached(right);
+
+        try {
+            if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+                return lessThan(leftInterop.asLong(left), rightInterop.asLong(right));
+            } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
+                return lessThan((SLBigNumber) left, (SLBigNumber) right);
+            } else {
+                typeError(left, right);
+                return false;
+            }
+        } catch (UnsupportedMessageException ex) {
+            throw shouldNotReachHere(ex);
         }
     }
 

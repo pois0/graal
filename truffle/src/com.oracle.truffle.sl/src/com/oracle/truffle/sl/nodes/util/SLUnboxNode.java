@@ -50,6 +50,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
@@ -124,5 +125,10 @@ public abstract class SLUnboxNode extends SLExpressionNode {
     @Override
     protected boolean hasNewChildNode() {
         return getChild().hasNewNode();
+    }
+
+    @Override
+    public SLExpressionNode unwrap() {
+        return getChild();
     }
 }

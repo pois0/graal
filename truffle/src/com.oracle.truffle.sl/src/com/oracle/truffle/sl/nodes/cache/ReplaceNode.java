@@ -34,21 +34,21 @@ public final class ReplaceNode extends SLExpressionNode {
     public Object calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
-        return op.newExecutionGeneric(getNodeIdentifier(), frame, this::executeGeneric);
+        return op.newExecutionGeneric(getNodeIdentifier(), frame, this);
     }
 
     @Override
     public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
-        return op.newExecutionBoolean(getNodeIdentifier(), frame, this::executeBoolean);
+        return op.newExecutionBoolean(getNodeIdentifier(), frame, this);
     }
 
     @Override
     public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
-        return op.newExecutionLong(getNodeIdentifier(), frame, this::executeLong);
+        return op.newExecutionLong(getNodeIdentifier(), frame, this);
     }
 
     @Override

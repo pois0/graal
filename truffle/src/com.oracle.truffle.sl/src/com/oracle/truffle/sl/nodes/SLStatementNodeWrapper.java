@@ -6,7 +6,7 @@ import com.oracle.truffle.api.instrumentation.InstrumentableNode.WrapperNode;
 import com.oracle.truffle.api.nodes.NodeCost;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
 
-final class SLStatementNodeWrapper extends SLStatementNode implements WrapperNode {
+public final class SLStatementNodeWrapper extends SLStatementNode implements WrapperNode {
 
     @Child private SLStatementNode delegateNode;
     @Child private ProbeNode probeNode;
@@ -14,6 +14,7 @@ final class SLStatementNodeWrapper extends SLStatementNode implements WrapperNod
     SLStatementNodeWrapper(SLStatementNode delegateNode, ProbeNode probeNode) {
         this.delegateNode = delegateNode;
         this.probeNode = probeNode;
+        if (delegateNode.isNewNode()) setNewNode();
     }
 
     @Override
@@ -66,5 +67,10 @@ final class SLStatementNodeWrapper extends SLStatementNode implements WrapperNod
     @Override
     public NodeIdentifier getNodeIdentifier() {
         return delegateNode.getNodeIdentifier();
+    }
+
+    @Override
+    public SLStatementNode unwrap() {
+        return delegateNode;
     }
 }

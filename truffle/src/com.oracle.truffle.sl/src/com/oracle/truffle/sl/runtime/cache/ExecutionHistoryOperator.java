@@ -1,5 +1,6 @@
 package com.oracle.truffle.sl.runtime.cache;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -16,12 +17,16 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
+import com.oracle.truffle.sl.builtins.SLBuiltinNode;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.SLExpressionNodeWrapper;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.nodes.SLStatementNodeWrapper;
 import com.oracle.truffle.sl.nodes.controlflow.SLBreakException;
 import com.oracle.truffle.sl.nodes.controlflow.SLContinueException;
 import com.oracle.truffle.sl.nodes.controlflow.SLReturnException;
-import com.oracle.truffle.sl.nodes.util.SLUnboxNode;
+import com.oracle.truffle.sl.nodes.expression.SLLessThanNode;
+import com.oracle.truffle.sl.nodes.local.SLReadArgumentNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
@@ -208,6 +213,7 @@ public final class ExecutionHistoryOperator {
     }
 
     public void onGenerateObject(SLObject object) {
+        final Time currentTime = this.currentTime;
         objToCtx.put(object, currentTime);
         ctxToObj.put(currentTime, new WeakReference<>(object));
         currentHistory.onCreateObject(currentTime);
@@ -221,6 +227,12 @@ public final class ExecutionHistoryOperator {
     }
 
     public ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
+        final ShouldReExecuteResult shouldReExecuteResult = shouldReExecuteX(node);
+        return shouldReExecuteResult;
+    }
+
+    @CompilerDirectives.TruffleBoundary
+    public ShouldReExecuteResult shouldReExecuteX(SLStatementNode node) {
         if (node.isNewNode()) return ShouldReExecuteResult.NEW_EXECUTE;
         if (node.hasNewNode()) return ShouldReExecuteResult.RE_EXECUTE;
 
@@ -262,9 +274,7 @@ public final class ExecutionHistoryOperator {
                 HashSet<Object> fields = objectFieldFlags.get(content.getObjGenCtx());
                 return fields != null && fields.contains(content.getFieldName());
             });
-            if (check) {
-                return ShouldReExecuteResult.RE_EXECUTE;
-            }
+            if (check) return ShouldReExecuteResult.RE_EXECUTE;
         }
 
         return ShouldReExecuteResult.USE_CACHE;
@@ -272,7 +282,8 @@ public final class ExecutionHistoryOperator {
 
     private final static int STREAM_THRESHOLD = 10_000;
     private <T> boolean checkFromList(List<ItemWithTime<T>> list, Predicate<T> pred) {
-        if (list.size() > STREAM_THRESHOLD) {
+//        if (list.size() > STREAM_THRESHOLD) {
+        if (false) {
             return list.parallelStream().map(ItemWithTime::getItem).anyMatch(pred);
         } else {
             for (ItemWithTime<T> entry : list) {
@@ -287,15 +298,20 @@ public final class ExecutionHistoryOperator {
     }
 
     public Object getReturnedValueOrThrow(ExecutionContext execCtx) {
-//        System.out.println("Skipped " + execCtx);
-        return revertObject(currentHistory.getReturnedValueOrThrow(execCtx));
+        try {
+            final Object o = revertObject(currentHistory.getReturnedValueOrThrow(execCtx));
+//            System.out.println("Skipped " + execCtx + "/ Returned value: " + o);
+            return o;
+        } catch (SLReturnException e) {
+            throw new SLReturnException(revertObject(e.getResult()));
+        }
     }
 
     public Object getVariableValue(Object varName, NodeIdentifier identifier) {
         final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
         //noinspection DataFlowIssue
         final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get((String) varName);
-        return varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).getItem();
+        return revertObject(varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).getItem());
     }
 
     public Object getFieldValue(Object obj, String fieldName, NodeIdentifier identifier) {
@@ -326,15 +342,16 @@ public final class ExecutionHistoryOperator {
     }
 
     public Object calcGeneric(VirtualFrame frame, SLExpressionNode node) {
-        if (node instanceof SLUnboxNode) return calcGeneric(frame, ((SLUnboxNode) node).getChild());
+        final SLExpressionNode unwrapped = node.unwrap();
+        if (unwrapped != null) return calcGeneric(frame, unwrapped);
         try {
             switch (shouldReExecute(node)) {
                 case USE_CACHE:
                     return getReturnedValueOrThrow(node.getNodeIdentifier());
                 case RE_EXECUTE:
-                    return reExecuteGeneric(node.getNodeIdentifier(), frame, node::calcGenericInner);
+                    return reExecuteGeneric(node.getNodeIdentifier(), frame, node);
                 case NEW_EXECUTE:
-                    return newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric);
+                    return newExecutionGeneric(node.getNodeIdentifier(), frame, node);
             }
         } catch (SLReturnException | SLBreakException | SLContinueException e) {
             currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
@@ -347,15 +364,16 @@ public final class ExecutionHistoryOperator {
     }
 
     public Pair<Object, Boolean> calcGenericParameter(VirtualFrame frame, SLExpressionNode node) {
-        if (node instanceof SLUnboxNode) return calcGenericParameter(frame, ((SLUnboxNode) node).getChild());
+        final SLExpressionNode unwrapped = node.unwrap();
+        if (unwrapped != null) return calcGenericParameter(frame, unwrapped);
         try {
             switch (shouldReExecute(node)) {
                 case USE_CACHE:
                     return Pair.create(getReturnedValueOrThrow(node.getNodeIdentifier()), false);
                 case RE_EXECUTE:
-                    return Pair.create(reExecuteGeneric(node.getNodeIdentifier(), frame, node::calcGenericInner), true);
+                    return Pair.create(reExecuteGeneric(node.getNodeIdentifier(), frame, node), true);
                 case NEW_EXECUTE:
-                    return Pair.create(newExecutionGeneric(node.getNodeIdentifier(), frame, node::executeGeneric), true);
+                    return Pair.create(newExecutionGeneric(node.getNodeIdentifier(), frame, node), true);
             }
         } finally {
             finishCalc(node.getNodeIdentifier());
@@ -365,7 +383,8 @@ public final class ExecutionHistoryOperator {
     }
 
     public boolean calcBoolean(VirtualFrame frame, Node currentNode, SLExpressionNode node) {
-        if (node instanceof SLUnboxNode) return calcBoolean(frame, node, ((SLUnboxNode) node).getChild());
+        final SLExpressionNode unwrapped = node.unwrap();
+        if (unwrapped != null) return calcBoolean(frame, currentNode, unwrapped);
         try {
             switch (shouldReExecute(node)) {
             case USE_CACHE:
@@ -376,9 +395,9 @@ public final class ExecutionHistoryOperator {
                     throw new UnexpectedResultException(obj);
                 }
             case RE_EXECUTE:
-                return reExecuteBoolean(node.getNodeIdentifier(), frame, node::calcBooleanInner);
+                return reExecuteBoolean(node.getNodeIdentifier(), frame, node);
             case NEW_EXECUTE:
-                return newExecutionBoolean(node.getNodeIdentifier(), frame, node::executeBoolean);
+                return newExecutionBoolean(node.getNodeIdentifier(), frame, node);
             }
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
@@ -390,7 +409,8 @@ public final class ExecutionHistoryOperator {
     }
 
     public long calcLong(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
-        if (node instanceof SLUnboxNode) return calcLong(frame, node, ((SLUnboxNode) node).getChild());
+        final SLExpressionNode unwrapped = node.unwrap();
+        if (unwrapped != null) return calcLong(frame, currentNode, unwrapped);
         try {
             switch (shouldReExecute(node)) {
             case USE_CACHE:
@@ -401,9 +421,9 @@ public final class ExecutionHistoryOperator {
                     throw new UnexpectedResultException(obj);
                 }
             case RE_EXECUTE:
-                return reExecuteLong(node.getNodeIdentifier(), frame, node::calcLongInner);
+                return reExecuteLong(node.getNodeIdentifier(), frame, node);
             case NEW_EXECUTE:
-                return newExecutionLong(node.getNodeIdentifier(), frame, node::executeLong);
+                return newExecutionLong(node.getNodeIdentifier(), frame, node);
             }
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
@@ -415,16 +435,21 @@ public final class ExecutionHistoryOperator {
     }
 
     public void calcVoid(VirtualFrame frame, SLStatementNode node) {
+        final SLStatementNode unwrapped = node.unwrap();
+        if (unwrapped != null) {
+            calcVoid(frame, unwrapped);
+            return;
+        }
         try {
             switch (shouldReExecute(node)) {
             case USE_CACHE:
                 getReturnedValueOrThrow(node.getNodeIdentifier());
                 return;
             case RE_EXECUTE:
-                reExecuteVoid(node.getNodeIdentifier(), frame, node::calcVoidInner);
+                reExecuteVoid(node.getNodeIdentifier(), frame, node);
                 return;
             case NEW_EXECUTE:
-                newExecutionVoid(node.getNodeIdentifier(), frame, node::executeVoid);
+                newExecutionVoid(node.getNodeIdentifier(), frame, node);
                 return;
             }
         } catch (SLReturnException | SLBreakException | SLContinueException e) {
@@ -469,91 +494,81 @@ public final class ExecutionHistoryOperator {
         isInExec = false;
     }
 
-    public <T> T newExecutionGeneric(NodeIdentifier identifier, VirtualFrame frame, Task<T> task) {
+    public Object newExecutionGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
-        final T result;
         try {
-            result = task.invoke(frame);
-        } catch (Throwable e) {
-            tickNode.onReturnExceptional(frame, e);
-            endNewExecution();
-            throw e;
-        }
-
-        try {
+            final Object result = node.executeGeneric(frame);
             tickNode.onReturnValue(frame, result);
             return result;
+        } catch (Throwable e) {
+            tickNode.onReturnExceptional(frame, e);
+            throw e;
+        } finally {
+            endNewExecution();
+        }
+
+    }
+
+    public boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+        final TickNode tickNode = new TickNode(identifier);
+        startNewExecution(frame, identifier);
+        tickNode.onEnter(frame);
+        try {
+            final boolean result = node.executeBoolean(frame);
+            tickNode.onReturnValue(frame, result);
+            return result;
+        } catch (UnexpectedResultException ex) {
+            final SLException slEx = SLException.typeError(node, ex.getResult());
+            tickNode.onReturnExceptional(frame, slEx);
+            throw slEx;
+        } catch (Throwable e) {
+            tickNode.onReturnExceptional(frame, e);
+            throw e;
         } finally {
             endNewExecution();
         }
     }
 
-    public boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, BooleanTask task) throws UnexpectedResultException {
+    public long newExecutionLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
-        final boolean result;
         try {
-            result = task.invokeBoolean(frame);
-        } catch (Throwable e) {
-            tickNode.onReturnExceptional(frame, e);
-            endNewExecution();
-            throw e;
-        }
-
-        try {
+            final long result = node.executeLong(frame);
             tickNode.onReturnValue(frame, result);
             return result;
+        } catch (UnexpectedResultException ex) {
+            final SLException slEx = SLException.typeError(node, ex.getResult());
+            tickNode.onReturnExceptional(frame, slEx);
+            throw slEx;
+        } catch (Throwable e) {
+            tickNode.onReturnExceptional(frame, e);
+            throw e;
         } finally {
             endNewExecution();
         }
     }
 
-    public long newExecutionLong(NodeIdentifier identifier, VirtualFrame frame, LongTask task) throws UnexpectedResultException {
-        final TickNode tickNode = new TickNode(identifier);
-        startNewExecution(frame, identifier);
-        tickNode.onEnter(frame);
-        final long result;
-        try {
-            result = task.invokeLong(frame);
-        } catch (Throwable e) {
-            tickNode.onReturnExceptional(frame, e);
-            endNewExecution();
-            throw e;
-        }
-
-        try {
-            tickNode.onReturnValue(frame, result);
-            return result;
-        } finally {
-            endNewExecution();
-        }
-    }
-
-    public void newExecutionVoid(NodeIdentifier identifier, VirtualFrame frame, VoidTask task) {
+    public void newExecutionVoid(NodeIdentifier identifier, VirtualFrame frame, SLStatementNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
         try {
-            task.invokeVoid(frame);
-        } catch (Throwable e) {
-            tickNode.onReturnExceptional(frame, e);
-            endNewExecution();
-            throw e;
-        }
-
-        try {
+            node.executeVoid(frame);
             tickNode.onReturnValue(frame, null);
+        } catch (Throwable e) {
+            tickNode.onReturnExceptional(frame, e);
+            throw e;
         } finally {
             endNewExecution();
         }
     }
 
-    public void reExecuteVoid(NodeIdentifier identifier, VirtualFrame frame, VoidTask task) {
+    public void reExecuteVoid(NodeIdentifier identifier, VirtualFrame frame, SLStatementNode node) {
         try {
-            task.invokeVoid(frame);
+            node.calcVoidInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
@@ -561,39 +576,39 @@ public final class ExecutionHistoryOperator {
         currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), null);
     }
 
-    public <T> T reExecuteGeneric(NodeIdentifier identifier, VirtualFrame frame, Task<T> task) {
-        T value;
+    public Object reExecuteGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+        Object value;
         try {
-            value = task.invoke(frame);
+            value = node.calcGenericInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), value);
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
         return value;
     }
 
-    public boolean reExecuteBoolean(NodeIdentifier identifier, VirtualFrame frame, BooleanTask task) throws UnexpectedResultException {
+    public boolean reExecuteBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
         boolean value;
         try {
-            value = task.invokeBoolean(frame);
+            value = node.calcBooleanInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), value);
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
         return value;
     }
 
-    public long reExecuteLong(NodeIdentifier identifier, VirtualFrame frame, LongTask task) throws UnexpectedResultException {
+    public long reExecuteLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
         long value;
         try {
-            value = task.invokeLong(frame);
+            value = node.calcLongInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), value);
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
         return value;
     }
 
@@ -726,8 +741,7 @@ public final class ExecutionHistoryOperator {
                 || value == SLNull.SINGLETON) {
             return value;
         } else if (value instanceof ExecutionHistory.ObjectReference) {
-            return ctxToObj.computeIfAbsent(
-                            ((ExecutionHistory.ObjectReference) value).getObjGenCtx(),
+            return ctxToObj.computeIfAbsent(((ExecutionHistory.ObjectReference) value).getObjGenCtx(),
                             objGenCtx -> {
                                 final SLObject newObject = language.justCreateObject();
                                 objToCtx.put(newObject, objGenCtx);
@@ -805,7 +819,10 @@ public final class ExecutionHistoryOperator {
 
         @Override
         protected void onReturnExceptional(VirtualFrame frame, Throwable exception) {
-            if (exception instanceof ControlFlowException) {
+            if (exception instanceof SLReturnException) {
+                final SLReturnException forRecord = new SLReturnException(replaceReference(((SLReturnException) exception).getResult()));
+                currentHistory.onReturnExceptional(startTime.pop(), getAndIncrementTime(), getExecutionContext(identifier), forRecord);
+            } else if (exception instanceof ControlFlowException) {
                 currentHistory.onReturnExceptional(startTime.pop(), getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
             }
         }
@@ -866,22 +883,6 @@ public final class ExecutionHistoryOperator {
             this.paramLen = paramLen;
             this.cc = cc;
         }
-    }
-
-    public interface Task<T> {
-        T invoke(VirtualFrame frame);
-    }
-
-    public interface BooleanTask {
-        boolean invokeBoolean(VirtualFrame frame) throws UnexpectedResultException;
-    }
-
-    public interface LongTask {
-        long invokeLong(VirtualFrame frame) throws UnexpectedResultException;
-    }
-
-    public interface VoidTask {
-        void invokeVoid(VirtualFrame frame);
     }
 
     private enum ShouldReExecuteResult {

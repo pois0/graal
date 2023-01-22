@@ -166,20 +166,6 @@ public abstract class SLEqualNode extends SLBinaryNode {
     public boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        if (isNewNode()) {
-            try {
-                return op.newExecutionBoolean(getNodeIdentifier(), frame, f -> {
-                    try {
-                        return executeBoolean(f);
-                    } catch (UnexpectedResultException ex) {
-                        throw SLException.typeError(this, ex.getResult());
-                    }
-                });
-            } catch (UnexpectedResultException e) {
-                throw new RuntimeException("Never reach here");
-            }
-        }
-
         final Object left = op.calcGeneric(frame, getLeftNode());
         final Object right = op.calcGeneric(frame, getRightNode());
         return doGeneric(left, right, INTEROP_LIBRARY.getUncached(left), INTEROP_LIBRARY.getUncached(right));

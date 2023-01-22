@@ -106,7 +106,7 @@ public final class Time implements Comparable<Time> {
 
     public static ArrayList<Time> merge(ArrayList<Time> base, ArrayList<Time> newList, Time initialTime) {
         if (newList.isEmpty()) return base;
-        final int i = binarySearchWhereInsertTo(newList, initialTime);
+        final int i = binarySearchWhereInsertTo(base, initialTime);
         base.addAll(i, newList);
         return base;
     }

@@ -6,10 +6,10 @@ import com.google.common.hash.Hashing;
 public abstract class CallContext implements Comparable<CallContext> {
     protected final NodeIdentifier nodeIdentifier;
     protected final CallContext root;
-    protected final FunctionCall calledFrom;
+    protected final ContextBase calledFrom;
     protected final int hashCode;
 
-    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int hashCode) {
+    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, ContextBase calledFrom, int hashCode) {
         this.root = root;
         this.nodeIdentifier = nodeIdentifier;
         this.calledFrom = calledFrom;
@@ -99,7 +99,7 @@ public abstract class CallContext implements Comparable<CallContext> {
     }
 
     public static abstract class ContextBase extends CallContext {
-        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int hashCode) {
+        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, ContextBase calledFrom, int hashCode) {
             super(root, nodeIdentifier, calledFrom, hashCode);
         }
     }
@@ -158,7 +158,7 @@ public abstract class CallContext implements Comparable<CallContext> {
     public static final class Loop extends CallContext {
         private final int loopCount;
 
-        public Loop(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int loopCount) {
+        private Loop(CallContext root, NodeIdentifier nodeIdentifier, ContextBase calledFrom, int loopCount) {
             super(root,
                     nodeIdentifier,
                     calledFrom,
@@ -169,7 +169,7 @@ public abstract class CallContext implements Comparable<CallContext> {
         public Loop(CallContext root, NodeIdentifier nodeIdentifier) {
             this(root,
                     nodeIdentifier,
-                    root instanceof FunctionCall ? (FunctionCall) root : root == null ? null : root.calledFrom,
+                    root instanceof ContextBase ? (ContextBase) root : root == null ? null : root.calledFrom,
                     0);
         }
 
