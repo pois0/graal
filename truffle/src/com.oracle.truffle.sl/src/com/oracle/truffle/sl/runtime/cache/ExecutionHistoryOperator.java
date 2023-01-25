@@ -1,6 +1,5 @@
 package com.oracle.truffle.sl.runtime.cache;
 
-import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.frame.FrameDescriptor;
 import com.oracle.truffle.api.frame.FrameSlot;
 import com.oracle.truffle.api.frame.VirtualFrame;
@@ -17,16 +16,11 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
-import com.oracle.truffle.sl.builtins.SLBuiltinNode;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.nodes.SLExpressionNodeWrapper;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
-import com.oracle.truffle.sl.nodes.SLStatementNodeWrapper;
 import com.oracle.truffle.sl.nodes.controlflow.SLBreakException;
 import com.oracle.truffle.sl.nodes.controlflow.SLContinueException;
 import com.oracle.truffle.sl.nodes.controlflow.SLReturnException;
-import com.oracle.truffle.sl.nodes.expression.SLLessThanNode;
-import com.oracle.truffle.sl.nodes.local.SLReadArgumentNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
@@ -41,10 +35,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.function.Predicate;
 
 public final class ExecutionHistoryOperator {
     private static final LibraryFactory<InteropLibrary> INTEROP_LIBRARY_ = LibraryFactory.resolve(InteropLibrary.class);
@@ -55,7 +47,7 @@ public final class ExecutionHistoryOperator {
     private final SLLanguage language;
     private final SLFunctionRegistry functionRegistry;
 
-    private Time currentTime = Time.zero();
+    private Time currentTime = Time.ZERO;
     private boolean isInExec = false;
     private ExecutionContext lastCalcCtx = null;
     private ExecutionHistory currentHistory;
@@ -66,6 +58,9 @@ public final class ExecutionHistoryOperator {
     private HashMap<Time, WeakReference<SLObject>> ctxToObj = new HashMap<>();
     private WeakHashMap<SLObject, Time> objToCtx = new WeakHashMap<>();
     private final LocalVarOperatorHolder localVarOperatorHolder;
+
+    private Time firstHitAtFunctionCall;
+    private Time firstHitAtField;
 
     private final StackListener stackListener = new StackListener() {
         @Override
@@ -126,6 +121,9 @@ public final class ExecutionHistoryOperator {
         parameterFlagStack.push(new boolean[0]);
         localVarFlagStack.push(new HashSet<>());
         localVarOperatorHolder = new LocalVarOperatorHolder(0);
+
+        firstHitAtFunctionCall = rootHistory.getInitialTime();
+        firstHitAtField = rootHistory.getInitialTime();
     }
 
     public StackListener getStackListener() {
@@ -222,8 +220,9 @@ public final class ExecutionHistoryOperator {
     public void onObjectUpdated(Object object, String fldName, Object newValue) {
         final Time objGenTime = objToCtx.get((SLObject) object);
         currentHistory.onUpdateObjectWithHash(currentTime, objGenTime, fldName, replaceReference(newValue));
-        objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
+        final boolean newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fldName);
+        if (newlySet) firstHitAtField = currentHistory.getInitialTime();
     }
 
     public ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
@@ -231,10 +230,12 @@ public final class ExecutionHistoryOperator {
         return shouldReExecuteResult;
     }
 
-    @CompilerDirectives.TruffleBoundary
-    public ShouldReExecuteResult shouldReExecuteX(SLStatementNode node) {
+    private ShouldReExecuteResult shouldReExecuteX(SLStatementNode node) {
         if (node.isNewNode()) return ShouldReExecuteResult.NEW_EXECUTE;
-        if (node.hasNewNode()) return ShouldReExecuteResult.RE_EXECUTE;
+        if (node.hasNewNode()) {
+            System.out.println("Excuse: hasNewNode()");
+            return ShouldReExecuteResult.RE_EXECUTE;
+        }
 
         final ExecutionHistory currentHistory = this.currentHistory;
         NodeIdentifier nodeIdentifier = node.getNodeIdentifier();
@@ -242,8 +243,17 @@ public final class ExecutionHistoryOperator {
         ExecutionHistory.TimeInfo tp = currentHistory.getTime(execCtx);
         if (tp == null) return ShouldReExecuteResult.NEW_EXECUTE;
 
-        if (checkFromList(currentHistory.getFunctionEnters(tp.getStart(), tp.getEnd()), it -> functionRegistry.containNewNode(it.getRight()))) {
-            return ShouldReExecuteResult.RE_EXECUTE;
+        Time fcStart = this.firstHitAtFunctionCall;
+        if (fcStart.compareTo(tp.getEnd()) < 0) {
+            fcStart = Time.max(fcStart, tp.getStart());
+            for (ItemWithTime<Pair<CallContext.ContextBase, String>> entry : currentHistory.getFunctionEnters(fcStart, tp.getEnd())) {
+                if (functionRegistry.containNewNode(entry.getItem().getRight())) {
+                    firstHitAtFunctionCall = entry.getTime();
+                    System.out.println("Excuse: call modified function: " + entry.getItem().getRight() + " @ " + node.getSourceSection());
+                    return ShouldReExecuteResult.RE_EXECUTE;
+                }
+            }
+            firstHitAtFunctionCall = currentHistory.getNextTime(tp.getEnd());
         }
 
         ExecutionHistory.LocalVarOperator op = localVarOperatorHolder.peek();
@@ -255,7 +265,10 @@ public final class ExecutionHistoryOperator {
             if (readVarHistory == null || readVarHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
             final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
-            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
+            if (start != end) {
+                System.out.println("Excuse: flagged var / " + varName + " @ " + node.getSourceSection());
+                return ShouldReExecuteResult.RE_EXECUTE;
+            }
         }
 
         final boolean[] paramFlags = parameterFlagStack.peek();
@@ -266,31 +279,28 @@ public final class ExecutionHistoryOperator {
             if (readParamHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readParamHistory, tp.getStart());
             final int end = Time.binarySearchNext(readParamHistory, tp.getEnd());
-            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
+            if (start != end) {
+                System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection());
+                return ShouldReExecuteResult.RE_EXECUTE;
+            }
         }
 
-        if (!objectFieldFlags.isEmpty()) {
-            final boolean check = checkFromList(currentHistory.getReadOperations(tp.getStart(), tp.getEnd()), content -> {
-                HashSet<Object> fields = objectFieldFlags.get(content.getObjGenCtx());
-                return fields != null && fields.contains(content.getFieldName());
-            });
-            if (check) return ShouldReExecuteResult.RE_EXECUTE;
+
+        Time fldStart = firstHitAtField;
+        if (!objectFieldFlags.isEmpty() && fldStart.compareTo(tp.getEnd()) < 0) {
+            fldStart = tp.getStart();
+            for (ItemWithTime<ExecutionHistory.ReadObjectField> entry : this.currentHistory.getReadOperations(fldStart, tp.getEnd())) {
+                HashSet<Object> fields = objectFieldFlags.get(entry.getItem().getObjGenCtx());
+                if (fields != null && fields.contains(entry.getItem().getFieldName())) {
+                    firstHitAtField = entry.getTime();
+                    System.out.println("Excuse: flagged Fld / " + entry.getItem().getObjGenCtx() + ", " + entry.getItem().getFieldName() + " @ " + node.getSourceSection());
+                    return ShouldReExecuteResult.RE_EXECUTE;
+                }
+            }
+            firstHitAtField = this.currentHistory.getNextTime(tp.getEnd());
         }
 
         return ShouldReExecuteResult.USE_CACHE;
-    }
-
-    private final static int STREAM_THRESHOLD = 10_000;
-    private <T> boolean checkFromList(List<ItemWithTime<T>> list, Predicate<T> pred) {
-//        if (list.size() > STREAM_THRESHOLD) {
-        if (false) {
-            return list.parallelStream().map(ItemWithTime::getItem).anyMatch(pred);
-        } else {
-            for (ItemWithTime<T> entry : list) {
-                if (pred.test(entry.getItem())) return true;
-            }
-            return false;
-        }
     }
 
     public Object getReturnedValueOrThrow(NodeIdentifier identifier) {
@@ -333,8 +343,9 @@ public final class ExecutionHistoryOperator {
     public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier) {
         final Time objGenTime = objToCtx.get((SLObject) receiver);
         currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenTime, fieldName, replaceReference(value));
-        objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
+        final boolean newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
+        if (newlySet) firstHitAtField = currentHistory.getInitialTime();
     }
 
     public void deleteHistory(NodeIdentifier identifier) {
@@ -357,7 +368,7 @@ public final class ExecutionHistoryOperator {
             currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
             throw e;
         } finally {
-            finishCalc(node.getNodeIdentifier());
+            finishCalc(node);
         }
 
         throw new RuntimeException("Never reach here");
@@ -376,7 +387,7 @@ public final class ExecutionHistoryOperator {
                     return Pair.create(newExecutionGeneric(node.getNodeIdentifier(), frame, node), true);
             }
         } finally {
-            finishCalc(node.getNodeIdentifier());
+            finishCalc(node);
         }
 
         throw new RuntimeException("Never reach here");
@@ -402,7 +413,7 @@ public final class ExecutionHistoryOperator {
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
         } finally {
-            finishCalc(node.getNodeIdentifier());
+            finishCalc(node);
         }
 
         throw new RuntimeException("Never reach here");
@@ -428,7 +439,7 @@ public final class ExecutionHistoryOperator {
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(currentNode, ex.getResult());
         } finally {
-            finishCalc(node.getNodeIdentifier());
+            finishCalc(node);
         }
 
         throw new RuntimeException("Never reach here");
@@ -456,7 +467,7 @@ public final class ExecutionHistoryOperator {
             currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
             throw e;
         } finally {
-            finishCalc(node.getNodeIdentifier());
+            finishCalc(node);
         }
 
         throw new RuntimeException("Never reach here");
@@ -612,8 +623,8 @@ public final class ExecutionHistoryOperator {
         return value;
     }
 
-    public void finishCalc(NodeIdentifier identifier) {
-        lastCalcCtx = getExecutionContext(identifier);
+    public void finishCalc(SLStatementNode node) {
+        lastCalcCtx = getExecutionContext(node.getNodeIdentifier());
     }
 
     private void constructFrameAndObjects(Time time, VirtualFrame frame) {

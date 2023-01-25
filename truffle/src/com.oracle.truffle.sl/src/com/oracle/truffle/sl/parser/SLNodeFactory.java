@@ -652,6 +652,7 @@ public class SLNodeFactory {
 
     public SLExpressionNode createInsert(SLExpressionNode node) {
         node.setNewNode();
+        containsNewNode = true;
         return node;
 //        final NewNode result = new NewNode(node);
 //        result.setSourceSection(node.getSourceCharIndex(), node.getSourceLength());

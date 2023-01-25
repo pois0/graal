@@ -72,7 +72,6 @@ public final class ExecutionHistory {
 
     public void onUpdateObjectWithHash(Time time, Time objGenTime, String fieldName, Object newValue) {
         HashMap<String, ArrayList<ItemWithTime<Object>>> stringArrayListHashMap = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
-        //noinspection DataFlowIssue
         stringArrayListHashMap
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
                 .add(new ItemWithTime<>(time, newValue));
@@ -120,6 +119,10 @@ public final class ExecutionHistory {
         return ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
     }
 
+    public Time getInitialTime() {
+        return timeToContext.isEmpty() ? Time.ZERO : timeToContext.get(0).getTime();
+    }
+
     public TimeInfo getTime(ExecutionContext ctx) {
         final HashMap<CallContext, TimeInfo> map = contextToTime.get(ctx.getCurrentNodeIdentifier());
         if (map == null) return null;
@@ -135,9 +138,12 @@ public final class ExecutionHistory {
     public void deleteRecords(ExecutionContext exclusiveStart, ExecutionContext exclusiveEnd) {
         final Time startNext = getTime(exclusiveStart).getEnd();
         final int startI = ItemWithTime.binarySearchNext(timeToContext, startNext);
-        final Time startTime = timeToContext.get(startI).getTime();
         final Time endPrev = getTime(exclusiveEnd).getEnd();
         final int endI = ItemWithTime.binarySearchPrev(timeToContext, endPrev);
+
+        if (startI > endI) return;
+
+        final Time startTime = timeToContext.get(startI).getTime();
         final Time endTime = timeToContext.get(endI).getTime();
         deleteRecords(startTime, endTime);
     }
@@ -147,7 +153,6 @@ public final class ExecutionHistory {
      * @param endTime inclusive
      */
     public void deleteRecords(Time startTime, Time endTime) {
-        if (startTime.compareTo(endTime) > 0) return; //throw new RuntimeException();
         // delete timeToContext and contextToTime
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
         for (ItemWithTime<ExecutionContext> e : contexts) {

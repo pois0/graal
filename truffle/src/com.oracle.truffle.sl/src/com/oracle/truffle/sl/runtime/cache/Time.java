@@ -9,14 +9,12 @@ import java.util.Collections;
 import java.util.List;
 
 public final class Time implements Comparable<Time> {
+    public static final Time ZERO = new Time(new int[1]);
+
     private final int[] raw;
 
     private Time(int[] raw) {
         this.raw = raw;
-    }
-
-    public static Time zero() {
-        return new Time(new int[1]);
     }
 
     public Time inc() {
@@ -86,6 +84,10 @@ public final class Time implements Comparable<Time> {
         return "Time{" +
                 "raw=" + Arrays.toString(raw) +
                 '}';
+    }
+
+    public static Time max(Time t1, Time t2) {
+        return t1.compareTo(t2) >= 0 ? t1 : t2;
     }
 
     public static int binarySearchWhereInsertTo(ArrayList<Time> list, Time time) {

@@ -147,6 +147,7 @@ public class ItemWithTime<T> {
         return null;
     }
 
+    /** both inclusive */
     public static <T> List<ItemWithTime<T>> subList(ArrayList<ItemWithTime<T>> list, Time startTime, Time endTime) {
         final int start = binarySearchWhereInsertTo(list, startTime);
         final int end = binarySearchNext(list, endTime);
