@@ -114,7 +114,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
 
     public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ResultAndStrategy.Generic<Object> value = calcGenericInner(frame);
-        final long result = SLTypesGen.expectLong(value);
+        final long result = SLTypesGen.expectLong(value.getResult());
         if (value.isFresh()) {
             return ResultAndStrategy.Long.fresh(result);
         } else {
@@ -128,7 +128,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
 
     public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ResultAndStrategy.Generic<Object> value = calcGenericInner(frame);
-        final boolean result = SLTypesGen.expectBoolean(value);
+        final boolean result = SLTypesGen.expectBoolean(value.getResult());
         if (value.isFresh()) {
             return ResultAndStrategy.Boolean.fresh(result);
         } else {

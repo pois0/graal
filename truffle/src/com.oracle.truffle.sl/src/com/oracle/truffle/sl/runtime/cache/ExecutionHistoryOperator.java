@@ -241,6 +241,7 @@ public final class ExecutionHistoryOperator {
             for (ItemWithTime<Pair<CallContext.ContextBase, String>> entry : currentHistory.getFunctionEnters(fcStart, tp.getEnd())) {
                 if (functionRegistry.containNewNode(entry.getItem().getRight())) {
                     firstHitAtFunctionCall = entry.getTime();
+//                    System.out.println("Excuse: new function: " + entry.getItem().getRight());
                     return ShouldReExecuteResult.RE_EXECUTE;
                 }
             }
@@ -256,7 +257,10 @@ public final class ExecutionHistoryOperator {
             if (readVarHistory == null || readVarHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
             final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
-            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
+            if (start != end) {
+//                System.out.println("Excuse: flagged var / " + varName + " @ " + node.getSourceSection());
+                return ShouldReExecuteResult.RE_EXECUTE;
+            }
         }
 
         final boolean[] paramFlags = parameterFlagStack.peek();
@@ -267,7 +271,10 @@ public final class ExecutionHistoryOperator {
             if (readParamHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readParamHistory, tp.getStart());
             final int end = Time.binarySearchNext(readParamHistory, tp.getEnd());
-            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
+            if (start != end) {
+//                System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection());
+                return ShouldReExecuteResult.RE_EXECUTE;
+            }
         }
 
 
@@ -450,6 +457,7 @@ public final class ExecutionHistoryOperator {
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
         isInExec = true;
+        System.out.println("New: " + identifier);
         final ExecutionHistory history = currentHistory;
         final ExecutionHistory.TimeInfo time = history.getTime(getExecutionContext(identifier));
         if (time != null) history.deleteRecords(time.getStart(), time.getEnd());

@@ -58,7 +58,6 @@ import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
 import com.oracle.truffle.api.instrumentation.ObjectTracker;
 import com.oracle.truffle.api.instrumentation.StackTracker;
 import com.oracle.truffle.api.interop.TruffleObject;
-import com.oracle.truffle.api.nodes.LanguageInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.builtins.SLBuiltinNode;
@@ -80,7 +79,6 @@ import com.oracle.truffle.sl.builtins.SLReadlnBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLStackTraceBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLTypeOfBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistory;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 
 /**

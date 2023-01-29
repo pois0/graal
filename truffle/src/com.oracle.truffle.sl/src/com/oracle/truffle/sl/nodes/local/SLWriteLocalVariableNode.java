@@ -157,7 +157,9 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final ResultAndStrategy.Generic<Object> value = op.calcGeneric(frame, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        }
         return value;
     }
 
@@ -165,7 +167,9 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final ResultAndStrategy.Boolean value = op.calcBoolean(frame, this, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        }
         return value;
     }
 
@@ -173,7 +177,9 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final ResultAndStrategy.Long value = op.calcLong(frame, this, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
+        }
         return value;
     }
 
