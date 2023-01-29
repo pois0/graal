@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
@@ -71,35 +72,42 @@ public abstract class SLSubNode extends SLBinaryNode {
     protected SLBigNumber sub(SLBigNumber left, SLBigNumber right) {
         return new SLBigNumber(left.getValue().subtract(right.getValue()));
     }
-@Override
-    public Object calcGenericInner(VirtualFrame frame) {
+
+    @Override
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        final Object left = op.calcGeneric(frame, getLeftNode());
+        final ResultAndStrategy.Generic<Object> wrappedLeft = op.calcGeneric(frame, getLeftNode());
+        final Object left = wrappedLeft.getResult();
         final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
-        final Object right = op.calcGeneric(frame, getRightNode());
+        final ResultAndStrategy.Generic<Object> wrappedRight = op.calcGeneric(frame, getRightNode());
+        final Object right = wrappedRight.getResult();
         final InteropLibrary rightInterop = INTEROP_LIBRARY.getUncached(right);
 
         try {
+            Object result;
             if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
-                return sub(leftInterop.asLong(left), rightInterop.asLong(right));
+                result = sub(leftInterop.asLong(left), rightInterop.asLong(right));
             } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
-                return sub((SLBigNumber) left, (SLBigNumber) right);
+                result = sub((SLBigNumber) left, (SLBigNumber) right);
             } else {
-                return 0;
+                result = 0;
             }
+            return new ResultAndStrategy.Generic<>(result, wrappedLeft.isFresh() || wrappedRight.isFresh());
         } catch (UnsupportedMessageException e) {
             throw shouldNotReachHere(e);
         }
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        final long left = op.calcLong(frame, this, getLeftNode());
-        final long right = op.calcLong(frame, this, getRightNode());
-        return sub(left, right);
+        final ResultAndStrategy.Long wrappedLeft = op.calcLong(frame, this, getLeftNode());
+        final long left = wrappedLeft.getResult();
+        final ResultAndStrategy.Long wrappedRight = op.calcLong(frame, this, getRightNode());
+        final long right = wrappedRight.getResult();
+        return new ResultAndStrategy.Long(sub(left, right), wrappedLeft.isFresh() || wrappedRight.isFresh());
     }
 
     @Fallback

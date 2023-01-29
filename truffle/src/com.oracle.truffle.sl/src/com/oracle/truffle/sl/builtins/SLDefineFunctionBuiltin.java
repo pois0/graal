@@ -50,6 +50,7 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Builtin function to define (or redefine) functions. The provided source code is parsed the same
@@ -72,13 +73,13 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
         op.startNewExecution(frame, identifier);
         final Object result = executeGeneric(frame);
         op.endNewExecution();
-        return result;
+        return ResultAndStrategy.Generic.fresh(result);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("defineFunction");

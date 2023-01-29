@@ -55,6 +55,7 @@ import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Node to write a local variable to a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -153,26 +154,26 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final Object value = op.calcGeneric(frame, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value, identifier);
+        final ResultAndStrategy.Generic<Object> value = op.calcGeneric(frame, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
         return value;
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final boolean value = op.calcBoolean(frame, this, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value, identifier);
+        final ResultAndStrategy.Boolean value = op.calcBoolean(frame, this, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
         return value;
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final long value = op.calcLong(frame, this, getValueNode());
-        op.rewriteLocalVariable(getSlot(), value, identifier);
+        final ResultAndStrategy.Long value = op.calcLong(frame, this, getValueNode());
+        op.rewriteLocalVariable(getSlot(), value.getResult(), identifier);
         return value;
     }
 

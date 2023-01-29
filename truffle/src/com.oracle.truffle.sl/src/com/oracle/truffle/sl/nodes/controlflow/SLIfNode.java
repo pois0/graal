@@ -105,7 +105,7 @@ public final class SLIfNode extends SLStatementNode {
         ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final SLExpressionNode conditionNode = this.conditionNode;
 
-        if (op.calcBoolean(frame, this, conditionNode)) {
+        if (op.calcBoolean(frame, this, conditionNode).getResult()) {
             if (elsePartNode != null) {
                 op.deleteHistory(elsePartNode.getNodeIdentifier());
             }

@@ -46,6 +46,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Implementation of the SL return statement. We need to unwind an unknown number of interpreter
@@ -81,11 +82,11 @@ public final class SLReturnNode extends SLStatementNode {
     public void calcVoidInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        Object result;
+        ResultAndStrategy.Generic<Object> result;
         if (valueNode != null) {
             result = op.calcGeneric(frame, valueNode);
         } else {
-            result = SLNull.SINGLETON;
+            result = ResultAndStrategy.Generic.fresh(SLNull.SINGLETON);
         }
         throw new SLReturnException(result);
     }

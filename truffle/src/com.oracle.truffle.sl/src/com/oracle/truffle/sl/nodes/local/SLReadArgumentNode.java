@@ -45,6 +45,7 @@ import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.parser.SLNodeFactory;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Reads a function argument. Arguments are passed in as an object array.
@@ -83,15 +84,15 @@ public class SLReadArgumentNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         Object[] args = frame.getArguments();
         if (index < args.length) {
-            return args[index];
+            return ResultAndStrategy.Generic.fresh(args[index]);
         } else {
             /* In the interpreter, record profiling information that the branch was used. */
             outOfBoundsTaken.enter();
             /* Use the default null value. */
-            return SLNull.SINGLETON;
+            return ResultAndStrategy.Generic.fresh(SLNull.SINGLETON);
         }
     }
 

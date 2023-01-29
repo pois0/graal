@@ -46,6 +46,7 @@ import com.oracle.truffle.api.profiles.ConditionProfile;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Logical operations in SL use short circuit evaluation: if the evaluation of the left operand
@@ -95,17 +96,30 @@ public abstract class SLShortCircuitNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return calcBooleanInner(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).generify();
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        boolean leftValue = op.calcBoolean(frame, this, left);
-        boolean rightValue = isEvaluateRight(leftValue) && op.calcBoolean(frame, this, right);
-        return execute(leftValue, rightValue);
+        ResultAndStrategy.Boolean wrappedLeft = op.calcBoolean(frame, this, left);
+        if (wrappedLeft.isFresh()) {
+            if (isEvaluateRight(wrappedLeft.getResult())) {
+                final ResultAndStrategy.Boolean wrappedRight = op.calcBoolean(frame, this, right);
+                return ResultAndStrategy.Boolean.fresh(execute(wrappedLeft.getResult(), wrappedRight.getResult()));
+            } else {
+                return ResultAndStrategy.Boolean.fresh(wrappedLeft.getResult());
+            }
+        } else {
+            if (isEvaluateRight(wrappedLeft.getResult())) {
+                final ResultAndStrategy.Boolean wrappedRight = op.calcBoolean(frame, this, right);
+                return new ResultAndStrategy.Boolean(execute(wrappedLeft.getResult(), wrappedRight.getResult()), wrappedRight.isFresh());
+            } else {
+                return wrappedLeft;
+            }
+        }
     }
 
     /**

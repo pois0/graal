@@ -6,6 +6,7 @@ import com.oracle.truffle.api.instrumentation.ProbeNode;
 import com.oracle.truffle.api.nodes.NodeCost;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 public final class SLExpressionNodeWrapper extends SLExpressionNode implements InstrumentableNode.WrapperNode {
 
@@ -155,8 +156,18 @@ public final class SLExpressionNodeWrapper extends SLExpressionNode implements I
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return this.delegateNode.calcGenericInner(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return delegateNode.calcGenericInner(frame);
+    }
+
+    @Override
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+        return delegateNode.calcBooleanInner(frame);
+    }
+
+    @Override
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+        return delegateNode.calcLongInner(frame);
     }
 
     @Override

@@ -2,6 +2,7 @@ package com.oracle.truffle.sl.runtime.cache;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class ItemWithTime<T> {

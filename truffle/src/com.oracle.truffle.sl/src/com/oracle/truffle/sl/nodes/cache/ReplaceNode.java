@@ -5,6 +5,7 @@ import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 public final class ReplaceNode extends SLExpressionNode {
     @Child private SLExpressionNode delegateNode;
@@ -31,21 +32,21 @@ public final class ReplaceNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
         return op.newExecutionGeneric(getNodeIdentifier(), frame, this);
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
         return op.newExecutionBoolean(getNodeIdentifier(), frame, this);
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
         return op.newExecutionLong(getNodeIdentifier(), frame, this);

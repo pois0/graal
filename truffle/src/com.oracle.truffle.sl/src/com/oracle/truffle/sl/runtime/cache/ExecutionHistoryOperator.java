@@ -225,17 +225,9 @@ public final class ExecutionHistoryOperator {
         if (newlySet) firstHitAtField = currentHistory.getInitialTime();
     }
 
-    public ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
-        final ShouldReExecuteResult shouldReExecuteResult = shouldReExecuteX(node);
-        return shouldReExecuteResult;
-    }
-
-    private ShouldReExecuteResult shouldReExecuteX(SLStatementNode node) {
+    private ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
         if (node.isNewNode()) return ShouldReExecuteResult.NEW_EXECUTE;
-        if (node.hasNewNode()) {
-            System.out.println("Excuse: hasNewNode()");
-            return ShouldReExecuteResult.RE_EXECUTE;
-        }
+        if (node.hasNewNode()) return ShouldReExecuteResult.RE_EXECUTE;
 
         final ExecutionHistory currentHistory = this.currentHistory;
         NodeIdentifier nodeIdentifier = node.getNodeIdentifier();
@@ -249,7 +241,6 @@ public final class ExecutionHistoryOperator {
             for (ItemWithTime<Pair<CallContext.ContextBase, String>> entry : currentHistory.getFunctionEnters(fcStart, tp.getEnd())) {
                 if (functionRegistry.containNewNode(entry.getItem().getRight())) {
                     firstHitAtFunctionCall = entry.getTime();
-                    System.out.println("Excuse: call modified function: " + entry.getItem().getRight() + " @ " + node.getSourceSection());
                     return ShouldReExecuteResult.RE_EXECUTE;
                 }
             }
@@ -265,10 +256,7 @@ public final class ExecutionHistoryOperator {
             if (readVarHistory == null || readVarHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
             final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
-            if (start != end) {
-                System.out.println("Excuse: flagged var / " + varName + " @ " + node.getSourceSection());
-                return ShouldReExecuteResult.RE_EXECUTE;
-            }
+            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
         }
 
         final boolean[] paramFlags = parameterFlagStack.peek();
@@ -279,10 +267,7 @@ public final class ExecutionHistoryOperator {
             if (readParamHistory.isEmpty()) continue;
             final int start = Time.binarySearchWhereInsertTo(readParamHistory, tp.getStart());
             final int end = Time.binarySearchNext(readParamHistory, tp.getEnd());
-            if (start != end) {
-                System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection());
-                return ShouldReExecuteResult.RE_EXECUTE;
-            }
+            if (start != end) return ShouldReExecuteResult.RE_EXECUTE;
         }
 
 
@@ -293,7 +278,7 @@ public final class ExecutionHistoryOperator {
                 HashSet<Object> fields = objectFieldFlags.get(entry.getItem().getObjGenCtx());
                 if (fields != null && fields.contains(entry.getItem().getFieldName())) {
                     firstHitAtField = entry.getTime();
-                    System.out.println("Excuse: flagged Fld / " + entry.getItem().getObjGenCtx() + ", " + entry.getItem().getFieldName() + " @ " + node.getSourceSection());
+//                    System.out.println("Excuse: flagged Fld / " + entry.getItem().getObjGenCtx() + ", " + entry.getItem().getFieldName() + " @ " + node.getSourceSection());
                     return ShouldReExecuteResult.RE_EXECUTE;
                 }
             }
@@ -352,17 +337,17 @@ public final class ExecutionHistoryOperator {
         currentHistory.deleteRecords(getExecutionContext(identifier));
     }
 
-    public Object calcGeneric(VirtualFrame frame, SLExpressionNode node) {
+    public ResultAndStrategy.Generic<Object> calcGeneric(VirtualFrame frame, SLExpressionNode node) {
         final SLExpressionNode unwrapped = node.unwrap();
         if (unwrapped != null) return calcGeneric(frame, unwrapped);
         try {
             switch (shouldReExecute(node)) {
                 case USE_CACHE:
-                    return getReturnedValueOrThrow(node.getNodeIdentifier());
+                    return ResultAndStrategy.Generic.cached(getReturnedValueOrThrow(node.getNodeIdentifier()));
                 case RE_EXECUTE:
                     return reExecuteGeneric(node.getNodeIdentifier(), frame, node);
                 case NEW_EXECUTE:
-                    return newExecutionGeneric(node.getNodeIdentifier(), frame, node);
+                    return ResultAndStrategy.Generic.fresh(newExecutionGeneric(node.getNodeIdentifier(), frame, node));
             }
         } catch (SLReturnException | SLBreakException | SLContinueException e) {
             currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
@@ -374,26 +359,7 @@ public final class ExecutionHistoryOperator {
         throw new RuntimeException("Never reach here");
     }
 
-    public Pair<Object, Boolean> calcGenericParameter(VirtualFrame frame, SLExpressionNode node) {
-        final SLExpressionNode unwrapped = node.unwrap();
-        if (unwrapped != null) return calcGenericParameter(frame, unwrapped);
-        try {
-            switch (shouldReExecute(node)) {
-                case USE_CACHE:
-                    return Pair.create(getReturnedValueOrThrow(node.getNodeIdentifier()), false);
-                case RE_EXECUTE:
-                    return Pair.create(reExecuteGeneric(node.getNodeIdentifier(), frame, node), true);
-                case NEW_EXECUTE:
-                    return Pair.create(newExecutionGeneric(node.getNodeIdentifier(), frame, node), true);
-            }
-        } finally {
-            finishCalc(node);
-        }
-
-        throw new RuntimeException("Never reach here");
-    }
-
-    public boolean calcBoolean(VirtualFrame frame, Node currentNode, SLExpressionNode node) {
+    public ResultAndStrategy.Boolean calcBoolean(VirtualFrame frame, Node currentNode, SLExpressionNode node) {
         final SLExpressionNode unwrapped = node.unwrap();
         if (unwrapped != null) return calcBoolean(frame, currentNode, unwrapped);
         try {
@@ -401,7 +367,7 @@ public final class ExecutionHistoryOperator {
             case USE_CACHE:
                 final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
                 if (obj instanceof Boolean) {
-                    return (boolean) obj;
+                    return ResultAndStrategy.Boolean.cached((Boolean) obj);
                 } else {
                     throw new UnexpectedResultException(obj);
                 }
@@ -419,7 +385,7 @@ public final class ExecutionHistoryOperator {
         throw new RuntimeException("Never reach here");
     }
 
-    public long calcLong(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
+    public ResultAndStrategy.Long calcLong(VirtualFrame frame, SLExpressionNode currentNode, SLExpressionNode node) {
         final SLExpressionNode unwrapped = node.unwrap();
         if (unwrapped != null) return calcLong(frame, currentNode, unwrapped);
         try {
@@ -427,7 +393,7 @@ public final class ExecutionHistoryOperator {
             case USE_CACHE:
                 final Object obj = getReturnedValueOrThrow(node.getNodeIdentifier());
                 if (obj instanceof Long) {
-                    return (long) obj;
+                    return ResultAndStrategy.Long.cached((Long) obj);
                 } else {
                     throw new UnexpectedResultException(obj);
                 }
@@ -457,15 +423,17 @@ public final class ExecutionHistoryOperator {
                 getReturnedValueOrThrow(node.getNodeIdentifier());
                 return;
             case RE_EXECUTE:
-                reExecuteVoid(node.getNodeIdentifier(), frame, node);
-                return;
+                try {
+                    reExecuteVoid(node.getNodeIdentifier(), frame, node);
+                    return;
+                } catch (SLReturnException | SLBreakException | SLContinueException e) {
+                    currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
+                    throw e;
+                }
             case NEW_EXECUTE:
                 newExecutionVoid(node.getNodeIdentifier(), frame, node);
                 return;
             }
-        } catch (SLReturnException | SLBreakException | SLContinueException e) {
-            currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
-            throw e;
         } finally {
             finishCalc(node);
         }
@@ -505,14 +473,14 @@ public final class ExecutionHistoryOperator {
         isInExec = false;
     }
 
-    public Object newExecutionGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+    public ResultAndStrategy.Generic<Object> newExecutionGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
         try {
             final Object result = node.executeGeneric(frame);
             tickNode.onReturnValue(frame, result);
-            return result;
+            return ResultAndStrategy.Generic.fresh(result);
         } catch (Throwable e) {
             tickNode.onReturnExceptional(frame, e);
             throw e;
@@ -522,14 +490,14 @@ public final class ExecutionHistoryOperator {
 
     }
 
-    public boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+    public ResultAndStrategy.Boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
         try {
             final boolean result = node.executeBoolean(frame);
             tickNode.onReturnValue(frame, result);
-            return result;
+            return ResultAndStrategy.Boolean.fresh(result);
         } catch (UnexpectedResultException ex) {
             final SLException slEx = SLException.typeError(node, ex.getResult());
             tickNode.onReturnExceptional(frame, slEx);
@@ -542,14 +510,14 @@ public final class ExecutionHistoryOperator {
         }
     }
 
-    public long newExecutionLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+    public ResultAndStrategy.Long newExecutionLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
         final TickNode tickNode = new TickNode(identifier);
         startNewExecution(frame, identifier);
         tickNode.onEnter(frame);
         try {
             final long result = node.executeLong(frame);
             tickNode.onReturnValue(frame, result);
-            return result;
+            return ResultAndStrategy.Long.fresh(result);
         } catch (UnexpectedResultException ex) {
             final SLException slEx = SLException.typeError(node, ex.getResult());
             tickNode.onReturnExceptional(frame, slEx);
@@ -587,39 +555,39 @@ public final class ExecutionHistoryOperator {
         currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), null);
     }
 
-    public Object reExecuteGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
-        Object value;
+    public ResultAndStrategy.Generic<Object> reExecuteGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
+        ResultAndStrategy.Generic<Object> value;
         try {
             value = node.calcGenericInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value.getResult()));
         return value;
     }
 
-    public boolean reExecuteBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
-        boolean value;
+    public ResultAndStrategy.Boolean reExecuteBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
+        ResultAndStrategy.Boolean value;
         try {
             value = node.calcBooleanInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value.getResult()));
         return value;
     }
 
-    public long reExecuteLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
-        long value;
+    public ResultAndStrategy.Long reExecuteLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) throws UnexpectedResultException {
+        ResultAndStrategy.Long value;
         try {
             value = node.calcLongInner(frame);
         } catch (Throwable e) {
             currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value));
+        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceReference(value.getResult()));
         return value;
     }
 
@@ -863,7 +831,7 @@ public final class ExecutionHistoryOperator {
 
         public void pop() {
             assert pointer >= 0;
-            stack[pointer--] = null;
+            stack[--pointer] = null;
         }
 
         public ExecutionHistory.LocalVarOperator peek() {

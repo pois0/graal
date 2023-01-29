@@ -48,6 +48,7 @@ import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The body of a user-defined SL function. This is the node referenced by a {@link SLRootNode} for
@@ -77,20 +78,6 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
-//        final Object[] args = frame.getArguments();
-//        if (args.length == 0) {
-//            throw new RuntimeException("No argument");
-//        }
-//
-//        final Object arg = args[args.length - 1];
-//        if (!(arg instanceof FunctionCallSpecialParameter)) {
-//            throw new RuntimeException("The last argument is not a instance of FunctionCallSpecialParameter");
-//        }
-//
-//        return getContext().getHistoryOperator().newExecutionGeneric(getNodeIdentifier(), frame, this::executeGenericInner);
-//    }
-//
-//    public Object executeGenericInner(VirtualFrame frame) {
         try {
             /* Execute the function body. */
             bodyNode.executeVoid(frame);
@@ -115,15 +102,21 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         try {
             op.calcVoid(frame, bodyNode);
         } catch (SLReturnException ex) {
-            return ex.getResult();
+            final Object result = ex.getResult();
+            if (result instanceof ResultAndStrategy.Generic) {
+                //noinspection unchecked
+                return (ResultAndStrategy.Generic<Object>) result;
+            } else {
+                return ResultAndStrategy.Generic.cached(result);
+            }
         }
 
-        return SLNull.SINGLETON;
+        return ResultAndStrategy.Generic.fresh(SLNull.SINGLETON);
     }
 
     @Override

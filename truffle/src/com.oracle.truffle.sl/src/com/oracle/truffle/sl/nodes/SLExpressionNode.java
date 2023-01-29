@@ -47,6 +47,7 @@ import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Base class for all SL nodes that produce a value and therefore benefit from type specialization.
@@ -65,7 +66,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
      */
     public abstract Object executeGeneric(VirtualFrame frame);
 
-    public abstract Object calcGenericInner(VirtualFrame frame);
+    public abstract ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame);
 
     /**
      * When we use an expression at places where a {@link SLStatementNode statement} is already
@@ -111,16 +112,28 @@ public abstract class SLExpressionNode extends SLStatementNode {
         return SLTypesGen.expectLong(executeGeneric(frame));
     }
 
-    public long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
-        return SLTypesGen.expectLong(calcGenericInner(frame));
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+        final ResultAndStrategy.Generic<Object> value = calcGenericInner(frame);
+        final long result = SLTypesGen.expectLong(value);
+        if (value.isFresh()) {
+            return ResultAndStrategy.Long.fresh(result);
+        } else {
+            return ResultAndStrategy.Long.cached(result);
+        }
     }
 
     public boolean executeBoolean(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(executeGeneric(frame));
     }
 
-    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
-        return SLTypesGen.expectBoolean(calcGenericInner(frame));
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+        final ResultAndStrategy.Generic<Object> value = calcGenericInner(frame);
+        final boolean result = SLTypesGen.expectBoolean(value);
+        if (value.isFresh()) {
+            return ResultAndStrategy.Boolean.fresh(result);
+        } else {
+            return ResultAndStrategy.Boolean.cached(result);
+        }
     }
 
     @Override

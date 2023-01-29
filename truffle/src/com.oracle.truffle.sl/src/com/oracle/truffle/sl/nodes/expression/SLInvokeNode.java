@@ -57,7 +57,7 @@ import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
-import org.graalvm.collections.Pair;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The node for function invocation in SL. Since SL has first class functions, the {@link SLFunction
@@ -112,13 +112,13 @@ public final class SLInvokeNode extends SLExpressionNode {
 
     @ExplodeLoop
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final SLContext context = getContext();
         final ExecutionHistoryOperator op = context.getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        final Pair<Object, Boolean> functionPair = op.calcGenericParameter(frame, functionNode);
-        final Object function = functionPair.getLeft();
-        boolean shouldRecalc = functionPair.getRight();
+        final ResultAndStrategy.Generic<Object> functionPair = op.calcGeneric(frame, functionNode);
+        final Object function = functionPair.getResult();
+        boolean shouldRecalc = functionPair.isFresh();
 
         /*
          * The number of arguments is constant for one invoke node. During compilation, the loop is
@@ -133,21 +133,22 @@ public final class SLInvokeNode extends SLExpressionNode {
         boolean[] argumentFlags = new boolean[argumentLength];
         argumentValues[argumentLength] = FunctionCallSpecialParameter.CALC;
         for (int i = 0; i < argumentNodes.length; i++) {
-            final Pair<Object, Boolean> parameter = op.calcGenericParameter(frame, argumentNodes[i]);
-            argumentValues[i] = parameter.getLeft();
-            argumentFlags[i] = parameter.getRight();
-            shouldRecalc |= argumentFlags[i];
+            final ResultAndStrategy.Generic<Object> parameter = op.calcGeneric(frame, argumentNodes[i]);
+            argumentValues[i] = parameter.getResult();
+            final boolean isFresh = parameter.isFresh();
+            argumentFlags[i] = isFresh;
+            shouldRecalc |= isFresh;
         }
 
         if (!shouldRecalc && !context.getHistoryOperator().checkContainsNewNodeInFunctionCalls(getNodeIdentifier())) {
-            final Object returnedValueOrThrow = op.getReturnedValueOrThrow(identifier);
-            return returnedValueOrThrow;
+            // Never reach here? TODO
+            return ResultAndStrategy.Generic.cached(op.getReturnedValueOrThrow(identifier));
         }
 
         op.onEnterFunction(identifier, ((SLFunction) function).getName(), argumentLength, true);
         try {
             op.pushArgumentFlags(argumentFlags);
-            return library.execute(function, argumentValues);
+            return (ResultAndStrategy.Generic<Object>) library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, function);

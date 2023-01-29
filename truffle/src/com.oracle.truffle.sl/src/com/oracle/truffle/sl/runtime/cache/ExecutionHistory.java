@@ -72,6 +72,7 @@ public final class ExecutionHistory {
 
     public void onUpdateObjectWithHash(Time time, Time objGenTime, String fieldName, Object newValue) {
         HashMap<String, ArrayList<ItemWithTime<Object>>> stringArrayListHashMap = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
+        assert stringArrayListHashMap != null;
         stringArrayListHashMap
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
                 .add(new ItemWithTime<>(time, newValue));
@@ -141,8 +142,7 @@ public final class ExecutionHistory {
         final Time endPrev = getTime(exclusiveEnd).getEnd();
         final int endI = ItemWithTime.binarySearchPrev(timeToContext, endPrev);
 
-        if (startI > endI) return;
-
+        if (startI >= endI) return;
         final Time startTime = timeToContext.get(startI).getTime();
         final Time endTime = timeToContext.get(endI).getTime();
         deleteRecords(startTime, endTime);
@@ -153,7 +153,6 @@ public final class ExecutionHistory {
      * @param endTime inclusive
      */
     public void deleteRecords(Time startTime, Time endTime) {
-        // delete timeToContext and contextToTime
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
         for (ItemWithTime<ExecutionContext> e : contexts) {
             final ExecutionContext ctx = e.getItem();
@@ -323,7 +322,7 @@ public final class ExecutionHistory {
                 '}';
     }
 
-    public static class TimeInfo {
+    public final static class TimeInfo {
         private final Time start;
         private final Time end;
         private Object value;

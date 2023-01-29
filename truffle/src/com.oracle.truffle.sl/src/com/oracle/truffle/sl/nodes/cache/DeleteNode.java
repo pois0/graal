@@ -5,6 +5,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 public final class DeleteNode extends SLExpressionNode {
     private final NodeIdentifier deleted;
@@ -19,10 +20,10 @@ public final class DeleteNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         op.deleteHistory(deleted);
-        return executeGeneric(frame);
+        return ResultAndStrategy.Generic.fresh(executeGeneric(frame));
     }
 
     @Override

@@ -137,7 +137,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
         final ExecutionHistoryOperator op = context.getHistoryOperator();
 
         boolean result;
-        if (!op.calcBoolean(frame, this, conditionNode)) {
+        if (!op.calcBoolean(frame, this, conditionNode).getResult()) {
             result = false;
         } else {
             try {

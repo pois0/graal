@@ -44,8 +44,7 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * A {@link SLExpressionNode} that represents a parenthesized expression; it simply returns the
@@ -78,17 +77,17 @@ public class SLParenExpressionNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         return getContext().getHistoryOperator().calcGeneric(frame, expression);
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
         return getContext().getHistoryOperator().calcBoolean(frame, this, expression);
     }
 
     @Override
-    public long calcLongInner(VirtualFrame frame) {
+    public ResultAndStrategy.Long calcLongInner(VirtualFrame frame) {
         return getContext().getHistoryOperator().calcLong(frame, this, expression);
     }
 

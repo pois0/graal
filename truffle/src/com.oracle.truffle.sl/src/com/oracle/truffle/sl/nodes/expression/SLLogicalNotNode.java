@@ -45,10 +45,9 @@ import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
-import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Example of a simple unary node that uses type specialization. See {@link SLAddNode} for
@@ -66,13 +65,14 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return calcBooleanInner(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).generify();
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) {
-        return !getContext().getHistoryOperator().calcBoolean(frame, this, getValueNode());
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) {
+        final ResultAndStrategy.Boolean childResult = getContext().getHistoryOperator().calcBoolean(frame, this, getValueNode());
+        return new ResultAndStrategy.Boolean(!childResult.getResult(), childResult.isFresh());
     }
 
     @Fallback

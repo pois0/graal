@@ -49,13 +49,12 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
-import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The {@code ==} operator of SL is defined on all types. Therefore, we need a
@@ -158,17 +157,19 @@ public abstract class SLEqualNode extends SLBinaryNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return calcBooleanInner(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).generify();
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        final Object left = op.calcGeneric(frame, getLeftNode());
-        final Object right = op.calcGeneric(frame, getRightNode());
-        return doGeneric(left, right, INTEROP_LIBRARY.getUncached(left), INTEROP_LIBRARY.getUncached(right));
+        final ResultAndStrategy.Generic<Object> left = op.calcGeneric(frame, getLeftNode());
+        final ResultAndStrategy.Generic<Object> right = op.calcGeneric(frame, getRightNode());
+        return new ResultAndStrategy.Boolean(
+                doGeneric(left.getResult(), right.getResult(), INTEROP_LIBRARY.getUncached(left), INTEROP_LIBRARY.getUncached(right)),
+                left.isFresh() || right.isFresh());
     }
 
 }

@@ -50,6 +50,7 @@ import com.oracle.truffle.api.instrumentation.StandardTags.ReadVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Node to read a local variable from a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -119,8 +120,8 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return getContext().getHistoryOperator().getVariableValue(slotIdentifier, getNodeIdentifier());
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return ResultAndStrategy.Generic.fresh(getContext().getHistoryOperator().getVariableValue(slotIdentifier, getNodeIdentifier()));
     }
 
     @Override

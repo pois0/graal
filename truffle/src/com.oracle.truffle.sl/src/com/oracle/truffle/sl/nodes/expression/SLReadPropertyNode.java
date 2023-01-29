@@ -56,6 +56,7 @@ import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The node for reading a property of an object. When executed, this node:
@@ -107,14 +108,16 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
 
-        final Object receiver = op.calcGeneric(frame, getReceiverNode());
-        final Object fldName = op.calcGeneric(frame, getNameNode());
+        final ResultAndStrategy.Generic<Object> receiver = op.calcGeneric(frame, getReceiverNode());
+        final ResultAndStrategy.Generic<Object> fldName = op.calcGeneric(frame, getNameNode());
 
-        return op.getFieldValue(receiver, (String) fldName, identifier);
+        return new ResultAndStrategy.Generic<>(
+                op.getFieldValue(receiver.getResult(), (String) fldName.getResult(), identifier),
+                receiver.isFresh() || fldName.isFresh());
     }
 
     @Override

@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Base class for all builtin functions. It contains the Truffle DSL annotation {@link NodeChild}
@@ -86,8 +87,8 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return executeGeneric(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return ResultAndStrategy.Generic.fresh(executeGeneric(frame));
     }
 
     @Override

@@ -47,11 +47,11 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.nodes.NodeInfo;
-import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigNumber;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 
@@ -74,31 +74,36 @@ public abstract class SLLessThanNode extends SLBinaryNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
-        return calcBooleanInner(frame);
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).generify();
     }
 
     @Override
-    public boolean calcBooleanInner(VirtualFrame frame) {
+    public ResultAndStrategy.Boolean calcBooleanInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
 
-        final Object left = op.calcGeneric(frame, getLeftNode());
+        final ResultAndStrategy.Generic<Object> wrappedLeft = op.calcGeneric(frame, getLeftNode());
+        final Object left = wrappedLeft.getResult();
         final InteropLibrary leftInterop = INTEROP_LIBRARY.getUncached(left);
-        final Object right = op.calcGeneric(frame, getRightNode());
+        final ResultAndStrategy.Generic<Object> wrappedRight = op.calcGeneric(frame, getRightNode());
+        final Object right = wrappedRight.getResult();
         final InteropLibrary rightInterop = INTEROP_LIBRARY.getUncached(right);
 
         try {
+            boolean result;
             if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
-                return lessThan(leftInterop.asLong(left), rightInterop.asLong(right));
+                result = lessThan(leftInterop.asLong(left), rightInterop.asLong(right));
             } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
-                return lessThan((SLBigNumber) left, (SLBigNumber) right);
+                result = lessThan((SLBigNumber) left, (SLBigNumber) right);
             } else {
                 typeError(left, right);
-                return false;
+                result = false;
             }
+            return new ResultAndStrategy.Boolean(result, wrappedLeft.isFresh() || wrappedRight.isFresh());
         } catch (UnsupportedMessageException ex) {
             throw shouldNotReachHere(ex);
         }
+
     }
 
     @Fallback

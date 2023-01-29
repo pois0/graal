@@ -44,6 +44,7 @@ import com.oracle.truffle.api.TruffleLanguage.ContextReference;
 import com.oracle.truffle.api.dsl.CachedContext;
 import com.oracle.truffle.api.dsl.CachedLanguage;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.ArityException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
@@ -55,6 +56,7 @@ import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * Built-in function to create a new object. Objects in SL are simply made up of name/value pairs.
@@ -77,6 +79,12 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
             /* Foreign access was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, obj);
         }
+    }
+
+    @Override
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        // TODO
+        return super.calcGenericInner(frame);
     }
 
     private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("new");

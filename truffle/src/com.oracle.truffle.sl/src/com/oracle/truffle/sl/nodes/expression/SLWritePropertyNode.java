@@ -59,6 +59,7 @@ import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The node for writing a property of an object. When executed, this node:
@@ -117,14 +118,17 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
     }
 
     @Override
-    public Object calcGenericInner(VirtualFrame frame) {
+    public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
         final NodeIdentifier identifier = getNodeIdentifier();
-        final Object receiver = op.calcGeneric(frame, getReceiverNode());
-        final Object name = op.calcGeneric(frame, getNameNode());
-        final Object value = op.calcGeneric(frame, getValueNode());
-        op.rewriteObjectField(receiver, (String) name, value, identifier);
-        return value;
+        final ResultAndStrategy.Generic<Object> receiver = op.calcGeneric(frame, getReceiverNode());
+        final ResultAndStrategy.Generic<Object> name = op.calcGeneric(frame, getNameNode());
+        final ResultAndStrategy.Generic<Object> value = op.calcGeneric(frame, getValueNode());
+        if (receiver.isFresh() || name.isFresh() || value.isFresh()) {
+            op.rewriteObjectField(receiver.getResult(), (String) name.getResult(), value.getResult(), identifier);
+            return ResultAndStrategy.Generic.fresh(value);
+        }
+        return ResultAndStrategy.Generic.cached(value);
     }
 
     @Override
