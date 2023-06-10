@@ -100,4 +100,20 @@ public final class SLWhileNode extends SLStatementNode {
         SLWhileRepeatingNode repeatingNode = (SLWhileRepeatingNode) loopNode.getRepeatingNode();
         return repeatingNode.hasNewNode();
     }
+
+    @Override
+    public int getSize() {
+        return ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).getBodyNode().getSize();
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        SLStatementNode bodyNode = ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).getBodyNode();
+        if (i < bodyNode.getSize()) {
+            bodyNode.handleAsReplaced(i);
+            return;
+        }
+
+        throw new IllegalStateException();
+    }
 }

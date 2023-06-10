@@ -65,7 +65,8 @@ import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 @NodeField(name = "slot", type = FrameSlot.class)
 public abstract class SLReadLocalVariableNode extends SLExpressionNode {
 
-    private final Object slotIdentifier;
+//    private final Object slotIdentifier;
+    public final Object slotIdentifier;
 
     protected SLReadLocalVariableNode(Object slotIdentifier) {
         this.slotIdentifier = slotIdentifier;

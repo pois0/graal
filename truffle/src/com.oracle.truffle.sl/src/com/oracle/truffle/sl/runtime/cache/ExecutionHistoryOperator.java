@@ -316,7 +316,15 @@ public final class ExecutionHistoryOperator {
         return revertObject(varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).getItem());
     }
 
+    public void getVariableTable(Object varName, NodeIdentifier identifier) {
+        final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
+        //noinspection DataFlowIssue
+        final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get((String) varName);
+    }
+
     public Object getFieldValue(Object obj, String fieldName, NodeIdentifier identifier) {
+        if (!(obj instanceof SLObject)) throw new IllegalStateException();
+
         final Time objGenTime = objToCtx.get((SLObject) obj);
         final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
         final HashMap<String, ArrayList<ItemWithTime<Object>>> objectHistory = currentHistory.getObjectHistory(objGenTime);
@@ -332,11 +340,15 @@ public final class ExecutionHistoryOperator {
         localVarFlagStack.peek().add(varName);
     }
 
-    public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier) {
+    public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier, boolean fieldChanged) {
         final Time objGenTime = objToCtx.get((SLObject) receiver);
-        currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenTime, fieldName, replaceReference(value));
+        final ExecutionHistory.ObjectUpdate prevUpdate = currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenTime, fieldName, replaceReference(value), fieldChanged);
         final boolean newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
+        if (prevUpdate != null) {
+            objectFieldFlags.computeIfAbsent(prevUpdate.getObjectGenCtx(), it -> new HashSet<>())
+                    .add(prevUpdate.getFieldName());
+        }
         if (newlySet) firstHitAtField = currentHistory.getInitialTime();
     }
 
@@ -457,7 +469,7 @@ public final class ExecutionHistoryOperator {
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
         isInExec = true;
-        System.out.println("New: " + identifier);
+//        System.out.println("New: " + identifier);
         final ExecutionHistory history = currentHistory;
         final ExecutionHistory.TimeInfo time = history.getTime(getExecutionContext(identifier));
         if (time != null) history.deleteRecords(time.getStart(), time.getEnd());
@@ -495,7 +507,6 @@ public final class ExecutionHistoryOperator {
         } finally {
             endNewExecution();
         }
-
     }
 
     public ResultAndStrategy.Boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {

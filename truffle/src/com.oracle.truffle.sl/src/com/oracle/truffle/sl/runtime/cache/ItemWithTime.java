@@ -148,6 +148,26 @@ public class ItemWithTime<T> {
         return null;
     }
 
+    public static <T> int binarySearchJustIndex(ArrayList<ItemWithTime<T>> list, Time time) {
+        int low = 0;
+        int high = list.size() - 1;
+
+        while (low <= high) {
+            final int mid = (low + high) >>> 1;
+            final ItemWithTime<T> midEntry = list.get(mid);
+            final Time midVal = midEntry.time;
+            int cmp = midVal.compareTo(time);
+
+            if (cmp < 0)
+                low = mid + 1;
+            else if (cmp > 0)
+                high = mid - 1;
+            else
+                return mid;
+        }
+        return -1;
+    }
+
     /** both inclusive */
     public static <T> List<ItemWithTime<T>> subList(ArrayList<ItemWithTime<T>> list, Time startTime, Time endTime) {
         final int start = binarySearchWhereInsertTo(list, startTime);

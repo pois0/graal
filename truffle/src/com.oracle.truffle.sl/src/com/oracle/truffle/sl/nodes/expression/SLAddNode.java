@@ -47,6 +47,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
+import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
@@ -139,10 +140,10 @@ public abstract class SLAddNode extends SLBinaryNode {
                 result = add(leftInterop.asLong(left), rightInterop.asLong(right));
             } else if (left instanceof SLBigNumber && right instanceof SLBigNumber) {
                 result = add((SLBigNumber) left, (SLBigNumber) right);
-            } else if (leftInterop.isString(left) && rightInterop.isString(right)) {
-                result = add(leftInterop.asString(left), rightInterop.asString(right));
+            } else if (isString(left, right)) {
+                result = add(left, right);
             } else {
-                result = 0;
+                result = 0L;
             }
             return new ResultAndStrategy.Generic<>(result, wrappedLeft.isFresh() || wrappedRight.isFresh());
         } catch (UnsupportedMessageException e) {

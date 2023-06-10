@@ -52,6 +52,7 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.library.LibraryFactory;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.nodes.local.SLReadLocalVariableNodeGen;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import com.oracle.truffle.sl.runtime.cache.ExecutionHistoryOperator;
@@ -116,7 +117,7 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
         final ResultAndStrategy.Generic<Object> fldName = op.calcGeneric(frame, getNameNode());
 
         return new ResultAndStrategy.Generic<>(
-                op.getFieldValue(receiver.getResult(), (String) fldName.getResult(), identifier),
+                op.getFieldValue(receiver.getResult(), fldName.getResult().toString(), identifier),
                 receiver.isFresh() || fldName.isFresh());
     }
 

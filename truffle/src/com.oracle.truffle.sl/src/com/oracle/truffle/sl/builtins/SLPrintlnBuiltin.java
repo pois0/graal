@@ -70,5 +70,4 @@ public abstract class SLPrintlnBuiltin extends SLBuiltinNode {
         context.getOutput().println(interop.toDisplayString(SLLanguageView.forValue(value)));
         return value;
     }
-
 }

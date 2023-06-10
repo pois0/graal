@@ -45,7 +45,7 @@ package com.oracle.truffle.sl.parser;
 // DO NOT MODIFY - generated from SimpleLanguage.g4 using "mx create-sl-parser"
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;import java.util.List;
 import java.util.Map;
 
 import com.oracle.truffle.api.source.Source;
@@ -54,7 +54,7 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
-import com.oracle.truffle.sl.parser.SLParseError;
+import com.oracle.truffle.sl.nodes.controlflow.SLBlockNode;import com.oracle.truffle.sl.parser.SLParseError;
 
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -66,10 +66,11 @@ import org.graalvm.collections.Pair;
 import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
-import java.util.Set;
+import java.util.Random;import java.util.Set;import static com.oracle.truffle.sl.parser.SimpleLanguageParserSupport.getMapSetPair;
 
 @SuppressWarnings("all")
 public class SimpleLanguageParser extends Parser {
+
 	static { RuntimeMetaData.checkVersion("4.7.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
@@ -161,7 +162,7 @@ public class SimpleLanguageParser extends Parser {
 	public ATN getATN() { return _ATN; }
 
 
-	private SLNodeFactory factory;
+	SLNodeFactory factory;
 	private Source source;
 
 	private static final class BailoutErrorListener extends BaseErrorListener {
@@ -198,7 +199,8 @@ public class SimpleLanguageParser extends Parser {
 	    parser.factory = new SLNodeFactory(language, source);
 	    parser.source = source;
 	    parser.simplelanguage();
-	    return org.graalvm.collections.Pair.create(parser.factory.getAllFunctions(), parser.factory.getFunctionContainsNewNode());
+
+		return getMapSetPair(parser);
 	}
 
 	public SimpleLanguageParser(TokenStream input) {

@@ -118,7 +118,6 @@ public final class SLInvokeNode extends SLExpressionNode {
         final NodeIdentifier identifier = getNodeIdentifier();
         final ResultAndStrategy.Generic<Object> functionPair = op.calcGeneric(frame, functionNode);
         final Object function = functionPair.getResult();
-        boolean shouldRecalc = functionPair.isFresh();
 
         /*
          * The number of arguments is constant for one invoke node. During compilation, the loop is
@@ -137,17 +136,12 @@ public final class SLInvokeNode extends SLExpressionNode {
             argumentValues[i] = parameter.getResult();
             final boolean isFresh = parameter.isFresh();
             argumentFlags[i] = isFresh;
-            shouldRecalc |= isFresh;
-        }
-
-        if (!shouldRecalc && !context.getHistoryOperator().checkContainsNewNodeInFunctionCalls(getNodeIdentifier())) {
-            // Never reach here? TODO
-            return ResultAndStrategy.Generic.cached(op.getReturnedValueOrThrow(identifier));
         }
 
         op.onEnterFunction(identifier, ((SLFunction) function).getName(), argumentLength, true);
         try {
             op.pushArgumentFlags(argumentFlags);
+            //noinspection unchecked
             return (ResultAndStrategy.Generic<Object>) library.execute(function, argumentValues);
         } catch (ArityException | UnsupportedTypeException | UnsupportedMessageException e) {
             /* Execute was not successful. */

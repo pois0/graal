@@ -68,4 +68,14 @@ public final class SLBreakNode extends SLStatementNode {
     protected boolean hasNewChildNode() {
         return false;
     }
+
+    @Override
+    public int getSize() {
+        return 0;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        throw new UnsupportedOperationException();
+    }
 }

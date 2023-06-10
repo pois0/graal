@@ -135,6 +135,7 @@ s='('
     )*
 )?
 ')'
+('@')?                                          { factory.dontFlag(); }
 body=block[false]                               { factory.finishFunction($body.result); }
 ;
 

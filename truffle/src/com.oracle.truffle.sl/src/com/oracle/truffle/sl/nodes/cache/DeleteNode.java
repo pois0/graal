@@ -16,13 +16,13 @@ public final class DeleteNode extends SLExpressionNode {
 
     @Override
     public Object executeGeneric(VirtualFrame frame) {
+        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
+        op.deleteHistory(deleted);
         return SLNull.SINGLETON;
     }
 
     @Override
     public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
-        final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        op.deleteHistory(deleted);
         return ResultAndStrategy.Generic.fresh(executeGeneric(frame));
     }
 

@@ -12,7 +12,7 @@ public final class ExecutionHistory {
     private final ArrayList<ItemWithTime<ExecutionContext>> timeToContext = new ArrayList<>(100_000);
     private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo>> contextToTime = new HashMap<>();
     private final ArrayList<ItemWithTime<ReadObjectField>> objectReadList = new ArrayList<>(100_000);
-    private final ArrayList<ItemWithTime<HashMap<String, ArrayList<ItemWithTime<Object>>>>> objectUpdateMap = new ArrayList<>(100_000);
+    private final HashMap<Time, HashMap<String, ArrayList<ItemWithTime<Object>>>> objectUpdateMap = new HashMap<>();
     private final ArrayList<ItemWithTime<ObjectUpdate>> objectUpdateList = new ArrayList<>(100_000);
     private final HashMap<CallContext.ContextBase, LocalVarOperator> localVarInfo = new HashMap<>(10_000);
     private final ArrayList<ItemWithTime<Pair<CallContext.ContextBase, String>>> functionCalls = new ArrayList<>(2_500);
@@ -48,22 +48,35 @@ public final class ExecutionHistory {
         varList.set(i1, new ItemWithTime<>(time, value));
     }
 
-    public void rewriteObjectField(ExecutionContext ctx, Time objGenTime, String fieldName, Object value) {
+    public ObjectUpdate rewriteObjectField(ExecutionContext ctx, Time objGenTime, String fieldName, Object value, boolean fieldChanged) {
         final Time time = getTime(ctx).getEnd();
         final int i = ItemWithTime.binarySearchApproximately(objectUpdateList, time);
         assert i >= 0;
-        objectUpdateList.set(i, new ItemWithTime<>(time, new ObjectUpdate(objGenTime, fieldName, value)));
-        final HashMap<String, ArrayList<ItemWithTime<Object>>> update = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
-        assert update != null;
-        final ArrayList<ItemWithTime<Object>> fieldList = update.get(fieldName);
+
+        final ItemWithTime<ObjectUpdate> prev = objectUpdateList.set(i, new ItemWithTime<>(time, new ObjectUpdate(objGenTime, fieldName, value)));
+        final ArrayList<ItemWithTime<Object>> fieldList = objectUpdateMap.get(objGenTime).get(fieldName);
         assert fieldList != null;
-        final int i1 = ItemWithTime.binarySearchApproximately(fieldList, time);
-        assert i1 >= 0;
-        fieldList.set(i1, new ItemWithTime<>(time, value));
+
+        if (fieldChanged) {
+            final ObjectUpdate prevItem = prev.getItem();
+            final ArrayList<ItemWithTime<Object>> prevHistory = objectUpdateMap.get(prevItem.objectGenCtx)
+                    .get(prevItem.fieldName);
+            final int removeIndex = ItemWithTime.binarySearchJustIndex(prevHistory, time);
+            prevHistory.remove(removeIndex);
+            final int i1 = ItemWithTime.binarySearchWhereInsertTo(fieldList, time);
+            assert i1 >= 0;
+            fieldList.add(i1, new ItemWithTime<>(time, value));
+            return prevItem;
+        } else {
+            final int i1 = ItemWithTime.binarySearchApproximately(fieldList, time);
+            assert i1 >= 0;
+            fieldList.set(i1, new ItemWithTime<>(time, value));
+            return null;
+        }
     }
 
     public void onCreateObject(Time time) {
-        objectUpdateMap.add(new ItemWithTime<>(time, new HashMap<>()));
+        objectUpdateMap.put(time, new HashMap<>());
     }
 
     public void onReadObjectField(Time time, Time objGenTime, Object field) {
@@ -71,9 +84,7 @@ public final class ExecutionHistory {
     }
 
     public void onUpdateObjectWithHash(Time time, Time objGenTime, String fieldName, Object newValue) {
-        HashMap<String, ArrayList<ItemWithTime<Object>>> stringArrayListHashMap = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
-        assert stringArrayListHashMap != null;
-        stringArrayListHashMap
+        objectUpdateMap.computeIfAbsent(objGenTime, it -> new HashMap<>())
                 .computeIfAbsent(fieldName, it -> new ArrayList<>())
                 .add(new ItemWithTime<>(time, newValue));
         objectUpdateList.add(new ItemWithTime<>(time, new ObjectUpdate(objGenTime, fieldName, newValue)));
@@ -117,7 +128,7 @@ public final class ExecutionHistory {
     }
 
     public HashMap<String, ArrayList<ItemWithTime<Object>>> getObjectHistory(Time objGenTime) {
-        return ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
+        return objectUpdateMap.get(objGenTime);
     }
 
     public Time getInitialTime() {
@@ -131,6 +142,7 @@ public final class ExecutionHistory {
     }
 
     public void deleteRecords(ExecutionContext context) {
+//        System.out.println("delete records!: " + context);
         final TimeInfo tp = getTime(context);
         if (tp == null) return;
         deleteRecords(tp.start, tp.end);
@@ -153,6 +165,7 @@ public final class ExecutionHistory {
      * @param endTime inclusive
      */
     public void deleteRecords(Time startTime, Time endTime) {
+        System.out.println("deleteRecordsBase: " + startTime + " ~ " + endTime);
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
         for (ItemWithTime<ExecutionContext> e : contexts) {
             final ExecutionContext ctx = e.getItem();
@@ -172,9 +185,8 @@ public final class ExecutionHistory {
                     .add(item.getFieldName());
         }
         for (Map.Entry<Time, HashSet<String>> entry : updatedFields.entrySet()) {
-            HashMap<String, ArrayList<ItemWithTime<Object>>> map = ItemWithTime.binarySearchJust(objectUpdateMap, entry.getKey());
+            HashMap<String, ArrayList<ItemWithTime<Object>>> map = objectUpdateMap.get(entry.getKey());
             for (String field : entry.getValue()) {
-                //noinspection DataFlowIssue
                 ItemWithTime.subList(map.get(field), startTime, endTime).clear();
             }
         }
@@ -204,7 +216,7 @@ public final class ExecutionHistory {
         final HashSet<String> vars = new HashSet<>();
         for (ItemWithTime<LocalVariableUpdate> e : writeVarList) {
             final LocalVariableUpdate item = e.getItem();
-            vars.add(item.varName);
+            vars.add(item.getVarName());
         }
         writeVarList.clear();
         for (String varName : vars) {
@@ -233,19 +245,19 @@ public final class ExecutionHistory {
                 return base;
             });
         }
-        contextToTime.putAll(other.contextToTime);
 
         // merge objectReadList
         ItemWithTime.merge(objectReadList, other.objectReadList, initialTime);
 
         // merge objectUpdateMap
-        final int oumStart = ItemWithTime.binarySearchWhereInsertTo(other.objectUpdateMap, initialTime);
-        final int oumEnd = ItemWithTime.binarySearchNext(other.objectUpdateMap, endTime);
-        final int oumIP = ItemWithTime.binarySearchWhereInsertTo(objectUpdateMap, initialTime);
-        objectUpdateMap.addAll(oumIP, other.objectUpdateMap.subList(oumStart, oumEnd));
-        final int otherOumSize = other.objectUpdateMap.size();
-        for (int i = 0; i < oumStart; i++) mergeObjectUpdateMap(other, initialTime, i);
-        for (int i = oumEnd; i < otherOumSize; i++) mergeObjectUpdateMap(other, initialTime, i);
+        for (Map.Entry<Time, HashMap<String, ArrayList<ItemWithTime<Object>>>> entry : other.objectUpdateMap.entrySet()) {
+            objectUpdateMap.merge(entry.getKey(), entry.getValue(), (base, otherValue) -> {
+                for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> fieldEntry : otherValue.entrySet()) {
+                    base.merge(fieldEntry.getKey(), fieldEntry.getValue(), (baseEntry, otherEntry) -> ItemWithTime.merge(baseEntry, otherEntry, initialTime));
+                }
+                return base;
+            });
+        }
 
         // merge objectUpdateList
         ItemWithTime.merge(objectUpdateList, other.objectUpdateList, initialTime);
@@ -289,24 +301,6 @@ public final class ExecutionHistory {
         ItemWithTime.merge(functionCalls, other.functionCalls, initialTime);
 
         return this;
-    }
-
-    private void mergeObjectUpdateMap(ExecutionHistory other, Time initialTime, int i) {
-        final ItemWithTime<HashMap<String, ArrayList<ItemWithTime<Object>>>> entry = other.objectUpdateMap.get(i);
-        final Time objGenTime = entry.getTime();
-        final HashMap<String, ArrayList<ItemWithTime<Object>>> thatObjHistory = entry.getItem();
-        final HashMap<String, ArrayList<ItemWithTime<Object>>> thisObjHistory = ItemWithTime.binarySearchJust(objectUpdateMap, objGenTime);
-        assert thisObjHistory != null;
-        for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> e : thatObjHistory.entrySet()) {
-            String fldName = e.getKey();
-            ArrayList<ItemWithTime<Object>> fldHistory = e.getValue();
-
-            thisObjHistory.merge(
-                    fldName,
-                    fldHistory,
-                    (thisFldHistory, thatFldHistory) -> ItemWithTime.merge(thisFldHistory, thatFldHistory, initialTime)
-            );
-        }
     }
 
     @Override
@@ -455,7 +449,7 @@ public final class ExecutionHistory {
         }
     }
 
-    private final static class ObjectUpdate {
+    public final static class ObjectUpdate {
         private final Time objectGenCtx;
         private final String fieldName;
         private final Object newValue;

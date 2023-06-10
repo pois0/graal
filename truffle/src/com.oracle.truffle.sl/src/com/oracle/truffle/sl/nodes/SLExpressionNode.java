@@ -140,4 +140,14 @@ public abstract class SLExpressionNode extends SLStatementNode {
     public SLExpressionNode unwrap() {
         return null;
     }
+
+    @Override
+    public int getSize() {
+        return 0;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        throw new UnsupportedOperationException();
+    }
 }

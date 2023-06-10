@@ -57,7 +57,6 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.cache.NodeIdentifier;
-import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * The base class of all Truffle nodes for SL. All nodes (even expressions) can be used as
@@ -275,4 +274,8 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
     public SLStatementNode unwrap() {
         return null;
     }
+
+    public abstract int getSize();
+
+    public abstract void handleAsReplaced(int i);
 }

@@ -73,4 +73,14 @@ public final class SLStatementNodeWrapper extends SLStatementNode implements Wra
     public SLStatementNode unwrap() {
         return delegateNode;
     }
+
+    @Override
+    public int getSize() {
+        return delegateNode.getSize();
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        delegateNode.handleAsReplaced(i);
+    }
 }

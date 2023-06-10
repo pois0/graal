@@ -102,6 +102,7 @@ import com.oracle.truffle.sl.nodes.local.SLReadLocalVariableNodeGen;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNodeGen;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import org.graalvm.collections.Pair;
 
 /**
  * Helper class used by the SL {@link Parser} to create nodes. The code is factored out of the
@@ -130,9 +131,12 @@ public class SLNodeFactory {
     /* State while parsing a source unit. */
     private final Source source;
     private final Map<String, RootCallTarget> allFunctions;
+
+    final ArrayList<Pair<String, SLBlockNode>> flaggableFunctions;
     private final Set<String> functionContainsNewNode;
 
     /* State while parsing a function. */
+    private boolean notFlag;
     private int functionStartPos;
     private String functionName;
     private boolean containsNewNode;
@@ -153,6 +157,7 @@ public class SLNodeFactory {
         this.source = source;
         this.allFunctions = new HashMap<>();
         this.functionContainsNewNode = new HashSet<>();
+        this.flaggableFunctions = new ArrayList<>();
     }
 
     public Map<String, RootCallTarget> getAllFunctions() {
@@ -170,6 +175,7 @@ public class SLNodeFactory {
         assert parameterCount == 0;
         assert frameDescriptor == null;
         assert lexicalScope == null;
+        assert !notFlag;
 
         functionStartPos = nameToken.getStartIndex();
         functionName = nameToken.getText();
@@ -181,6 +187,10 @@ public class SLNodeFactory {
         inNewExp = false;
         containsNewNode = false;
         startBlock();
+    }
+
+    public void dontFlag() {
+        notFlag = true;
     }
 
     public void addFormalParameter(Token nameToken) {
@@ -205,7 +215,7 @@ public class SLNodeFactory {
             methodNodes.add(bodyNode);
             final int bodyEndPos = bodyNode.getSourceEndIndex();
             final SourceSection functionSrc = source.createSection(functionStartPos, bodyEndPos - functionStartPos);
-            final SLStatementNode methodBlock = finishBlock(methodNodes, parameterCount, functionBodyStartPos, bodyEndPos - functionBodyStartPos);
+            final SLBlockNode methodBlock = finishBlock(methodNodes, parameterCount, functionBodyStartPos, bodyEndPos - functionBodyStartPos);
             assert lexicalScope == null : "Wrong scoping of blocks in parser";
 
             final SLFunctionBodyNode functionBodyNode = new SLFunctionBodyNode(methodBlock);
@@ -215,6 +225,7 @@ public class SLNodeFactory {
             final SLRootNode rootNode = new SLRootNode(language, frameDescriptor, functionBodyNode, functionSrc, functionName);
             allFunctions.put(functionName, Truffle.getRuntime().createCallTarget(rootNode));
             if (containsNewNode) functionContainsNewNode.add(functionName);
+            if (!notFlag) flaggableFunctions.add(Pair.create(functionName, methodBlock));
         }
 
         functionStartPos = 0;
@@ -223,6 +234,7 @@ public class SLNodeFactory {
         parameterCount = 0;
         frameDescriptor = null;
         lexicalScope = null;
+        notFlag = false;
     }
 
     public void startBlock() {
@@ -233,7 +245,7 @@ public class SLNodeFactory {
         return finishBlock(bodyNodes, 0, startPos, length);
     }
 
-    public SLStatementNode finishBlock(List<SLStatementNode> bodyNodes, int skipCount, int startPos, int length) {
+    public SLBlockNode finishBlock(List<SLStatementNode> bodyNodes, int skipCount, int startPos, int length) {
         lexicalScope = lexicalScope.outer;
 
         if (containsNull(bodyNodes)) {

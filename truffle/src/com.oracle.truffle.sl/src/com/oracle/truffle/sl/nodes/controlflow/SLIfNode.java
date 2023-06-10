@@ -59,13 +59,20 @@ public final class SLIfNode extends SLStatementNode {
      * result value. We do not have a node type that can only return a {@code boolean} value, so
      * {@link #evaluateCondition executing the condition} can lead to a type error.
      */
-    @Child private SLExpressionNode conditionNode;
+    @Child
+    private SLExpressionNode conditionNode;
 
-    /** Statement (or {@link SLBlockNode block}) executed when the condition is true. */
-    @Child private SLStatementNode thenPartNode;
+    /**
+     * Statement (or {@link SLBlockNode block}) executed when the condition is true.
+     */
+    @Child
+    private SLStatementNode thenPartNode;
 
-    /** Statement (or {@link SLBlockNode block}) executed when the condition is false. */
-    @Child private SLStatementNode elsePartNode;
+    /**
+     * Statement (or {@link SLBlockNode block}) executed when the condition is false.
+     */
+    @Child
+    private SLStatementNode elsePartNode;
 
     /**
      * Profiling information, collected by the interpreter, capturing the profiling information of
@@ -137,5 +144,26 @@ public final class SLIfNode extends SLStatementNode {
              */
             throw SLException.typeError(this, ex.getResult());
         }
+    }
+
+    @Override
+    public int getSize() {
+        int ret = thenPartNode.getSize();
+        if (elsePartNode != null) ret += elsePartNode.getSize();
+        return ret;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        int thenSize = thenPartNode.getSize();
+        if (i < thenSize) {
+            thenPartNode.handleAsReplaced(i);
+            return;
+        } else if (elsePartNode != null && i < thenSize + elsePartNode.getSize()) {
+            elsePartNode.handleAsReplaced(i - thenSize);
+            return;
+        }
+
+        throw new IllegalStateException();
     }
 }

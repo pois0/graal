@@ -96,4 +96,14 @@ public final class SLReturnNode extends SLStatementNode {
         final SLExpressionNode valueNode = this.valueNode;
         return valueNode == null || valueNode.hasNewNode();
     }
+
+    @Override
+    public int getSize() {
+        return 0;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        throw new UnsupportedOperationException();
+    }
 }

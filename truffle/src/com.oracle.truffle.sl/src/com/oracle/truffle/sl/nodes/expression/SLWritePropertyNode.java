@@ -124,10 +124,12 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
         final ResultAndStrategy.Generic<Object> receiver = op.calcGeneric(frame, getReceiverNode());
         final ResultAndStrategy.Generic<Object> name = op.calcGeneric(frame, getNameNode());
         final ResultAndStrategy.Generic<Object> value = op.calcGeneric(frame, getValueNode());
+
         if (receiver.isFresh() || name.isFresh() || value.isFresh()) {
-            op.rewriteObjectField(receiver.getResult(), (String) name.getResult(), value.getResult(), identifier);
+            op.rewriteObjectField(receiver.getResult(), name.getResult().toString(), value.getResult(), identifier, receiver.isFresh() || name.isFresh());
             return ResultAndStrategy.Generic.fresh(value.getResult());
         }
+
         return ResultAndStrategy.Generic.cached(value.getResult());
     }
 

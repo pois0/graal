@@ -85,7 +85,6 @@ public abstract class SLDivNode extends SLBinaryNode {
     @Override
     public ResultAndStrategy.Generic<Object> calcGenericInner(VirtualFrame frame) {
         final ExecutionHistoryOperator op = getContext().getHistoryOperator();
-        final NodeIdentifier identifier = getNodeIdentifier();
 
         final ResultAndStrategy.Generic<Object> wrappedLeft = op.calcGeneric(frame, getLeftNode());
         final Object left = wrappedLeft.getResult();
@@ -118,7 +117,6 @@ public abstract class SLDivNode extends SLBinaryNode {
         final ResultAndStrategy.Long wrappedRight = op.calcLong(frame, this, getRightNode());
         final long right = wrappedRight.getResult();
         return new ResultAndStrategy.Long(div(left, right), wrappedLeft.isFresh() || wrappedRight.isFresh());
-
     }
 
     @Fallback
