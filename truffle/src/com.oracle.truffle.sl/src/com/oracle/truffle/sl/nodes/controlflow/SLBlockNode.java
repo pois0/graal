@@ -250,7 +250,6 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
         for (int j = 0; j < elements.length; j++) {
             SLStatementNode element = elements[j];
             int size = element.getSize();
-//            System.out.println("i: " + i + ", sum: " + sum + ", size: " + size);
             if (i < sum + size) {
                 element.handleAsReplaced(i - sum);
                 return;

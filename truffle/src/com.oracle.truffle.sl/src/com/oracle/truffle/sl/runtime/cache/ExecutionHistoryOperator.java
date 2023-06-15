@@ -667,7 +667,7 @@ public final class ExecutionHistoryOperator {
     ) {
         HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(objGenTime);
         if (currentObjectHistory != null) {
-            InteropLibrary library = INTEROP_LIBRARY_.create(newObject);
+            InteropLibrary library = INTEROP_LIBRARY_.getUncached(newObject);
             for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : currentObjectHistory.entrySet()) {
                 String name = entry.getKey();
                 ArrayList<ItemWithTime<Object>> list = entry.getValue();

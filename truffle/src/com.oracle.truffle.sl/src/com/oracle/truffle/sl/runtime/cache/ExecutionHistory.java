@@ -165,7 +165,7 @@ public final class ExecutionHistory {
      * @param endTime inclusive
      */
     public void deleteRecords(Time startTime, Time endTime) {
-        System.out.println("deleteRecordsBase: " + startTime + " ~ " + endTime);
+//        System.out.println("deleteRecordsBase: " + startTime + " ~ " + endTime);
         List<ItemWithTime<ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
         for (ItemWithTime<ExecutionContext> e : contexts) {
             final ExecutionContext ctx = e.getItem();
