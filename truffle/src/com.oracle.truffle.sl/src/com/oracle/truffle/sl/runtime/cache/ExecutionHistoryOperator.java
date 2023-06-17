@@ -316,12 +316,6 @@ public final class ExecutionHistoryOperator {
         return revertObject(varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).getItem());
     }
 
-    public void getVariableTable(Object varName, NodeIdentifier identifier) {
-        final Time time = currentHistory.getTime(getExecutionContext(identifier)).getEnd();
-        //noinspection DataFlowIssue
-        final ArrayList<ItemWithTime<Object>> varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get((String) varName);
-    }
-
     public Object getFieldValue(Object obj, String fieldName, NodeIdentifier identifier) {
         if (!(obj instanceof SLObject)) throw new IllegalStateException();
 
@@ -623,10 +617,12 @@ public final class ExecutionHistoryOperator {
         final HashMap<Time, WeakReference<SLObject>> ctxToObj = new HashMap<>(this.ctxToObj);
         final WeakHashMap<SLObject, Time> objToCtx = new WeakHashMap<>(this.objToCtx);
 
+        final InteropLibrary library = INTEROP_LIBRARY_.getUncached();
+
         for (Map.Entry<SLObject, Time> entry : this.objToCtx.entrySet()) {
             final SLObject obj = entry.getKey();
             final Time objGenCtx = entry.getValue();
-            constructObjects(time, objGenCtx, obj, history, ctxToObj, objToCtx);
+            constructObjects(time, objGenCtx, obj, history, ctxToObj, objToCtx, library);
         }
 
         for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : local.entrySet()) {
@@ -644,7 +640,7 @@ public final class ExecutionHistoryOperator {
             } else if (value instanceof SLBigNumber || value instanceof String || value == SLNull.SINGLETON) {
                 frame.setObject(slot, value);
             } else if (value instanceof ExecutionHistory.ObjectReference) {
-                Object obj = constructObjects(time, ((ExecutionHistory.ObjectReference) value).getObjGenCtx(), history, ctxToObj, objToCtx);
+                Object obj = constructObjects(time, ((ExecutionHistory.ObjectReference) value).getObjGenCtx(), history, ctxToObj, objToCtx, library);
                 frame.setObject(slot, obj);
             } else if (value instanceof FunctionReference) {
                 frame.setObject(slot, getFunction(((FunctionReference) value).getFunctionName()));
@@ -663,11 +659,11 @@ public final class ExecutionHistoryOperator {
             SLObject newObject,
             ExecutionHistory history,
             HashMap<Time, WeakReference<SLObject>> ctxToObj,
-            WeakHashMap<SLObject, Time> objToCtx
+            WeakHashMap<SLObject, Time> objToCtx,
+            InteropLibrary library
     ) {
         HashMap<String, ArrayList<ItemWithTime<Object>>> currentObjectHistory = history.getObjectHistory(objGenTime);
         if (currentObjectHistory != null) {
-            InteropLibrary library = INTEROP_LIBRARY_.getUncached(newObject);
             for (Map.Entry<String, ArrayList<ItemWithTime<Object>>> entry : currentObjectHistory.entrySet()) {
                 String name = entry.getKey();
                 ArrayList<ItemWithTime<Object>> list = entry.getValue();
@@ -688,7 +684,7 @@ public final class ExecutionHistoryOperator {
                         WeakReference<SLObject> objRef = ctxToObj.get(valueGenTime);
                         Object newValue;
                         if (objRef == null) {
-                            newValue = constructObjects(time, valueGenTime, history, ctxToObj, objToCtx);
+                            newValue = constructObjects(time, valueGenTime, history, ctxToObj, objToCtx, library);
                         } else {
                             newValue = objRef.get();
                         }
@@ -712,13 +708,14 @@ public final class ExecutionHistoryOperator {
             Time objGenTime,
             ExecutionHistory history,
             HashMap<Time,WeakReference<SLObject>> ctxToObj,
-            WeakHashMap<SLObject, Time> objToCtx
+            WeakHashMap<SLObject, Time> objToCtx,
+            InteropLibrary library
     ) {
         SLObject newObject = language.justCreateObject();
         ctxToObj.put(objGenTime, new WeakReference<>(newObject));
         objToCtx.put(newObject, objGenTime);
 
-        return constructObjects(time, objGenTime, newObject, history, ctxToObj, objToCtx);
+        return constructObjects(time, objGenTime, newObject, history, ctxToObj, objToCtx, library);
     }
 
     private Time getAndIncrementTime() {

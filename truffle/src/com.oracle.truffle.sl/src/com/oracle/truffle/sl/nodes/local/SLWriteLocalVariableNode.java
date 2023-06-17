@@ -66,7 +66,6 @@ import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 @NodeField(name = "nameNode", type = SLExpressionNode.class)
 @NodeField(name = "declaration", type = boolean.class)
 public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
-
     /**
      * Returns the descriptor of the accessed local variable. The implementation of this method is
      * created by the Truffle DSL based on the {@link NodeField} annotation on the class.

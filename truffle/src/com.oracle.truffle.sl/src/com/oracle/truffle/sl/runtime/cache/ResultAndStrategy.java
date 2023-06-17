@@ -13,6 +13,8 @@ public abstract class ResultAndStrategy implements TruffleObject {
         return isFresh;
     }
 
+    public abstract Object getGenericResult();
+
     public final static class Generic<T> extends ResultAndStrategy {
         private final T result;
 
@@ -31,6 +33,11 @@ public abstract class ResultAndStrategy implements TruffleObject {
 
         public T getResult() {
             return result;
+        }
+
+        @Override
+        public Object getGenericResult() {
+            return getResult();
         }
     }
 
@@ -52,6 +59,11 @@ public abstract class ResultAndStrategy implements TruffleObject {
 
         public boolean getResult() {
             return result;
+        }
+
+        @Override
+        public Object getGenericResult() {
+            return getResult();
         }
 
         public Generic<Object> generify() {
@@ -81,6 +93,11 @@ public abstract class ResultAndStrategy implements TruffleObject {
 
         public long getResult() {
             return result;
+        }
+
+        @Override
+        public Object getGenericResult() {
+            return getResult();
         }
 
         public Generic<Object> generify() {

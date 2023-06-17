@@ -935,6 +935,7 @@ final class PolyglotContextImpl extends AbstractContextImpl implements com.oracl
         PolyglotLanguageContext languageContext = getContext(language);
         assert languageContext != null;
         Object prev = hostEnter(languageContext);
+        executed++;
         try {
             Source source = (Source) sourceImpl;
             languageContext.checkAccess(null);
@@ -943,8 +944,8 @@ final class PolyglotContextImpl extends AbstractContextImpl implements com.oracl
             long l = System.nanoTime();
             Object result = target.call(PolyglotImpl.EMPTY_ARGS);
             final long elapsed = System.nanoTime() - l;
-            executed++;
-            if (executed > 90) {
+            System.out.println("Time: " + executed);
+            if (executed > 50) {
                 if (executed % 2 == 0) {
                     System.err.println("" + prevElapsed + "," + elapsed);
                 } else {

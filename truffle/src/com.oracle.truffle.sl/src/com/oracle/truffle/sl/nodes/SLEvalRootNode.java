@@ -56,6 +56,7 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.cache.FunctionCallSpecialParameter;
+import com.oracle.truffle.sl.runtime.cache.ResultAndStrategy;
 
 /**
  * This class performs two additional tasks:
@@ -145,7 +146,12 @@ public final class SLEvalRootNode extends RootNode {
             } else {
                 newArgs[originalArgs.length] = FunctionCallSpecialParameter.CALC;
             }
-            return mainCallNode.call(newArgs);
+            final Object result = mainCallNode.call(newArgs);
+            if (result instanceof ResultAndStrategy) {
+                return ((ResultAndStrategy) result).getGenericResult();
+            } else {
+                return result;
+            }
         }
     }
 
