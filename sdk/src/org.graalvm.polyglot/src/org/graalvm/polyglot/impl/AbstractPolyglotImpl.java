@@ -93,6 +93,8 @@ import org.graalvm.polyglot.management.ExecutionEvent;
 @SuppressWarnings("unused")
 public abstract class AbstractPolyglotImpl {
 
+    public static int testCount = 0;
+
     protected AbstractPolyglotImpl() {
         if (!getClass().getName().equals("com.oracle.truffle.polyglot.PolyglotImpl") && !getClass().getName().equals("org.graalvm.polyglot.Engine$PolyglotInvalid")) {
             throw new AssertionError("Only one implementation Engine.Impl allowed.");

@@ -74,6 +74,7 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.EnvironmentAccess;
 import org.graalvm.polyglot.PolyglotAccess;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
 import org.graalvm.polyglot.impl.AbstractPolyglotImpl.AbstractContextImpl;
 
 import com.oracle.truffle.api.Assumption;
@@ -947,11 +948,12 @@ final class PolyglotContextImpl extends AbstractContextImpl implements com.oracl
             System.out.println("Time: " + executed);
             if (executed > 50) {
                 if (executed % 2 == 0) {
-                    System.err.println("" + prevElapsed + "," + elapsed);
+                    System.err.println(prevElapsed + "," + elapsed + ", " + AbstractPolyglotImpl.testCount);
                 } else {
                     prevElapsed = elapsed;
                 }
             }
+            AbstractPolyglotImpl.testCount = 0;
             Value hostValue;
             try {
                 hostValue = languageContext.asValue(result);

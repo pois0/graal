@@ -57,6 +57,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.NodeUtil;
 import com.oracle.truffle.api.nodes.NodeVisitor;
 
+import com.oracle.truffle.sl.nodes.SLDebuggerStatementNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.cache.DeleteNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
@@ -263,10 +264,12 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
                 DeleteNode delNode = new DeleteNode(ident);
                 delNode.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 1, true));
                 delNode.setNewNode();
+//                final SLDebuggerStatementNode newElement = new SLDebuggerStatementNode(element);
+//                newElement.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 0, true));
+//                newElement.setNewNode();
+//                list.set(j + 1, newElement);
                 list.add(j, delNode);
                 block = BlockNode.create(list.toArray(new SLStatementNode[0]), this);
-                element.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 0, true));
-                element.setNewNode();
                 return;
             }
             sum += size + 1;

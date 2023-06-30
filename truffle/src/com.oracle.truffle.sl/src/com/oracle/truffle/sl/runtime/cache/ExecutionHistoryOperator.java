@@ -28,6 +28,7 @@ import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 import org.graalvm.collections.Pair;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -143,19 +144,6 @@ public final class ExecutionHistoryOperator {
         return isInitialExecution;
     }
 
-    public boolean checkContainsNewNodeInFunctionCalls(NodeIdentifier identifier) {
-        final ExecutionHistory.TimeInfo tp = currentHistory.getTime(lastCalcCtx);
-        assert tp != null;
-        final Time from = tp.getEnd();
-        final ExecutionHistory.TimeInfo tp2 = currentHistory.getTime(getExecutionContext(identifier));
-        assert tp2 != null;
-        final Time end = tp2.getEnd();
-        for (ItemWithTime<Pair<CallContext.ContextBase, String>> entry : currentHistory.getFunctionEnters(from, end)) {
-            if (functionRegistry.containNewNode(entry.getItem().getRight())) return true;
-        }
-        return false;
-    }
-
     public void onReadArgument(int argIndex) {
         localVarOperatorHolder.onReadParam(currentTime, argIndex);
     }
@@ -226,14 +214,23 @@ public final class ExecutionHistoryOperator {
     }
 
     private ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
-        if (node.isNewNode()) return ShouldReExecuteResult.NEW_EXECUTE;
-        if (node.hasNewNode()) return ShouldReExecuteResult.RE_EXECUTE;
+        if (node.isNewNode()) {
+//            System.out.println("New Execution!");
+            return ShouldReExecuteResult.NEW_EXECUTE;
+        }
+        if (node.hasNewNode()) {
+//            System.out.println("Excuse: hasNewNode");
+            return ShouldReExecuteResult.RE_EXECUTE;
+        }
 
         final ExecutionHistory currentHistory = this.currentHistory;
         NodeIdentifier nodeIdentifier = node.getNodeIdentifier();
         ExecutionContext execCtx = getExecutionContext(nodeIdentifier);
         ExecutionHistory.TimeInfo tp = currentHistory.getTime(execCtx);
-        if (tp == null) return ShouldReExecuteResult.NEW_EXECUTE;
+        if (tp == null) {
+//            System.out.println("New Execution!");
+            return ShouldReExecuteResult.NEW_EXECUTE;
+        }
 
         Time fcStart = this.firstHitAtFunctionCall;
         if (fcStart.compareTo(tp.getEnd()) < 0) {
@@ -258,7 +255,7 @@ public final class ExecutionHistoryOperator {
             final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
             final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
             if (start != end) {
-//                System.out.println("Excuse: flagged var / " + varName + " @ " + node.getSourceSection());
+//                System.out.println("Excuse: flagged var / " + varName + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
                 return ShouldReExecuteResult.RE_EXECUTE;
             }
         }
@@ -272,7 +269,7 @@ public final class ExecutionHistoryOperator {
             final int start = Time.binarySearchWhereInsertTo(readParamHistory, tp.getStart());
             final int end = Time.binarySearchNext(readParamHistory, tp.getEnd());
             if (start != end) {
-//                System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection());
+//                System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
                 return ShouldReExecuteResult.RE_EXECUTE;
             }
         }
@@ -285,13 +282,14 @@ public final class ExecutionHistoryOperator {
                 HashSet<Object> fields = objectFieldFlags.get(entry.getItem().getObjGenCtx());
                 if (fields != null && fields.contains(entry.getItem().getFieldName())) {
                     firstHitAtField = entry.getTime();
-//                    System.out.println("Excuse: flagged Fld / " + entry.getItem().getObjGenCtx() + ", " + entry.getItem().getFieldName() + " @ " + node.getSourceSection());
+//                    System.out.println("Excuse: flagged Fld / " + entry.getItem().getObjGenCtx() + ", " + entry.getItem().getFieldName() + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
                     return ShouldReExecuteResult.RE_EXECUTE;
                 }
             }
             firstHitAtField = this.currentHistory.getNextTime(tp.getEnd());
         }
 
+//        System.out.println("Using cache!: " + node.getSourceSection());
         return ShouldReExecuteResult.USE_CACHE;
     }
 
@@ -462,6 +460,7 @@ public final class ExecutionHistoryOperator {
 
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier) {
         if (isInExec) return;
+        AbstractPolyglotImpl.testCount++;
         isInExec = true;
 //        System.out.println("New: " + identifier);
         final ExecutionHistory history = currentHistory;
