@@ -60,8 +60,13 @@ public final class DefaultLoopNode extends LoopNode {
 
     @Override
     public Object execute(VirtualFrame frame) {
+        return execute(frame, NO_ARGUMENT);
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame, int arg) {
         Object status;
-        while (repeatNode.shouldContinue((status = repeatNode.executeRepeatingWithValue(frame)))) {
+        while (repeatNode.shouldContinue((status = repeatNode.executeRepeatingWithValue(frame, arg)))) {
             TruffleSafepoint.poll(this);
         }
         return status;

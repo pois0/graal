@@ -901,7 +901,8 @@ suite = {
       "sourceDirs" : ["src"],
       "dependencies" : [
         "TRUFFLE_API",
-        "truffle:ANTLR4"
+        "truffle:ANTLR4",
+        "GUAVA"
       ],
       "requires" : [
         "java.logging",

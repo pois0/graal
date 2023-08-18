@@ -51,7 +51,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
  * by the {@link SLWhileNode#executeVoid loop node}.
  */
 @NodeInfo(shortName = "continue", description = "The node implementing a continue statement")
-public final class SLContinueNode extends SLStatementNode {
+public final class SLContinueNode extends SLTerminalNode {
 
     @Override
     public void executeVoid(VirtualFrame frame) {

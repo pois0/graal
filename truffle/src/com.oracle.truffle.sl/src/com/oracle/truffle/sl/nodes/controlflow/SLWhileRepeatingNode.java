@@ -50,6 +50,11 @@ import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.diffexec.Ternary;
+
+import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.EXEC;
 
 /**
  * The loop body of a {@link SLWhileNode while loop}. A Truffle framework {@link LoopNode} between
@@ -76,6 +81,8 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     private final BranchProfile continueTaken = BranchProfile.create();
     private final BranchProfile breakTaken = BranchProfile.create();
 
+    private Ternary hasNewNode;
+
     public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
         this.bodyNode = bodyNode;
@@ -83,29 +90,60 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
 
     @Override
     public boolean executeRepeating(VirtualFrame frame) {
+        boolean result;
+
         if (!evaluateCondition(frame)) {
             /* Normal exit of the loop when loop condition is false. */
-            return false;
+            result = false;
+        } else {
+            try {
+                /* Execute the loop body. */
+                bodyNode.executeVoid(frame);
+                /* Continue with next loop iteration. */
+                result = true;
+
+            } catch (SLContinueException ex) {
+                /* In the interpreter, record profiling information that the loop uses continue. */
+                continueTaken.enter();
+                /* Continue with next loop iteration. */
+                result = true;
+
+            } catch (SLBreakException ex) {
+                /* In the interpreter, record profiling information that the loop uses break. */
+                breakTaken.enter();
+                /* Break out of the loop. */
+                result = false;
+            }
         }
 
-        try {
-            /* Execute the loop body. */
-            bodyNode.executeVoid(frame);
-            /* Continue with next loop iteration. */
-            return true;
+        if (result) getContext().getHistoryOperator().onEnterNextIteration();
 
-        } catch (SLContinueException ex) {
-            /* In the interpreter, record profiling information that the loop uses continue. */
-            continueTaken.enter();
-            /* Continue with next loop iteration. */
-            return true;
+        return result;
+    }
 
-        } catch (SLBreakException ex) {
-            /* In the interpreter, record profiling information that the loop uses break. */
-            breakTaken.enter();
-            /* Break out of the loop. */
-            return false;
+    @Override
+    public boolean executeRepeating(VirtualFrame frame, int arg) {
+        if (arg == EXEC) return executeRepeating(frame);
+
+        final ExecutionHistoryOperator<Object> op = getContext().getHistoryOperator();
+
+        boolean result;
+        if (!conditionNode.calcBoolean(frame, conditionNode).getResult()) {
+            result = false;
+        } else {
+            try {
+                bodyNode.calcVoid(frame);
+                result = true;
+            } catch (SLContinueException ex) {
+                result = true;
+            } catch (SLBreakException ex) {
+                result = false;
+            }
         }
+
+        if (result) op.onEnterNextIteration();
+
+        return result;
     }
 
     private boolean evaluateCondition(VirtualFrame frame) {
@@ -130,4 +168,15 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
         return SLStatementNode.formatSourceSection(this);
     }
 
+    public boolean hasNewNode() {
+        Ternary hasNewNode = this.hasNewNode;
+        if (hasNewNode == Ternary.UNVERIFIED) {
+            this.hasNewNode = hasNewNode = conditionNode.hasNewNode() || bodyNode.hasNewNode() ? Ternary.TRUE : Ternary.FALSE;
+        }
+        return hasNewNode == Ternary.TRUE;
+    }
+
+    private SLContext getContext() {
+        return SLContext.get(this);
+    }
 }

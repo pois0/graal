@@ -47,6 +47,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * The body of a user-defined SL function. This is the node referenced by a {@link SLRootNode} for
@@ -97,5 +98,27 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
         nullTaken.enter();
         /* Return the default null value. */
         return SLNull.SINGLETON;
+    }
+
+    @Override
+    public CalcResult.Generic<Object> calcGenericInner(VirtualFrame frame) {
+        try {
+            bodyNode.calcVoid(frame);
+        } catch (SLReturnException e) {
+            final Object result = e.getResult();
+            if (result instanceof CalcResult.Generic<?>) {
+                //noinspection unchecked
+                return (CalcResult.Generic<Object>) result;
+            } else {
+                return CalcResult.Generic.fresh(result); // TODO fresh or cached
+            }
+        }
+
+        return CalcResult.Generic.fresh(SLNull.SINGLETON); // TODO fresh or cached
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return bodyNode.hasNewNode();
     }
 }

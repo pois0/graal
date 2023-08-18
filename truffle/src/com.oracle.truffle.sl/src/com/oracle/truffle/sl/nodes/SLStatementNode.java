@@ -40,7 +40,9 @@
  */
 package com.oracle.truffle.sl.nodes;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.GenerateWrapper;
 import com.oracle.truffle.api.instrumentation.InstrumentableNode;
@@ -53,6 +55,9 @@ import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
+import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.diffexec.Ternary;
 
 /**
  * The base class of all Truffle nodes for SL. All nodes (even expressions) can be used as
@@ -71,6 +76,13 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
 
     private boolean hasStatementTag;
     private boolean hasRootTag;
+
+    @CompilerDirectives.CompilationFinal
+    protected NodeIdentifier nodeIdentifier = null;
+    @CompilerDirectives.CompilationFinal
+    private boolean isNewNode = false;
+    @CompilerDirectives.CompilationFinal
+    private Ternary hasNewNode = Ternary.UNVERIFIED;
 
     /*
      * The creation of source section can be implemented lazily by looking up the root node source
@@ -130,6 +142,14 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         return sourceLength;
     }
 
+    public void setNodeIdentifier(NodeIdentifier nodeIdentifier) {
+        this.nodeIdentifier = nodeIdentifier;
+    }
+
+    public NodeIdentifier getNodeIdentifier() {
+        return nodeIdentifier;
+    }
+
     // invoked by the parser to set the source
     public final void setSourceSection(int charIndex, int length) {
         assert sourceCharIndex == NO_SOURCE : "source must only be set once";
@@ -156,6 +176,20 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         return false;
     }
 
+    public boolean isNewNode() {
+        return isNewNode;
+    }
+
+    public final boolean hasNewNode() {
+        Ternary state = hasNewNode;
+        if (state == Ternary.UNVERIFIED) {
+            hasNewNode = state = (isNewNode || hasNewChildNode()) ? Ternary.TRUE : Ternary.FALSE;
+        }
+        return state == Ternary.TRUE;
+    }
+
+    protected abstract boolean hasNewChildNode();
+
     public WrapperNode createWrapper(ProbeNode probe) {
         return new SLStatementNodeWrapper(this, probe);
     }
@@ -164,6 +198,12 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
      * Execute this node as as statement, where no return value is necessary.
      */
     public abstract void executeVoid(VirtualFrame frame);
+
+    public final void calcVoid(VirtualFrame frame) {
+        getContext().getHistoryOperator().calcVoid(frame, this);
+    }
+
+    public abstract void calcVoidInner(VirtualFrame frame);
 
     /**
      * Marks this node as being a {@link StandardTags.StatementTag} for instrumentation purposes.
@@ -213,4 +253,7 @@ public abstract class SLStatementNode extends SLScopedNode implements Instrument
         }
     }
 
+    protected final SLContext getContext() {
+        return SLContext.get(this);
+    }
 }

@@ -50,4 +50,11 @@ import com.oracle.truffle.api.dsl.NodeChild;
 @NodeChild("leftNode")
 @NodeChild("rightNode")
 public abstract class SLBinaryNode extends SLExpressionNode {
+    protected abstract SLExpressionNode getLeftNode();
+    protected abstract SLExpressionNode getRightNode();
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getLeftNode().hasNewNode() || getRightNode().hasNewNode();
+    }
 }

@@ -48,6 +48,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 import org.graalvm.polyglot.Context;
 
 import com.oracle.truffle.api.CallTarget;
@@ -109,6 +110,7 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
+    private final ExecutionHistoryOperator<Object> historyOperator = null; // TODO
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins) {
         this.env = env;
@@ -273,5 +275,9 @@ public final class SLContext {
                 throw shouldNotReachHere("Shutdown hook is not executable!", e);
             }
         }
+    }
+
+    public ExecutionHistoryOperator<Object> getHistoryOperator() {
+        return historyOperator;
     }
 }

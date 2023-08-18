@@ -127,6 +127,8 @@ import com.oracle.truffle.api.frame.VirtualFrame;
  * @since 0.8 or earlier
  */
 public abstract class LoopNode extends Node {
+    public static final int NO_ARGUMENT = 0;
+
     /**
      * Constructor for subclasses.
      *
@@ -151,6 +153,10 @@ public abstract class LoopNode extends Node {
      */
     public Object execute(VirtualFrame frame) {
         throw new AbstractMethodError("This method must be overridden in concrete subclasses.");
+    }
+
+    public Object execute(VirtualFrame frame, int arg) {
+        return execute(frame);
     }
 
     /**

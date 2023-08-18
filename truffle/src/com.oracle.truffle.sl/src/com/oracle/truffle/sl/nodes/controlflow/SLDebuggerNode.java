@@ -50,7 +50,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
  * Implementation of the SL debugger statement. When under the debugger, execution suspends here.
  */
 @NodeInfo(shortName = "debugger", description = "The node implementing a debugger statement")
-public class SLDebuggerNode extends SLStatementNode {
+public class SLDebuggerNode extends SLTerminalNode {
 
     @Override
     public void executeVoid(VirtualFrame frame) {

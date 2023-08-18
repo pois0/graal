@@ -51,7 +51,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
  * the {@link SLWhileNode#executeVoid loop node}.
  */
 @NodeInfo(shortName = "break", description = "The node implementing a break statement")
-public final class SLBreakNode extends SLStatementNode {
+public final class SLBreakNode extends SLTerminalNode {
 
     @Override
     public void executeVoid(VirtualFrame frame) {

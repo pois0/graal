@@ -66,6 +66,8 @@ import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
  */
 @NodeInfo(shortName = "block", description = "The node implementing a source code block")
 public final class SLBlockNode extends SLStatementNode implements BlockNode.ElementExecutor<SLStatementNode> {
+    static final int EXEC = 0;
+    static final int CALC = 1;
 
     /**
      * The block of child nodes. Using the block node allows Truffle to split the block into
@@ -96,6 +98,17 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
         this.block = bodyNodes.length > 0 ? BlockNode.create(bodyNodes, this) : null;
     }
 
+    @Override
+    protected boolean hasNewChildNode() {
+        final BlockNode<SLStatementNode> block = this.block;
+        if (block == null) return false;
+        for (SLStatementNode child : block.getElements()) {
+            if (child.hasNewNode()) return true;
+        }
+
+        return false;
+    }
+
     /**
      * Execute all block statements. The block node makes sure that {@link ExplodeLoop full
      * unrolling} of the loop is triggered during compilation. This allows the
@@ -104,7 +117,14 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
     @Override
     public void executeVoid(VirtualFrame frame) {
         if (this.block != null) {
-            this.block.executeVoid(frame, BlockNode.NO_ARGUMENT);
+            this.block.executeVoid(frame, EXEC);
+        }
+    }
+
+    @Override
+    public void calcVoidInner(VirtualFrame frame) {
+        if (this.block != null) {
+            this.block.executeVoid(frame, CALC);
         }
     }
 

@@ -48,6 +48,7 @@ import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Base class for all SL nodes that produce a value and therefore benefit from type specialization.
@@ -67,6 +68,12 @@ public abstract class SLExpressionNode extends SLStatementNode {
      */
     public abstract Object executeGeneric(VirtualFrame frame);
 
+    public final CalcResult.Generic<Object> calcGeneric(VirtualFrame frame) {
+        return getContext().getHistoryOperator().calcGeneric(frame, this);
+    }
+
+    public abstract CalcResult.Generic<Object> calcGenericInner(VirtualFrame frame);
+
     /**
      * When we use an expression at places where a {@link SLStatementNode statement} is already
      * sufficient, the return value is just discarded.
@@ -74,6 +81,11 @@ public abstract class SLExpressionNode extends SLStatementNode {
     @Override
     public void executeVoid(VirtualFrame frame) {
         executeGeneric(frame);
+    }
+
+    @Override
+    public void calcVoidInner(VirtualFrame frame) {
+        calcGenericInner(frame);
     }
 
     @Override
@@ -106,7 +118,35 @@ public abstract class SLExpressionNode extends SLStatementNode {
         return SLTypesGen.expectLong(executeGeneric(frame));
     }
 
+    public final CalcResult.Long calcLong(VirtualFrame frame, SLExpressionNode callerNode) {
+        return getContext().getHistoryOperator().calcLong(frame, callerNode, this);
+    }
+
+    public CalcResult.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
+        CalcResult.Generic<Object> result = calcGenericInner(frame);
+        long value = SLTypesGen.expectLong(result.getResult());
+        if  (result.isFresh()) {
+            return CalcResult.Long.fresh(value);
+        } else {
+            return CalcResult.Long.cached(value);
+        }
+    }
+
     public boolean executeBoolean(VirtualFrame frame) throws UnexpectedResultException {
         return SLTypesGen.expectBoolean(executeGeneric(frame));
+    }
+
+    public final CalcResult.Boolean calcBoolean(VirtualFrame frame, SLExpressionNode callerNode) {
+        return getContext().getHistoryOperator().calcBoolean(frame, callerNode, this);
+    }
+
+    public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+        CalcResult.Generic<Object> result = calcGenericInner(frame);
+        boolean value = SLTypesGen.expectBoolean(result.getResult());
+        if  (result.isFresh()) {
+            return CalcResult.Boolean.fresh(value);
+        } else {
+            return CalcResult.Boolean.cached(value);
+        }
     }
 }
