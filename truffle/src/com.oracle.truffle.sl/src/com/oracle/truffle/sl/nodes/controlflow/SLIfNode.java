@@ -48,6 +48,7 @@ import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 @NodeInfo(shortName = "if", description = "The node implementing a condional statement")
 public final class SLIfNode extends SLStatementNode {
@@ -97,6 +98,25 @@ public final class SLIfNode extends SLStatementNode {
         }
     }
 
+    @Override
+    public void calcVoidInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+        final SLExpressionNode conditionNode = this.conditionNode;
+        final SLStatementNode elsePartNode = this.elsePartNode;
+
+        if (op.calcBoolean(frame, this, conditionNode).getResult()) {
+            if (elsePartNode != null) {
+                op.deleteHistory(elsePartNode.getNodeIdentifier());
+            }
+            op.calcVoid(frame, thenPartNode);
+        } else {
+            op.deleteHistory(thenPartNode.getNodeIdentifier());
+            if (elsePartNode != null) {
+                op.calcVoid(frame, elsePartNode);
+            }
+        }
+    }
+
     private boolean evaluateCondition(VirtualFrame frame) {
         try {
             /*
@@ -111,5 +131,31 @@ public final class SLIfNode extends SLStatementNode {
              */
             throw SLException.typeError(this, ex.getResult());
         }
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return conditionNode.hasNewNode() || thenPartNode.hasNewNode() || (elsePartNode != null && elsePartNode.hasNewNode());
+    }
+
+    @Override
+    public int getSize() {
+        int ret = thenPartNode.getSize();
+        if (elsePartNode != null) ret += elsePartNode.getSize();
+        return ret;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        int thenSize = thenPartNode.getSize();
+        if (i < thenSize) {
+            thenPartNode.handleAsReplaced(i);
+            return;
+        } else if (elsePartNode != null && i < thenSize + elsePartNode.getSize()) {
+            elsePartNode.handleAsReplaced(i - thenSize);
+            return;
+        }
+
+        throw new IllegalStateException();
     }
 }

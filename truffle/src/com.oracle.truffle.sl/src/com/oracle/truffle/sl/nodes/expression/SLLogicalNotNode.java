@@ -43,9 +43,12 @@ package com.oracle.truffle.sl.nodes.expression;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Example of a simple unary node that uses type specialization. See {@link SLAddNode} for
@@ -55,9 +58,22 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 @NodeInfo(shortName = "!")
 public abstract class SLLogicalNotNode extends SLExpressionNode {
 
+    protected abstract SLExpressionNode getValueNode();
+
     @Specialization
     protected boolean doBoolean(boolean value) {
         return !value;
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).getGenericResult();
+    }
+
+    @Override
+    public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) {
+        CalcResult.Boolean valueWrapped = getContext().getHistoryOperator().calcBoolean(frame, this, getValueNode());
+        return new CalcResult.Boolean(doBoolean(valueWrapped.getResult()), valueWrapped.isFresh());
     }
 
     @Fallback
@@ -65,4 +81,8 @@ public abstract class SLLogicalNotNode extends SLExpressionNode {
         throw SLException.typeError(this, value);
     }
 
+    @Override
+    protected boolean hasNewChildNode() {
+        return getValueNode().hasNewNode();
+    }
 }

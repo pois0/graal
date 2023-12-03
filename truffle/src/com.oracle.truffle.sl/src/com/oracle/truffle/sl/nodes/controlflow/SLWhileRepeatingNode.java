@@ -47,12 +47,13 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.RepeatingNode;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.profiles.BranchProfile;
+import com.oracle.truffle.api.utilities.TriState;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
-import com.oracle.truffle.sl.runtime.diffexec.Ternary;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.EXEC;
 
@@ -81,7 +82,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     private final BranchProfile continueTaken = BranchProfile.create();
     private final BranchProfile breakTaken = BranchProfile.create();
 
-    private Ternary hasNewNode;
+    private TriState hasNewNode = TriState.UNDEFINED;
 
     public SLWhileRepeatingNode(SLExpressionNode conditionNode, SLStatementNode bodyNode) {
         this.conditionNode = SLUnboxNodeGen.create(conditionNode);
@@ -125,7 +126,7 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     public boolean executeRepeating(VirtualFrame frame, int arg) {
         if (arg == EXEC) return executeRepeating(frame);
 
-        final ExecutionHistoryOperator<Object> op = getContext().getHistoryOperator();
+        final var op = getContext().getHistoryOperator();
 
         boolean result;
         if (!conditionNode.calcBoolean(frame, conditionNode).getResult()) {
@@ -169,11 +170,15 @@ public final class SLWhileRepeatingNode extends Node implements RepeatingNode {
     }
 
     public boolean hasNewNode() {
-        Ternary hasNewNode = this.hasNewNode;
-        if (hasNewNode == Ternary.UNVERIFIED) {
-            this.hasNewNode = hasNewNode = conditionNode.hasNewNode() || bodyNode.hasNewNode() ? Ternary.TRUE : Ternary.FALSE;
+        TriState hasNewNode = this.hasNewNode;
+        if (hasNewNode == TriState.UNDEFINED) {
+            this.hasNewNode = hasNewNode = TriState.valueOf(conditionNode.hasNewNode() || bodyNode.hasNewNode());
         }
-        return hasNewNode == Ternary.TRUE;
+        return hasNewNode == TriState.TRUE;
+    }
+
+    SLStatementNode getBodyNode() {
+        return bodyNode;
     }
 
     private SLContext getContext() {

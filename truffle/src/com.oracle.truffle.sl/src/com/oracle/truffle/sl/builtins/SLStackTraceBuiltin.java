@@ -58,6 +58,7 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLEvalRootNode;
 import com.oracle.truffle.sl.nodes.SLRootNode;
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Returns a string representation of the current stack. This includes the {@link CallTarget}s and
@@ -122,5 +123,12 @@ public abstract class SLStackTraceBuiltin extends SLBuiltinNode {
         } else {
             return SLStrings.fromJavaString(rootNode.getName());
         }
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("stackTrace");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

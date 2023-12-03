@@ -45,6 +45,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function that registers a function as a shutdown hook. Only no-parameter functions are
@@ -57,5 +58,12 @@ public abstract class SLRegisterShutdownHookBuiltin extends SLBuiltinNode {
     protected Object doDefault(SLFunction shutdownHook) {
         SLContext.get(this).registerShutdownHook(shutdownHook);
         return SLNull.SINGLETON;
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("registerShutdownHook");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

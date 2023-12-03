@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function that reads a String from the {@link SLContext#getInput() standard input}.
@@ -80,5 +81,12 @@ public abstract class SLReadlnBuiltin extends SLBuiltinNode {
         } catch (IOException ex) {
             throw new SLException(ex.getMessage(), this);
         }
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("readln");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

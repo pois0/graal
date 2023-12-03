@@ -101,14 +101,13 @@ public final class SLFunctionBodyNode extends SLExpressionNode {
     }
 
     @Override
-    public CalcResult.Generic<Object> calcGenericInner(VirtualFrame frame) {
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
         try {
             bodyNode.calcVoid(frame);
         } catch (SLReturnException e) {
             final Object result = e.getResult();
-            if (result instanceof CalcResult.Generic<?>) {
-                //noinspection unchecked
-                return (CalcResult.Generic<Object>) result;
+            if (result instanceof CalcResult.Generic) {
+                return (CalcResult.Generic) result;
             } else {
                 return CalcResult.Generic.fresh(result); // TODO fresh or cached
             }

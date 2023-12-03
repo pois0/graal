@@ -47,6 +47,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.CALC;
 import static com.oracle.truffle.sl.nodes.controlflow.SLBlockNode.EXEC;
@@ -71,7 +72,7 @@ public final class SLWhileNode extends SLStatementNode {
     }
 
     private void loop(VirtualFrame frame, int arg) {
-        final ExecutionHistoryOperator<Object> op = getContext().getHistoryOperator();
+        final var op = getContext().getHistoryOperator();
         op.onEnterLoop(nodeIdentifier);
         try {
             loopNode.execute(frame, arg);
@@ -83,5 +84,21 @@ public final class SLWhileNode extends SLStatementNode {
     @Override
     protected boolean hasNewChildNode() {
         return ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).hasNewNode();
+    }
+
+    @Override
+    public int getSize() {
+        return ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).getBodyNode().getSize();
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        SLStatementNode bodyNode = ((SLWhileRepeatingNode) loopNode.getRepeatingNode()).getBodyNode();
+        if (i < bodyNode.getSize()) {
+            bodyNode.handleAsReplaced(i);
+            return;
+        }
+
+        throw new IllegalStateException();
     }
 }

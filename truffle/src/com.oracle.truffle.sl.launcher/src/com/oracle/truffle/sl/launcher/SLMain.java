@@ -77,12 +77,16 @@ public final class SLMain {
         if (file == null) {
             // @formatter:off
             source = Source.newBuilder(SL, new InputStreamReader(System.in), "<stdin>").build();
+            System.exit(executeSource(source, System.in, System.out, options));
             // @formatter:on
         } else {
-            source = Source.newBuilder(SL, new File(file)).build();
+            for (int i = 0; i < 2; i++) {
+                System.out.println("execute " + i);
+                source = Source.newBuilder(SL, new File(file)).build();
+                executeSource(source, System.in, System.out, options);
+                System.gc();
+            }
         }
-
-        System.exit(executeSource(source, System.in, System.out, options));
     }
 
     private static int executeSource(Source source, InputStream in, PrintStream out, Map<String, String> options) {

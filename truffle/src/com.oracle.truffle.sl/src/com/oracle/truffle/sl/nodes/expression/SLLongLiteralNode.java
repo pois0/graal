@@ -51,7 +51,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
  * the primitive value is automatically boxed by Java.
  */
 @NodeInfo(shortName = "const")
-public final class SLLongLiteralNode extends SLExpressionNode {
+public final class SLLongLiteralNode extends SLLiteralNode {
 
     private final long value;
 

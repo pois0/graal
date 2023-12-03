@@ -47,7 +47,6 @@ import com.oracle.truffle.api.dsl.Cached.Shared;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.interop.InteropLibrary;
-import com.oracle.truffle.api.interop.InvalidArrayIndexException;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.library.CachedLibrary;
@@ -82,7 +81,7 @@ import com.oracle.truffle.sl.SLLanguage;
  */
 @SuppressWarnings("static-method")
 @ExportLibrary(InteropLibrary.class)
-public final class SLObject extends DynamicObject implements TruffleObject {
+public final class SLObject extends SLObjectBase {
     protected static final int CACHE_LIMIT = 3;
 
     public SLObject(Shape shape) {
@@ -171,39 +170,6 @@ public final class SLObject extends DynamicObject implements TruffleObject {
     boolean isMemberInsertable(String member,
                     @CachedLibrary("this") InteropLibrary receivers) {
         return !receivers.isMemberExisting(this, member);
-    }
-
-    @ExportLibrary(InteropLibrary.class)
-    static final class Keys implements TruffleObject {
-
-        private final Object[] keys;
-
-        Keys(Object[] keys) {
-            this.keys = keys;
-        }
-
-        @ExportMessage
-        Object readArrayElement(long index) throws InvalidArrayIndexException {
-            if (!isArrayElementReadable(index)) {
-                throw InvalidArrayIndexException.create(index);
-            }
-            return keys[(int) index];
-        }
-
-        @ExportMessage
-        boolean hasArrayElements() {
-            return true;
-        }
-
-        @ExportMessage
-        long getArraySize() {
-            return keys.length;
-        }
-
-        @ExportMessage
-        boolean isArrayElementReadable(long index) {
-            return index >= 0 && index < keys.length;
-        }
     }
 
     /**

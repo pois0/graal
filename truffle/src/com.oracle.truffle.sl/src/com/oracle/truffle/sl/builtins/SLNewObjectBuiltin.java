@@ -53,7 +53,9 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Built-in function to create a new object. Objects in SL are simply made up of name/value pairs.
@@ -66,7 +68,9 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
     @SuppressWarnings("unused")
     public Object newObject(SLNull o,
                     @Cached(value = "lookup()", neverDefault = true) AllocationReporter reporter) {
-        return SLLanguage.get(this).createObject(reporter);
+        SLObject object = SLLanguage.get(this).createObject(reporter);
+        getContext().getHistoryOperator().onGenerateObject(object);
+        return object;
     }
 
     final AllocationReporter lookup() {
@@ -81,5 +85,12 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
             /* Foreign access was not successful. */
             throw SLUndefinedNameException.undefinedFunction(this, obj);
         }
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("new");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

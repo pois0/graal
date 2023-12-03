@@ -50,14 +50,14 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
-import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 /**
  * This class is similar to the extensively documented {@link SLAddNode}.
  */
 @NodeInfo(shortName = "-")
-public abstract class SLSubNode extends SLBinaryNode {
+public abstract class SLSubNode extends SLArithOpNode {
 
     @Specialization(rewriteOn = ArithmeticException.class)
     protected long doLong(long left, long right) {
@@ -79,6 +79,17 @@ public abstract class SLSubNode extends SLBinaryNode {
             return new SLBigInteger(leftLibrary.asBigInteger(left).subtract(rightLibrary.asBigInteger(right)));
         } catch (UnsupportedMessageException e) {
             throw shouldNotReachHere(e);
+        }
+    }
+
+    @Override
+    protected Object calcOpApplication(Object left, InteropLibrary leftInterop, Object right, InteropLibrary rightInterop) throws UnsupportedMessageException {
+        if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+            return doLong(leftInterop.asLong(left), rightInterop.asLong(right));
+        } else if (left instanceof SLBigInteger && right instanceof SLBigInteger) {
+            return doSLBigInteger((SLBigInteger) left, (SLBigInteger) right);
+        } else {
+            return 0L;
         }
     }
 

@@ -84,6 +84,7 @@ import org.graalvm.options.OptionValues;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
 import org.graalvm.polyglot.impl.AbstractPolyglotImpl.AbstractHostLanguageService;
 import org.graalvm.polyglot.io.IOAccess;
 
@@ -122,6 +123,8 @@ import com.oracle.truffle.polyglot.PolyglotThreadLocalActions.HandshakeConfig;
 import com.oracle.truffle.polyglot.SystemThread.LanguageSystemThread;
 
 final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotImpl.VMObject {
+    private static int executed = 0;
+    private static long prevElapsed = 0;
 
     private static final TruffleLogger LOG = TruffleLogger.getLogger(PolyglotEngineImpl.OPTION_GROUP_ENGINE, PolyglotContextImpl.class);
     private static final InteropLibrary UNCACHED = InteropLibrary.getFactory().getUncached();
@@ -1478,7 +1481,19 @@ final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotI
             languageContext.checkAccess(null);
             languageContext.ensureInitialized(null);
             CallTarget target = languageContext.parseCached(null, truffleSource, null);
+            long l = System.nanoTime();
             Object result = target.call(PolyglotImpl.EMPTY_ARGS);
+            final long elapsed = System.nanoTime() - l;
+            System.out.println("Time: " + elapsed);
+            executed++;
+            if (executed > 50) {
+                if (executed % 2 == 0) {
+                    System.err.println(prevElapsed + "," + elapsed + ", " + AbstractPolyglotImpl.testCount + ", " + AbstractPolyglotImpl.constructCost);
+                } else {
+                    prevElapsed = elapsed;
+                }
+            }
+
             Value hostValue;
             try {
                 hostValue = languageContext.asValue(result);

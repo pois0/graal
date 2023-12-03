@@ -49,6 +49,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function that performs context exit.
@@ -68,5 +69,12 @@ public abstract class SLAddToHostClassPathBuiltin extends SLBuiltinNode {
         TruffleLanguage.Env env = SLContext.get(this).getEnv();
         TruffleFile file = env.getPublicTruffleFile(classPath);
         env.addToHostClassPath(file);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("addToHostClassPath");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

@@ -40,13 +40,17 @@
  */
 package com.oracle.truffle.sl.runtime;
 
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.interop.TruffleObject;
@@ -54,6 +58,7 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.parser.SimpleLanguageParser;
+import org.graalvm.collections.Pair;
 
 /**
  * Manages the mapping from function names to {@link SLFunction function objects}.
@@ -63,6 +68,8 @@ public final class SLFunctionRegistry {
     private final SLLanguage language;
     private final FunctionsObject functionsObject = new FunctionsObject();
     private final Map<Map<TruffleString, RootCallTarget>, Void> registeredFunctions = new IdentityHashMap<>();
+    @CompilerDirectives.CompilationFinal
+    private Set<TruffleString> functionContainsNewNode;
 
     public SLFunctionRegistry(SLLanguage language) {
         this.language = language;
@@ -104,7 +111,7 @@ public final class SLFunctionRegistry {
      * functions might not get registered.
      */
     @TruffleBoundary
-    public void register(Map<TruffleString, RootCallTarget> newFunctions) {
+    public void register(Map<TruffleString, RootCallTarget> newFunctions, Set<TruffleString> functionContainsNewNode) {
         if (registeredFunctions.containsKey(newFunctions)) {
             return;
         }
@@ -112,10 +119,22 @@ public final class SLFunctionRegistry {
             register(entry.getKey(), entry.getValue());
         }
         registeredFunctions.put(newFunctions, null);
+        switch (functionContainsNewNode.size()) {
+            case 0:
+                this.functionContainsNewNode = Collections.emptySet();
+                break;
+            case 1:
+                final TruffleString targetFunctionName = functionContainsNewNode.iterator().next();
+                this.functionContainsNewNode = new StringSingletonSet(targetFunctionName);
+                break;
+            default:
+                this.functionContainsNewNode = functionContainsNewNode;
+        }
     }
 
     public void register(Source newFunctions) {
-        register(SimpleLanguageParser.parseSL(language, newFunctions));
+        final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(language, newFunctions);
+        register(ff.getLeft(), ff.getRight());
     }
 
     public SLFunction getFunction(TruffleString name) {
@@ -140,4 +159,40 @@ public final class SLFunctionRegistry {
         return functionsObject;
     }
 
+    public boolean containNewNode(TruffleString functionName) {
+        return functionContainsNewNode.contains(functionName);
+    }
+
+    private static class StringSingletonSet extends AbstractSet<TruffleString> {
+        private final TruffleString element;
+
+        StringSingletonSet(TruffleString e) {
+            element = e;
+        }
+
+        @Override
+        public Iterator<TruffleString> iterator() {
+            return new Iterator<>() {
+                boolean notVisited = true;
+
+                @Override
+                public boolean hasNext() {
+                    return notVisited;
+                }
+
+                @Override
+                public TruffleString next() {
+                    notVisited = false;
+                    return element;
+                }
+            };
+        }
+
+        public int size() {return 1;}
+
+        @Override
+        public boolean contains(Object o) {
+            return element.equals(o);
+        }
+    }
 }

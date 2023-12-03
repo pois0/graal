@@ -58,8 +58,10 @@ import com.oracle.truffle.api.nodes.NodeUtil;
 import com.oracle.truffle.api.nodes.NodeVisitor;
 
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+import com.oracle.truffle.sl.nodes.diffexec.DeleteNode;
 import com.oracle.truffle.sl.nodes.local.SLScopedNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * A statement node that just executes a list of other statements.
@@ -77,18 +79,21 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
      * Truffle from compiling big methods, so these methods might fail to compile with a compilation
      * bailout.
      */
-    @Child private BlockNode<SLStatementNode> block;
+    @Child
+    private BlockNode<SLStatementNode> block;
 
     /**
      * All declared variables visible from this block (including all parent blocks). Variables
      * declared in this block only are from zero index up to {@link #parentBlockIndex} (exclusive).
      */
-    @CompilationFinal(dimensions = 1) private SLWriteLocalVariableNode[] writeNodesCache;
+    @CompilationFinal(dimensions = 1)
+    private SLWriteLocalVariableNode[] writeNodesCache;
 
     /**
      * Index of the parent block's variables in the {@link #writeNodesCache list of variables}.
      */
-    @CompilationFinal private int parentBlockIndex = -1;
+    @CompilationFinal
+    private int parentBlockIndex = -1;
 
     public SLBlockNode(SLStatementNode[] bodyNodes) {
         /*
@@ -146,7 +151,12 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
      */
     @Override
     public void executeVoid(VirtualFrame frame, SLStatementNode node, int index, int argument) {
-        node.executeVoid(frame);
+        if (argument == EXEC) {
+            node.executeVoid(frame);
+            return;
+        }
+
+        getContext().getHistoryOperator().calcVoid(frame, node);
     }
 
     /**
@@ -223,4 +233,50 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
         }
     }
 
+    @Override
+    public int getSize() {
+        if (block == null) return 0;
+
+        int sum = 0;
+        for (SLStatementNode element : block.getElements()) {
+            sum += element.getSize() + 1;
+        }
+
+        return sum;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        if (i < 0) throw new RuntimeException();
+        int sum = 0;
+        SLStatementNode[] elements = block.getElements();
+        for (int j = 0; j < elements.length; j++) {
+            SLStatementNode element = elements[j];
+            int size = element.getSize();
+            if (i < sum + size) {
+                element.handleAsReplaced(i - sum);
+                return;
+            } else if (i == sum + size) {
+                // TODO NEED TO CHECK!
+                System.out.println("Chosen!: " + element.getSourceSection().getCharacters() + " / " + element.getClass().getCanonicalName() + " @ " + element.getSourceSection());
+                System.out.println("Old identifier: " + element.getNodeIdentifier());
+
+                NodeIdentifier ident = element.getNodeIdentifier();
+                List<SLStatementNode> list = new ArrayList<>();
+                Collections.addAll(list, elements);
+                DeleteNode delNode = new DeleteNode(ident);
+                delNode.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 1, true));
+                delNode.setNewNode();
+                list.add(j, delNode);
+                block = BlockNode.create(list.toArray(new SLStatementNode[0]), this);
+                element.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 0, true));
+                element.setNewNode();
+                return;
+            }
+            sum += size + 1;
+        }
+
+        throw new IllegalStateException();
+
+    }
 }

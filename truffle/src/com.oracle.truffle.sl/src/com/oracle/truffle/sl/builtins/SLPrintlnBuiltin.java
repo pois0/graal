@@ -47,6 +47,7 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLLanguageView;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function to write a value to the {@link SLContext#getOutput() standard output}. The
@@ -68,4 +69,10 @@ public abstract class SLPrintlnBuiltin extends SLBuiltinNode {
         return value;
     }
 
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("println");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
+    }
 }

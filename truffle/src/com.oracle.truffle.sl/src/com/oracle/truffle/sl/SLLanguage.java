@@ -44,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.oracle.truffle.api.Assumption;
@@ -114,6 +115,8 @@ import com.oracle.truffle.sl.runtime.SLLanguageView;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
+import org.graalvm.collections.Pair;
 
 /**
  * SL is a simple language to demonstrate and showcase features of Truffle. The implementation is as
@@ -264,7 +267,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * from this array.
          */
         for (int i = 0; i < argumentCount; i++) {
-            argumentNodes[i] = new SLReadArgumentNode(i);
+            final SLReadArgumentNode readArgumentNode = new SLReadArgumentNode(i);
+            readArgumentNode.setIdentifier(new NodeIdentifier("__builtin", i));
+            argumentNodes[i] = readArgumentNode;
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */
         SLBuiltinNode builtinBodyNode = factory.createNode((Object) argumentNodes);
@@ -304,12 +309,15 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
     protected CallTarget parse(ParsingRequest request) throws Exception {
         Source source = request.getSource();
         Map<TruffleString, RootCallTarget> functions;
+        Set<TruffleString> functionContainsNewNode;
         /*
          * Parse the provided source. At this point, we do not have a SLContext yet. Registration of
          * the functions with the SLContext happens lazily in SLEvalRootNode.
          */
         if (request.getArgumentNames().isEmpty()) {
-            functions = SimpleLanguageParser.parseSL(this, source);
+            final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(this, source);
+            functions = ff.getLeft();
+            functionContainsNewNode = ff.getRight();
         } else {
             StringBuilder sb = new StringBuilder();
             sb.append("function main(");
@@ -324,7 +332,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
             sb.append(";}");
             String language = source.getLanguage() == null ? ID : source.getLanguage();
             Source decoratedSource = Source.newBuilder(language, sb.toString(), source.getName()).build();
-            functions = SimpleLanguageParser.parseSL(this, decoratedSource);
+            final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(this, decoratedSource);
+            functions = ff.getLeft();
+            functionContainsNewNode = ff.getRight();
         }
 
         RootCallTarget main = functions.get(SLStrings.MAIN);
@@ -336,13 +346,13 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
              * we cannot use the original SLRootNode for the main function. Instead, we create a new
              * SLEvalRootNode that does everything we need.
              */
-            evalMain = new SLEvalRootNode(this, main, functions);
+            evalMain = new SLEvalRootNode(this, main, functions, functionContainsNewNode);
         } else {
             /*
              * Even without a main function, "evaluating" the parsed source needs to register the
              * functions into the SLContext.
              */
-            evalMain = new SLEvalRootNode(this, null, functions);
+            evalMain = new SLEvalRootNode(this, null, functions, functionContainsNewNode);
         }
         return evalMain.getCallTarget();
     }

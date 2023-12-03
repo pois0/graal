@@ -43,10 +43,13 @@ package com.oracle.truffle.sl.parser;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.Token;
 
@@ -94,6 +97,7 @@ import com.oracle.truffle.sl.nodes.local.SLReadLocalVariableNodeGen;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNode;
 import com.oracle.truffle.sl.nodes.local.SLWriteLocalVariableNodeGen;
 import com.oracle.truffle.sl.nodes.util.SLUnboxNodeGen;
+import org.graalvm.collections.Pair;
 
 /**
  * Helper class used by the SL {@link Parser} to create nodes. The code is factored out of the
@@ -132,13 +136,21 @@ public class SLNodeFactory {
     private final TruffleString sourceString;
     private final Map<TruffleString, RootCallTarget> allFunctions;
 
+    final ArrayList<Pair<TruffleString, SLBlockNode>> flaggableFunctions = new ArrayList<>();
+    private final Set<TruffleString> functionContainsNewNode = new HashSet<>();
+
     /* State while parsing a function. */
+    private boolean notFlag;
     private int functionStartPos;
     private TruffleString functionName;
     private int functionBodyStartPos; // includes parameter list
     private int parameterCount;
     private FrameDescriptor.Builder frameDescriptorBuilder;
     private List<SLStatementNode> methodNodes;
+
+    private int expNumber;
+    private int newExpNumber;
+    private boolean inNewExp;
 
     /* State while parsing a block. */
     private LexicalScope lexicalScope;
@@ -155,6 +167,10 @@ public class SLNodeFactory {
         return allFunctions;
     }
 
+    public Set<TruffleString> getFunctionContainsNewNode() {
+        return functionContainsNewNode;
+    }
+
     public void startFunction(Token nameToken, Token bodyStartToken) {
         assert functionStartPos == 0;
         assert functionName == null;
@@ -162,13 +178,19 @@ public class SLNodeFactory {
         assert parameterCount == 0;
         assert frameDescriptorBuilder == null;
         assert lexicalScope == null;
+        assert !notFlag;
 
         functionStartPos = nameToken.getStartIndex();
         functionName = asTruffleString(nameToken, false);
         functionBodyStartPos = bodyStartToken.getStartIndex();
         frameDescriptorBuilder = FrameDescriptor.newBuilder();
         methodNodes = new ArrayList<>();
+        inNewExp = false;
         startBlock();
+    }
+
+    public void dontFlag() {
+        notFlag = true;
     }
 
     public void addFormalParameter(Token nameToken) {
@@ -178,6 +200,7 @@ public class SLNodeFactory {
          * specialized.
          */
         final SLReadArgumentNode readArg = new SLReadArgumentNode(parameterCount);
+        setIdentifier(readArg);
         readArg.setSourceSection(nameToken.getStartIndex(), nameToken.getText().length());
         SLExpressionNode assignment = createAssignment(createStringLiteral(nameToken, false), readArg, parameterCount);
         methodNodes.add(assignment);
@@ -192,14 +215,16 @@ public class SLNodeFactory {
             methodNodes.add(bodyNode);
             final int bodyEndPos = bodyNode.getSourceEndIndex();
             final SourceSection functionSrc = source.createSection(functionStartPos, bodyEndPos - functionStartPos);
-            final SLStatementNode methodBlock = finishBlock(methodNodes, parameterCount, functionBodyStartPos, bodyEndPos - functionBodyStartPos);
+            final SLBlockNode methodBlock = finishBlock(methodNodes, parameterCount, functionBodyStartPos, bodyEndPos - functionBodyStartPos);
             assert lexicalScope == null : "Wrong scoping of blocks in parser";
 
             final SLFunctionBodyNode functionBodyNode = new SLFunctionBodyNode(methodBlock);
             functionBodyNode.setSourceSection(functionSrc.getCharIndex(), functionSrc.getCharLength());
+            setIdentifier(functionBodyNode);
 
             final SLRootNode rootNode = new SLRootNode(language, frameDescriptorBuilder.build(), functionBodyNode, functionSrc, functionName);
             allFunctions.put(functionName, rootNode.getCallTarget());
+            if (!notFlag) flaggableFunctions.add(Pair.create(functionName, methodBlock));
         }
 
         functionStartPos = 0;
@@ -208,6 +233,10 @@ public class SLNodeFactory {
         parameterCount = 0;
         frameDescriptorBuilder = null;
         lexicalScope = null;
+
+        expNumber = 0;
+        newExpNumber = 0;
+        notFlag = false;
     }
 
     public void startBlock() {
@@ -218,7 +247,7 @@ public class SLNodeFactory {
         return finishBlock(bodyNodes, 0, startPos, length);
     }
 
-    public SLStatementNode finishBlock(List<SLStatementNode> bodyNodes, int skipCount, int startPos, int length) {
+    public SLBlockNode finishBlock(List<SLStatementNode> bodyNodes, int skipCount, int startPos, int length) {
         lexicalScope = lexicalScope.outer;
 
         if (containsNull(bodyNodes)) {
@@ -236,6 +265,7 @@ public class SLNodeFactory {
         }
         SLBlockNode blockNode = new SLBlockNode(flattenedNodes.toArray(new SLStatementNode[flattenedNodes.size()]));
         blockNode.setSourceSection(startPos, length);
+        setIdentifier(blockNode);
         return blockNode;
     }
 
@@ -262,6 +292,7 @@ public class SLNodeFactory {
     SLStatementNode createDebugger(Token debuggerToken) {
         final SLDebuggerNode debuggerNode = new SLDebuggerNode();
         srcFromToken(debuggerNode, debuggerToken);
+        setIdentifier(debuggerNode);
         return debuggerNode;
     }
 
@@ -274,6 +305,7 @@ public class SLNodeFactory {
     public SLStatementNode createBreak(Token breakToken) {
         final SLBreakNode breakNode = new SLBreakNode();
         srcFromToken(breakNode, breakToken);
+        setIdentifier(breakNode);
         return breakNode;
     }
 
@@ -286,6 +318,7 @@ public class SLNodeFactory {
     public SLStatementNode createContinue(Token continueToken) {
         final SLContinueNode continueNode = new SLContinueNode();
         srcFromToken(continueNode, continueToken);
+        setIdentifier(continueNode);
         return continueNode;
     }
 
@@ -308,6 +341,8 @@ public class SLNodeFactory {
         final int end = bodyNode.getSourceEndIndex();
         final SLWhileNode whileNode = new SLWhileNode(conditionNode, bodyNode);
         whileNode.setSourceSection(start, end - start);
+        setIdentifier(whileNode);
+        setIdentifier(conditionNode);
         return whileNode;
     }
 
@@ -331,6 +366,8 @@ public class SLNodeFactory {
         final int end = elsePartNode == null ? thenPartNode.getSourceEndIndex() : elsePartNode.getSourceEndIndex();
         final SLIfNode ifNode = new SLIfNode(conditionNode, thenPartNode, elsePartNode);
         ifNode.setSourceSection(start, end - start);
+        setIdentifier(ifNode);
+        setIdentifier(conditionNode);
         return ifNode;
     }
 
@@ -346,6 +383,7 @@ public class SLNodeFactory {
         final int length = valueNode == null ? t.getText().length() : valueNode.getSourceEndIndex() - start;
         final SLReturnNode returnNode = new SLReturnNode(valueNode);
         returnNode.setSourceSection(start, length);
+        setIdentifier(returnNode);
         return returnNode;
     }
 
@@ -412,6 +450,7 @@ public class SLNodeFactory {
         int length = rightNode.getSourceEndIndex() - start;
         result.setSourceSection(start, length);
         result.addExpressionTag();
+        setIdentifier(result);
 
         return result;
     }
@@ -436,6 +475,7 @@ public class SLNodeFactory {
         final int endPos = finalToken.getStartIndex() + finalToken.getText().length();
         result.setSourceSection(startPos, endPos - startPos);
         result.addExpressionTag();
+        setIdentifier(result);
 
         return result;
     }
@@ -483,6 +523,7 @@ public class SLNodeFactory {
         if (argumentIndex == null) {
             result.addExpressionTag();
         }
+        setIdentifier(result);
 
         return result;
     }
@@ -517,6 +558,7 @@ public class SLNodeFactory {
         }
         result.setSourceSection(nameNode.getSourceCharIndex(), nameNode.getSourceLength());
         result.addExpressionTag();
+        setIdentifier(result);
         return result;
     }
 
@@ -524,6 +566,7 @@ public class SLNodeFactory {
         final SLStringLiteralNode result = new SLStringLiteralNode(asTruffleString(literalToken, removeQuotes));
         srcFromToken(result, literalToken);
         result.addExpressionTag();
+        setIdentifier(result);
         return result;
     }
 
@@ -550,6 +593,7 @@ public class SLNodeFactory {
         }
         srcFromToken(result, literalToken);
         result.addExpressionTag();
+        setIdentifier(result);
         return result;
     }
 
@@ -560,6 +604,7 @@ public class SLNodeFactory {
 
         final SLParenExpressionNode result = new SLParenExpressionNode(expressionNode);
         result.setSourceSection(start, length);
+        setIdentifier(result);
         return result;
     }
 
@@ -582,6 +627,7 @@ public class SLNodeFactory {
         final int endPos = nameNode.getSourceEndIndex();
         result.setSourceSection(startPos, endPos - startPos);
         result.addExpressionTag();
+        setIdentifier(result);
 
         return result;
     }
@@ -606,8 +652,21 @@ public class SLNodeFactory {
         final int length = valueNode.getSourceEndIndex() - start;
         result.setSourceSection(start, length);
         result.addExpressionTag();
+        setIdentifier(result);
 
         return result;
+    }
+
+    private void setIdentifier(SLStatementNode node) {
+        node.setIdentifier(newIdentifier());
+    }
+
+    private NodeIdentifier newIdentifier() {
+        if (inNewExp) {
+            return new NodeIdentifier(functionName, newExpNumber++, true);
+        } else {
+            return new NodeIdentifier(functionName, expNumber++);
+        }
     }
 
     /**

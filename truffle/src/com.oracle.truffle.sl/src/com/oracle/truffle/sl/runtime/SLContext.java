@@ -48,7 +48,10 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
+import com.oracle.truffle.sl.runtime.diffexec.ArrayTime;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperatorImpl;
 import org.graalvm.polyglot.Context;
 
 import com.oracle.truffle.api.CallTarget;
@@ -101,6 +104,7 @@ import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
  * However, if two separate scripts run in one Java VM at the same time, they have a different
  * context. Therefore, the context is not a singleton.
  */
+@SuppressWarnings("JavadocReference")
 public final class SLContext {
 
     private final SLLanguage language;
@@ -110,7 +114,7 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
-    private final ExecutionHistoryOperator<Object> historyOperator = null; // TODO
+    private final ExecutionHistoryOperator<ArrayTime> historyOperator;
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins) {
         this.env = env;
@@ -119,6 +123,9 @@ public final class SLContext {
         this.language = language;
         this.allocationReporter = env.lookup(AllocationReporter.class);
         this.functionRegistry = new SLFunctionRegistry(language);
+        var op = this.historyOperator = new ExecutionHistoryOperatorImpl<>(functionRegistry, ArrayTime.ZERO);
+        InstrumentationHandler.staticFactory = op.getTickFactory();
+
         installBuiltins();
         for (NodeFactory<? extends SLBuiltinNode> builtin : externalBuiltins) {
             installBuiltin(builtin);
@@ -277,7 +284,7 @@ public final class SLContext {
         }
     }
 
-    public ExecutionHistoryOperator<Object> getHistoryOperator() {
+    public ExecutionHistoryOperator<ArrayTime> getHistoryOperator() {
         return historyOperator;
     }
 }

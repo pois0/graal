@@ -6,13 +6,11 @@ import com.google.common.hash.Hashing;
 public abstract sealed class CallContext implements Comparable<CallContext> {
     protected final NodeIdentifier nodeIdentifier;
     protected final CallContext root;
-    protected final FunctionCall calledFrom;
     protected final int hashCode;
 
-    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int hashCode) {
+    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, int hashCode) {
         this.root = root;
         this.nodeIdentifier = nodeIdentifier;
-        this.calledFrom = calledFrom;
         this.hashCode = hashCode;
     }
 
@@ -79,8 +77,8 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
     }
 
     public static abstract sealed class ContextBase extends CallContext {
-        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int hashCode) {
-            super(root, nodeIdentifier, calledFrom, hashCode);
+        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, int hashCode) {
+            super(root, nodeIdentifier, hashCode);
         }
     }
 
@@ -88,7 +86,7 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
         public static final ExecutionBase INSTANCE = new ExecutionBase();
 
         private ExecutionBase() {
-            super(null, null, null, 0);
+            super(null, null, 0);
         }
 
         @Override
@@ -117,7 +115,6 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
         public FunctionCall(CallContext root, NodeIdentifier nodeIdentifier) {
             super(root,
                     nodeIdentifier,
-                    root instanceof FunctionCall ? (FunctionCall) root : root.calledFrom,
                     hashCode(root, nodeIdentifier).putInt(0).hash().asInt());
         }
 
@@ -136,20 +133,20 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
     }
 
     public static final class Loop extends CallContext {
+        private final ContextBase base;
         private final int loopCount;
 
-        public Loop(CallContext root, NodeIdentifier nodeIdentifier, FunctionCall calledFrom, int loopCount) {
+        public Loop(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
             super(root,
                     nodeIdentifier,
-                    calledFrom,
                     hashCode(root, nodeIdentifier, loopCount));
+            this.base = root.getBase();
             this.loopCount = loopCount;
         }
 
         public Loop(CallContext root, NodeIdentifier nodeIdentifier) {
             this(root,
                     nodeIdentifier,
-                    root instanceof FunctionCall ? (FunctionCall) root : root == null ? null : root.calledFrom,
                     0);
         }
 
@@ -158,14 +155,15 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
         }
 
         public CallContext increment() {
-            return new Loop(root, nodeIdentifier, calledFrom, loopCount + 1);
+            return new Loop(root, nodeIdentifier,  loopCount + 1);
         }
 
         @Override
         public ContextBase getBase() {
-            return calledFrom;
+            return base;
         }
 
+        @SuppressWarnings("UnstableApiUsage")
         private static int hashCode(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
             return hashCode(root, nodeIdentifier).putInt(loopCount + 1).hash().asInt();
         }

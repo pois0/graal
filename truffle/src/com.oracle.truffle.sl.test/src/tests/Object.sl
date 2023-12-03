@@ -16,9 +16,9 @@ function main() {
   
   println(mkobj().z);
   
-  obj3 = new();
+/*  obj3 = new();
   obj3.fn = mkobj;
-  println(obj3.fn().z);
+  println(obj3.fn().z); */
 
   obj4 = new();
   write(obj4, 1);

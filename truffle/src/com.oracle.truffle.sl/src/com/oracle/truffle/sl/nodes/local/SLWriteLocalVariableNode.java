@@ -48,11 +48,14 @@ import com.oracle.truffle.api.frame.FrameSlotKind;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.instrumentation.StandardTags.WriteVariableTag;
 import com.oracle.truffle.api.instrumentation.Tag;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 /**
  * Node to write a local variable to a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -75,6 +78,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
      * the Truffle DSL based on the {@link NodeChild} annotation on the class.
      */
     protected abstract SLExpressionNode getNameNode();
+    protected abstract SLExpressionNode getValueNode();
 
     public abstract boolean isDeclaration();
 
@@ -93,6 +97,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         frame.getFrameDescriptor().setSlotKind(getSlot(), FrameSlotKind.Long);
 
         frame.setLong(getSlot(), value);
+        getContext().getHistoryOperator().onUpdateLocalVariable(getSlot(), value);
         return value;
     }
 
@@ -102,6 +107,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         frame.getFrameDescriptor().setSlotKind(getSlot(), FrameSlotKind.Boolean);
 
         frame.setBoolean(getSlot(), value);
+        getContext().getHistoryOperator().onUpdateLocalVariable(getSlot(), value);
         return value;
     }
 
@@ -127,6 +133,7 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         frame.getFrameDescriptor().setSlotKind(getSlot(), FrameSlotKind.Object);
 
         frame.setObject(getSlot(), value);
+        getContext().getHistoryOperator().onUpdateLocalVariable(getSlot(), value);
         return value;
     }
 
@@ -151,6 +158,36 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
     }
 
     @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+        final CalcResult.Generic value = op.calcGeneric(frame, getValueNode());
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), getNodeIdentifier());
+        }
+        return value;
+    }
+
+    @Override
+    public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
+        final var op = getContext().getHistoryOperator();
+        final CalcResult.Boolean value = op.calcBoolean(frame, this, getValueNode());
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), getNodeIdentifier());
+        }
+        return value;
+    }
+
+    @Override
+    public CalcResult.Long calcLongInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+        final CalcResult.Long value = op.calcLong(frame, this, getValueNode());
+        if (value.isFresh()) {
+            op.rewriteLocalVariable(getSlot(), value.getResult(), getNodeIdentifier());
+        }
+        return value;
+    }
+
+    @Override
     public boolean hasTag(Class<? extends Tag> tag) {
         return tag == WriteVariableTag.class || super.hasTag(tag);
     }
@@ -172,4 +209,10 @@ public abstract class SLWriteLocalVariableNode extends SLExpressionNode {
         }
         return NodeObjectDescriptor.writeVariable((TruffleString) getRootNode().getFrameDescriptor().getSlotName(getSlot()), nameSourceSection);
     }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getNameNode().hasNewNode() || getValueNode().hasNewNode();
+    }
+
 }

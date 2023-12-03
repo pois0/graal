@@ -44,6 +44,7 @@ import com.oracle.truffle.api.dsl.Bind;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.InvalidArrayIndexException;
 import com.oracle.truffle.api.interop.UnknownIdentifierException;
@@ -56,8 +57,14 @@ import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.nodes.util.SLToTruffleStringNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLObject;
+import com.oracle.truffle.sl.runtime.SLObjectBase;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
+import com.oracle.truffle.sl.runtime.diffexec.SLDEObject;
 
 /**
  * The node for reading a property of an object. When executed, this node:
@@ -74,12 +81,18 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
 
+    protected abstract SLExpressionNode getReceiverNode();
+    protected abstract SLExpressionNode getNameNode();
+
     @Specialization(guards = "arrays.hasArrayElements(receiver)", limit = "LIBRARY_LIMIT")
     protected Object readArray(Object receiver, Object index,
                     @CachedLibrary("receiver") InteropLibrary arrays,
                     @CachedLibrary("index") InteropLibrary numbers) {
         try {
-            return arrays.readArrayElement(receiver, numbers.asLong(index));
+            long i = numbers.asLong(index);
+            Object result = arrays.readArrayElement(receiver, i);
+            getContext().getHistoryOperator().onReadArrayElement(receiver, i);
+            return result;
         } catch (UnsupportedMessageException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, index);
@@ -87,16 +100,26 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
     }
 
     @Specialization(limit = "LIBRARY_LIMIT")
-    protected static Object readSLObject(SLObject receiver, Object name,
+    protected static Object readSLObject(SLObjectBase receiver, Object name,
                     @Bind("this") Node node,
                     @CachedLibrary("receiver") DynamicObjectLibrary objectLibrary,
                     @Cached SLToTruffleStringNode toTruffleStringNode) {
         TruffleString nameTS = toTruffleStringNode.execute(node, name);
-        Object result = objectLibrary.getOrDefault(receiver, nameTS, null);
+        Object result;
+        if (receiver instanceof SLObject) {
+            result = objectLibrary.getOrDefault(receiver, nameTS, null);
+        } else {
+            try {
+                result = ((SLDEObject) receiver).readMember(nameTS.toJavaStringUncached(), nameTS, DynamicObjectLibrary.getUncached());
+            } catch (UnknownIdentifierException e) {
+                throw SLUndefinedNameException.undefinedProperty(node, nameTS);
+            }
+        }
         if (result == null) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(node, nameTS);
         }
+        SLContext.get(node).getHistoryOperator().onReadObjectField(receiver, nameTS.toString());
         return result;
     }
 
@@ -106,15 +129,35 @@ public abstract class SLReadPropertyNode extends SLExpressionNode {
                     @CachedLibrary("receiver") InteropLibrary objects,
                     @Cached SLToMemberNode asMember) {
         try {
-            return objects.readMember(receiver, asMember.execute(node, name));
+            String nameS = asMember.execute(node, name);
+            Object result = objects.readMember(receiver, nameS);
+            SLContext.get(node).getHistoryOperator().onReadObjectField(receiver, nameS);
+            return result;
         } catch (UnsupportedMessageException | UnknownIdentifierException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(node, name);
         }
     }
 
-    static boolean isSLObject(Object receiver) {
-        return receiver instanceof SLObject;
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+
+        final CalcResult.Generic receiverWrapped = op.calcGeneric(frame, getReceiverNode());
+        Object receiver = receiverWrapped.getResult();
+        final CalcResult.Generic fldNameWrapped = op.calcGeneric(frame, getNameNode());
+        Object name = fldNameWrapped.getResult();
+
+        Object result = op.getObjectFieldValue(this, receiver, name.toString(), getNodeIdentifier());
+        return new CalcResult.Generic(result, receiverWrapped.isFresh() || fldNameWrapped.isFresh());
     }
 
+    @Override
+    protected boolean hasNewChildNode() {
+        return getReceiverNode().hasNewNode() || getNameNode().hasNewNode();
+    }
+
+    static boolean isSLObject(Object receiver) {
+        return receiver instanceof SLObjectBase;
+    }
 }

@@ -47,6 +47,7 @@ import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Built-in function that returns true if the given operand is of a given meta-object. Meta-objects
@@ -66,4 +67,10 @@ public abstract class SLIsInstanceBuiltin extends SLBuiltinNode {
         }
     }
 
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isInstance");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
+    }
 }

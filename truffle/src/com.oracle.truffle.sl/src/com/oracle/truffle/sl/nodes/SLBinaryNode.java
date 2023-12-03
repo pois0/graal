@@ -42,6 +42,8 @@ package com.oracle.truffle.sl.nodes;
 
 import com.oracle.truffle.api.dsl.NodeChild;
 
+import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
+
 /**
  * Utility base class for operations that take two arguments (per convention called "left" and
  * "right"). For concrete subclasses of this class, the Truffle DSL creates two child fields, and
@@ -50,6 +52,7 @@ import com.oracle.truffle.api.dsl.NodeChild;
 @NodeChild("leftNode")
 @NodeChild("rightNode")
 public abstract class SLBinaryNode extends SLExpressionNode {
+
     protected abstract SLExpressionNode getLeftNode();
     protected abstract SLExpressionNode getRightNode();
 

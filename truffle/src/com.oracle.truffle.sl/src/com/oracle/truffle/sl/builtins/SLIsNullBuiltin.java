@@ -41,9 +41,14 @@
 package com.oracle.truffle.sl.builtins;
 
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Built-in function that queries if the foreign object is a null value. See
@@ -55,5 +60,22 @@ public abstract class SLIsNullBuiltin extends SLBuiltinNode {
     @Specialization(limit = "3")
     public boolean isExecutable(Object obj, @CachedLibrary("obj") InteropLibrary values) {
         return values.isNull(obj);
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).getGenericResult();
+    }
+
+    @Override
+    public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) {
+        return CalcResult.Boolean.fresh(frame.getArguments()[0] == SLNull.SINGLETON); // TODO should be fresh?
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("isNull");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

@@ -58,7 +58,7 @@ import com.oracle.truffle.sl.runtime.SLBigInteger;
  * specialized methods return {@code boolean} instead of the input types.
  */
 @NodeInfo(shortName = "<")
-public abstract class SLLessThanNode extends SLBinaryNode {
+public abstract class SLLessThanNode extends SLRelCompNode {
 
     @Specialization
     protected boolean doLong(long left, long right) {

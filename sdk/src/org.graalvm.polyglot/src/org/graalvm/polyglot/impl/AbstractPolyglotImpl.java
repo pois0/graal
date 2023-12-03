@@ -110,6 +110,9 @@ import org.graalvm.polyglot.management.ExecutionListener;
 @SuppressWarnings("unused")
 public abstract class AbstractPolyglotImpl {
 
+    public static int testCount = 0;
+    public static long constructCost = 0;
+
     protected AbstractPolyglotImpl() {
     }
 

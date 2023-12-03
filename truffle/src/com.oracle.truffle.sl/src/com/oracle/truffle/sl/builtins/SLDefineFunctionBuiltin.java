@@ -42,11 +42,15 @@ package com.oracle.truffle.sl.builtins;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function to define (or redefine) functions. The provided source code is parsed the same
@@ -66,5 +70,20 @@ public abstract class SLDefineFunctionBuiltin extends SLBuiltinNode {
         SLContext.get(this).getFunctionRegistry().register(source);
 
         return code;
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        final Object result = executeGeneric(frame); // TODO ?
+        return CalcResult.Generic.fresh(result);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("defineFunction");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

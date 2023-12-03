@@ -13,12 +13,19 @@ public final class ArrayTime extends Time<ArrayTime> {
         this.raw = raw;
     }
 
+    @Override
     public ArrayTime inc() {
         int[] newRaw = Arrays.copyOf(raw, raw.length);
         newRaw[raw.length - 1]++;
         return new ArrayTime(newRaw);
     }
 
+    @Override
+    public ArrayTime incAndSimplify() {
+        return new ArrayTime(new int[]{raw[0] + 1});
+    }
+
+    @Override
     public ArrayTime mid(ArrayTime next) {
         if (raw.length > next.raw.length) {
             final int newLength = next.raw.length + 1;
@@ -53,5 +60,12 @@ public final class ArrayTime extends Time<ArrayTime> {
     @Override
     public int compareTo(ArrayTime o) {
         return Arrays.compare(raw, o.raw);
+    }
+
+    @Override
+    public String toString() {
+        return "ArrayTime{" +
+                "raw=" + Arrays.toString(raw) +
+                '}';
     }
 }

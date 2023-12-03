@@ -57,15 +57,17 @@ import com.oracle.truffle.sl.runtime.SLBigInteger;
  * This class is similar to the {@link SLLessThanNode}.
  */
 @NodeInfo(shortName = "<=")
-public abstract class SLLessOrEqualNode extends SLBinaryNode {
+public abstract class SLLessOrEqualNode extends SLRelCompNode {
 
     @Specialization
+    @Override
     protected boolean doLong(long left, long right) {
         return left <= right;
     }
 
     @Specialization
     @TruffleBoundary
+    @Override
     protected boolean doSLBigInteger(SLBigInteger left, SLBigInteger right) {
         return left.compareTo(right) <= 0;
     }

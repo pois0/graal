@@ -45,13 +45,17 @@ import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 /**
  * This class is similar to the extensively documented {@link SLAddNode}. Divisions by 0 throw the
@@ -59,9 +63,10 @@ import com.oracle.truffle.sl.runtime.SLBigInteger;
  * the code simple.
  */
 @NodeInfo(shortName = "/")
-public abstract class SLDivNode extends SLBinaryNode {
+public abstract class SLDivNode extends SLArithOpNode {
 
     @Specialization(rewriteOn = ArithmeticException.class)
+    @Override
     protected long doLong(long left, long right) throws ArithmeticException {
         long result = left / right;
         /*
@@ -88,6 +93,17 @@ public abstract class SLDivNode extends SLBinaryNode {
             return new SLBigInteger(leftLibrary.asBigInteger(left).divide(rightLibrary.asBigInteger(right)));
         } catch (UnsupportedMessageException e) {
             throw shouldNotReachHere(e);
+        }
+    }
+
+    @Override
+    protected Object calcOpApplication(Object left, InteropLibrary leftInterop, Object right, InteropLibrary rightInterop) throws UnsupportedMessageException {
+        if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+            return doLong(leftInterop.asLong(left), rightInterop.asLong(right));
+        } else if (left instanceof SLBigInteger && right instanceof SLBigInteger) {
+            return doSLBigInteger((SLBigInteger) left, (SLBigInteger) right);
+        } else {
+            return 0;
         }
     }
 

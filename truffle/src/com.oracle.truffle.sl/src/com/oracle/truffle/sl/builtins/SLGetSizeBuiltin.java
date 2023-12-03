@@ -41,11 +41,14 @@
 package com.oracle.truffle.sl.builtins;
 
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Built-in function that queries the size property of a foreign object. See
@@ -61,5 +64,23 @@ public abstract class SLGetSizeBuiltin extends SLBuiltinNode {
         } catch (UnsupportedMessageException e) {
             throw new SLException("Element is not a valid array.", this);
         }
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return calcLongInner(frame).getGenericResult();
+    }
+
+    @Override
+    public CalcResult.Long calcLongInner(VirtualFrame frame) {
+        Object arg = frame.getArguments()[0];
+        return CalcResult.Long.fresh((Long) getSize(arg, InteropLibrary.getUncached(arg))); // TODO should be fresh?
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("getSize");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

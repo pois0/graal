@@ -47,6 +47,7 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.runtime.SLContext;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin that allows to lookup a Java type.
@@ -69,4 +70,10 @@ public abstract class SLJavaTypeBuiltin extends SLBuiltinNode {
         }
     }
 
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("javaType");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
+    }
 }

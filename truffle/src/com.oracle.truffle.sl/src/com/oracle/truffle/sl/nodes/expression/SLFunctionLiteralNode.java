@@ -52,6 +52,7 @@ import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Constant literal for a {@link SLFunction function} value, created when a function name occurs as
@@ -60,7 +61,7 @@ import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
  * never changes. This is guaranteed by the {@link SLFunctionRegistry}.
  */
 @NodeInfo(shortName = "func")
-public final class SLFunctionLiteralNode extends SLExpressionNode {
+public final class SLFunctionLiteralNode extends SLLiteralNode {
 
     /** The name of the function. */
     private final TruffleString functionName;
@@ -106,4 +107,8 @@ public final class SLFunctionLiteralNode extends SLExpressionNode {
         return function;
     }
 
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return super.calcGenericInner(frame); // TODO
+    }
 }

@@ -52,6 +52,9 @@ grammar SimpleLanguage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import org.graalvm.collections.Pair;
 
 import com.oracle.truffle.api.RootCallTarget;
 import com.oracle.truffle.api.source.Source;
@@ -59,6 +62,8 @@ import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
+
+import static com.oracle.truffle.sl.parser.SimpleLanguageParserSupport.getMapSetPair;
 }
 
 @lexer::header
@@ -68,7 +73,7 @@ import com.oracle.truffle.sl.nodes.SLStatementNode;
 
 @parser::members
 {
-private SLNodeFactory factory;
+SLNodeFactory factory;
 private Source source;
 
 private static final class BailoutErrorListener extends BaseErrorListener {
@@ -94,7 +99,7 @@ private static void throwParseError(Source source, int line, int charPositionInL
     throw new SLParseError(source, line, col, length, String.format("Error(s) parsing script:%n" + location + message));
 }
 
-public static Map<TruffleString, RootCallTarget> parseSL(SLLanguage language, Source source) {
+public static Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> parseSL(SLLanguage language, Source source) {
     SimpleLanguageLexer lexer = new SimpleLanguageLexer(CharStreams.fromString(source.getCharacters().toString()));
     SimpleLanguageParser parser = new SimpleLanguageParser(new CommonTokenStream(lexer));
     lexer.removeErrorListeners();
@@ -105,7 +110,8 @@ public static Map<TruffleString, RootCallTarget> parseSL(SLLanguage language, So
     parser.factory = new SLNodeFactory(language, source);
     parser.source = source;
     parser.simplelanguage();
-    return parser.factory.getAllFunctions();
+
+    return getMapSetPair(parser);
 }
 }
 
@@ -134,10 +140,19 @@ s='('
     )*
 )?
 ')'
+g=at_mark                                       { if ($g.result) factory.dontFlag(); }
 body=block[false]                               { factory.finishFunction($body.result); }
 ;
 
 
+at_mark returns [boolean result]
+:
+(
+'@'                                             { $result = true; }
+|
+                                                { $result = false; }
+)
+;
 
 block [boolean inLoop] returns [SLStatementNode result]
 :                                               { factory.startBlock();

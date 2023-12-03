@@ -49,6 +49,7 @@ import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * This builtin sets the variable named "hello" in the caller frame to the string "world".
@@ -70,5 +71,12 @@ public abstract class SLHelloEqualsWorldBuiltin extends SLBuiltinNode {
             }
             return SLStrings.WORLD;
         }, 1);
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("helloEqualsWorld");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

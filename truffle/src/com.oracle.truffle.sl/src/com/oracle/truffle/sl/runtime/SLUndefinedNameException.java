@@ -55,6 +55,7 @@ public final class SLUndefinedNameException extends SLException {
 
     @TruffleBoundary
     public static SLUndefinedNameException undefinedProperty(Node location, Object name) {
+        (new RuntimeException()).printStackTrace();
         throw new SLUndefinedNameException("Undefined property: " + name, location);
     }
 

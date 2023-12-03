@@ -49,6 +49,7 @@ import com.oracle.truffle.api.instrumentation.Tag;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.interop.NodeObjectDescriptor;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Node to read a local variable from a function's {@link VirtualFrame frame}. The Truffle frame API
@@ -76,12 +77,16 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
          * written to the local variable. So we do not need to check that the frame really contains
          * a primitive long value.
          */
-        return frame.getLong(getSlot());
+        long result = frame.getLong(getSlot());
+        notifyVariableRead();
+        return result;
     }
 
     @Specialization(guards = "frame.isBoolean(getSlot())")
     protected boolean readBoolean(VirtualFrame frame) {
-        return frame.getBoolean(getSlot());
+        boolean result = frame.getBoolean(getSlot());
+        notifyVariableRead();
+        return result;
     }
 
     @Specialization(replaces = {"readLong", "readBoolean"})
@@ -97,10 +102,18 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
             CompilerDirectives.transferToInterpreter();
             Object result = frame.getValue(getSlot());
             frame.setObject(getSlot(), result);
+            notifyVariableRead();
             return result;
         }
 
-        return frame.getObject(getSlot());
+        Object result = frame.getObject(getSlot());
+        notifyVariableRead();
+        return result;
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return CalcResult.Generic.fresh(getContext().getHistoryOperator().getVariableValue(getSlot(), getNodeIdentifier()));
     }
 
     @Override
@@ -111,5 +124,14 @@ public abstract class SLReadLocalVariableNode extends SLExpressionNode {
     @Override
     public Object getNodeObject() {
         return NodeObjectDescriptor.readVariable((TruffleString) getRootNode().getFrameDescriptor().getSlotName(getSlot()));
+    }
+
+    private void notifyVariableRead() {
+        getContext().getHistoryOperator().onReadLocalVariable(getSlot());
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
     }
 }

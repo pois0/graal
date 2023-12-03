@@ -57,7 +57,6 @@ import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
  */
 @TypeSystemReference(SLTypes.class)
 @NodeInfo(description = "The abstract base node for all expressions")
-@GenerateWrapper
 public abstract class SLExpressionNode extends SLStatementNode {
 
     private boolean hasExpressionTag;
@@ -68,11 +67,11 @@ public abstract class SLExpressionNode extends SLStatementNode {
      */
     public abstract Object executeGeneric(VirtualFrame frame);
 
-    public final CalcResult.Generic<Object> calcGeneric(VirtualFrame frame) {
+    public final CalcResult.Generic calcGeneric(VirtualFrame frame) {
         return getContext().getHistoryOperator().calcGeneric(frame, this);
     }
 
-    public abstract CalcResult.Generic<Object> calcGenericInner(VirtualFrame frame);
+    public abstract CalcResult.Generic calcGenericInner(VirtualFrame frame);
 
     /**
      * When we use an expression at places where a {@link SLStatementNode statement} is already
@@ -123,7 +122,7 @@ public abstract class SLExpressionNode extends SLStatementNode {
     }
 
     public CalcResult.Long calcLongInner(VirtualFrame frame) throws UnexpectedResultException {
-        CalcResult.Generic<Object> result = calcGenericInner(frame);
+        CalcResult.Generic result = calcGenericInner(frame);
         long value = SLTypesGen.expectLong(result.getResult());
         if  (result.isFresh()) {
             return CalcResult.Long.fresh(value);
@@ -141,12 +140,27 @@ public abstract class SLExpressionNode extends SLStatementNode {
     }
 
     public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) throws UnexpectedResultException {
-        CalcResult.Generic<Object> result = calcGenericInner(frame);
+        CalcResult.Generic result = calcGenericInner(frame);
         boolean value = SLTypesGen.expectBoolean(result.getResult());
         if  (result.isFresh()) {
             return CalcResult.Boolean.fresh(value);
         } else {
             return CalcResult.Boolean.cached(value);
         }
+    }
+
+    @Override
+    public SLExpressionNode unwrap() {
+        return null;
+    }
+
+    @Override
+    public int getSize() {
+        return 0;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        throw new UnsupportedOperationException();
     }
 }

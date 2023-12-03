@@ -45,10 +45,13 @@ import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.UnsupportedSpecializationException;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
+import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Base class for all builtin functions. It contains the Truffle DSL annotation {@link NodeChild}
@@ -86,5 +89,20 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
         super.executeVoid(frame);
     }
 
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return CalcResult.Generic.fresh(executeGeneric(frame));
+    }
+
     protected abstract Object execute(VirtualFrame frame);
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
+    }
+
+    protected static NodeIdentifier generateNodeIdentifierForBuiltin(String functionName) {
+        TruffleString truffleStringTS = TruffleString.fromJavaStringUncached(functionName, TruffleString.Encoding.UTF_8);
+        return new NodeIdentifier(truffleStringTS, 0, false);
+    }
 }

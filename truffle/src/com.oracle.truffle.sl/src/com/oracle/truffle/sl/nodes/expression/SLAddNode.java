@@ -48,18 +48,23 @@ import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.Fallback;
 import com.oracle.truffle.api.dsl.ImplicitCast;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.NodeInfo;
+import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.nodes.SLTypes;
 import com.oracle.truffle.sl.nodes.util.SLToTruffleStringNode;
+import com.oracle.truffle.sl.nodes.util.SLToTruffleStringNodeGen;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 /**
  * SL node that performs the "+" operation, which performs addition on arbitrary precision numbers,
@@ -72,7 +77,7 @@ import com.oracle.truffle.sl.runtime.SLBigInteger;
  * is generated that provides, e.g., {@link SLAddNodeGen#create node creation}.
  */
 @NodeInfo(shortName = "+")
-public abstract class SLAddNode extends SLBinaryNode {
+public abstract class SLAddNode extends SLArithOpNode {
 
     /**
      * Specialization for primitive {@code long} values. This is the fast path of the
@@ -90,6 +95,7 @@ public abstract class SLAddNode extends SLBinaryNode {
      * operand are {@code long} values.
      */
     @Specialization(rewriteOn = ArithmeticException.class)
+    @Override
     protected long doLong(long left, long right) {
         return Math.addExact(left, right);
     }
@@ -153,6 +159,21 @@ public abstract class SLAddNode extends SLBinaryNode {
                     @Cached SLToTruffleStringNode toTruffleStringNodeRight,
                     @Cached TruffleString.ConcatNode concatNode) {
         return concatNode.execute(toTruffleStringNodeLeft.execute(node, left), toTruffleStringNodeRight.execute(node, right), SLLanguage.STRING_ENCODING, true);
+    }
+
+    @Override
+    protected Object calcOpApplication(Object left, InteropLibrary leftInterop, Object right, InteropLibrary rightInterop) throws UnsupportedMessageException {
+        if (leftInterop.fitsInLong(left) && rightInterop.fitsInLong(right)) {
+            return doLong(leftInterop.asLong(left), rightInterop.asLong(right));
+        } else if (left instanceof SLBigInteger && right instanceof SLBigInteger) {
+            return doSLBigInteger((SLBigInteger) left, (SLBigInteger) right);
+        } else if (isString(left, right)) {
+            SLToTruffleStringNode toTSNode = SLToTruffleStringNodeGen.getUncached();
+            TruffleString.ConcatNode concatNode = TruffleString.ConcatNode.getUncached();
+            return concatNode.execute(toTSNode.execute(this, left), toTSNode.execute(this, right), SLLanguage.STRING_ENCODING, true);
+        } else {
+            return 0L;
+        }
     }
 
     /**

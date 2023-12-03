@@ -79,7 +79,7 @@ public final class SLReturnNode extends SLStatementNode {
 
     @Override
     public void calcVoidInner(VirtualFrame frame) {
-        CalcResult.Generic<Object> result;
+        CalcResult.Generic result;
         if (valueNode != null) {
             result = valueNode.calcGeneric(frame);
         } else {
@@ -92,5 +92,15 @@ public final class SLReturnNode extends SLStatementNode {
     protected boolean hasNewChildNode() {
         final SLExpressionNode valueNode = this.valueNode;
         return valueNode != null && valueNode.hasNewNode();
+    }
+
+    @Override
+    public int getSize() {
+        return 0;
+    }
+
+    @Override
+    public void handleAsReplaced(int i) {
+        throw new UnsupportedOperationException();
     }
 }

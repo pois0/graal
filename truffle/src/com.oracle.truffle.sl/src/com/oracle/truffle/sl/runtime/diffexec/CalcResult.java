@@ -3,7 +3,7 @@ package com.oracle.truffle.sl.runtime.diffexec;
 import com.oracle.truffle.api.interop.TruffleObject;
 
 public abstract sealed class CalcResult implements TruffleObject {
-    private final boolean isFresh;
+    protected final boolean isFresh;
 
     protected CalcResult(boolean isFresh) {
         this.isFresh = isFresh;
@@ -13,31 +13,31 @@ public abstract sealed class CalcResult implements TruffleObject {
         return isFresh;
     }
 
-    public abstract Object getGenericResult();
+    public abstract CalcResult.Generic getGenericResult();
 
-    public static final class Generic<T> extends CalcResult {
-        private final T result;
+    public static final class Generic extends CalcResult {
+        private final Object result;
 
-        public static <T> Generic<T> cached(T result) {
-            return new Generic<>(result, false);
+        public static Generic cached(Object result) {
+            return new Generic(result, false);
         }
 
-        public static <T> Generic<T> fresh(T result) {
-            return new Generic<>(result, true);
+        public static Generic fresh(Object result) {
+            return new Generic(result, true);
         }
 
-        private Generic(T result, boolean isFresh) {
+        public Generic(Object result, boolean isFresh) {
             super(isFresh);
             this.result = result;
         }
 
-        public T getResult() {
+        public Object getResult() {
             return result;
         }
 
         @Override
-        public Object getGenericResult() {
-            return result;
+        public Generic getGenericResult() {
+            return this;
         }
     }
 
@@ -52,7 +52,7 @@ public abstract sealed class CalcResult implements TruffleObject {
             return new Boolean(result, true);
         }
 
-        private Boolean(boolean result, boolean isFresh) {
+        public Boolean(boolean result, boolean isFresh) {
             super(isFresh);
             this.result = result;
         }
@@ -62,8 +62,8 @@ public abstract sealed class CalcResult implements TruffleObject {
         }
 
         @Override
-        public Object getGenericResult() {
-            return result;
+        public Generic getGenericResult() {
+            return new Generic(result, isFresh);
         }
     }
 
@@ -71,14 +71,14 @@ public abstract sealed class CalcResult implements TruffleObject {
         private final long result;
 
         public static Long cached(long result) {
-            return new Long (result, false);
+            return new Long(result, false);
         }
 
         public static Long fresh(long result) {
             return new Long(result, true);
         }
 
-        private Long(long result, boolean isFresh) {
+        public Long(long result, boolean isFresh) {
             super(isFresh);
             this.result = result;
         }
@@ -88,8 +88,8 @@ public abstract sealed class CalcResult implements TruffleObject {
         }
 
         @Override
-        public Object getGenericResult() {
-            return result;
+        public Generic getGenericResult() {
+            return new Generic(result, isFresh);
         }
     }
 }

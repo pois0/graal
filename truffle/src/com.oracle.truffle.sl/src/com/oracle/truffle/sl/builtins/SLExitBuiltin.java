@@ -44,6 +44,7 @@ import com.oracle.truffle.api.dsl.Specialization;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Builtin function that performs context exit.
@@ -55,5 +56,12 @@ public abstract class SLExitBuiltin extends SLBuiltinNode {
     protected Object doDefault(long exitCode) {
         SLContext.get(this).getEnv().getContext().closeExited(this, (int) exitCode);
         return SLNull.SINGLETON;
+    }
+
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("exit");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
     }
 }

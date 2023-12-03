@@ -46,13 +46,14 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Constant literal for a arbitrary-precision number that exceeds the range of
  * {@link SLLongLiteralNode}.
  */
 @NodeInfo(shortName = "const")
-public final class SLBigIntegerLiteralNode extends SLExpressionNode {
+public final class SLBigIntegerLiteralNode extends SLLiteralNode {
 
     private final SLBigInteger value;
 

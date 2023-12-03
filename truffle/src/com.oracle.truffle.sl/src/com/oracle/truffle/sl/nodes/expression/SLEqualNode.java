@@ -45,6 +45,7 @@ import static com.oracle.truffle.api.CompilerDirectives.shouldNotReachHere;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.library.CachedLibrary;
@@ -53,8 +54,11 @@ import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLBinaryNode;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 
 /**
  * The {@code ==} operator of SL is defined on all types. Therefore, we need a
@@ -161,4 +165,22 @@ public abstract class SLEqualNode extends SLBinaryNode {
         }
     }
 
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        return calcBooleanInner(frame).getGenericResult();
+    }
+
+    @Override
+    public CalcResult.Boolean calcBooleanInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+
+        final CalcResult.Generic wrappedLeft = op.calcGeneric(frame, getLeftNode());
+        Object left = wrappedLeft.getResult();
+        final CalcResult.Generic wrappedRight = op.calcGeneric(frame, getRightNode());
+        Object right = wrappedRight.getResult();
+        return new CalcResult.Boolean(
+                doGeneric(left, right, InteropLibrary.getUncached(left), InteropLibrary.getUncached(right)),
+                wrappedLeft.isFresh() || wrappedRight.isFresh()
+        );
+    }
 }

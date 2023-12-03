@@ -44,6 +44,7 @@ import com.oracle.truffle.api.dsl.Bind;
 import com.oracle.truffle.api.dsl.Cached;
 import com.oracle.truffle.api.dsl.NodeChild;
 import com.oracle.truffle.api.dsl.Specialization;
+import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.InvalidArrayIndexException;
 import com.oracle.truffle.api.interop.UnknownIdentifierException;
@@ -53,11 +54,16 @@ import com.oracle.truffle.api.library.CachedLibrary;
 import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.NodeInfo;
 import com.oracle.truffle.api.object.DynamicObjectLibrary;
+import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.util.SLToMemberNode;
 import com.oracle.truffle.sl.nodes.util.SLToTruffleStringNode;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLObject;
+import com.oracle.truffle.sl.runtime.SLObjectBase;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * The node for writing a property of an object. When executed, this node:
@@ -77,12 +83,18 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
 
     static final int LIBRARY_LIMIT = 3;
 
+    protected abstract SLExpressionNode getReceiverNode();
+    protected abstract SLExpressionNode getNameNode();
+    protected abstract SLExpressionNode getValueNode();
+
     @Specialization(guards = "arrays.hasArrayElements(receiver)", limit = "LIBRARY_LIMIT")
     protected Object writeArray(Object receiver, Object index, Object value,
                     @CachedLibrary("receiver") InteropLibrary arrays,
                     @CachedLibrary("index") InteropLibrary numbers) {
         try {
-            arrays.writeArrayElement(receiver, numbers.asLong(index), value);
+            long i = numbers.asLong(index);
+            arrays.writeArrayElement(receiver, i, value);
+            getContext().getHistoryOperator().onUpdateArrayElement(receiver, i, value);
         } catch (UnsupportedMessageException | UnsupportedTypeException | InvalidArrayIndexException e) {
             // read was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(this, index);
@@ -91,11 +103,13 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
     }
 
     @Specialization(limit = "LIBRARY_LIMIT")
-    protected static Object writeSLObject(SLObject receiver, Object name, Object value,
+    protected static Object writeSLObject(SLObjectBase receiver, Object name, Object value,
                     @Bind("this") Node node,
                     @CachedLibrary("receiver") DynamicObjectLibrary objectLibrary,
                     @Cached SLToTruffleStringNode toTruffleStringNode) {
-        objectLibrary.put(receiver, toTruffleStringNode.execute(node, name), value);
+        TruffleString nameTS = toTruffleStringNode.execute(node, name);
+        objectLibrary.put(receiver, nameTS, value);
+        SLContext.get(node).getHistoryOperator().onUpdateObjectField(receiver, nameTS.toJavaStringUncached(), value);
         return value;
     }
 
@@ -105,7 +119,9 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
                     @CachedLibrary("receiver") InteropLibrary objectLibrary,
                     @Cached SLToMemberNode asMember) {
         try {
-            objectLibrary.writeMember(receiver, asMember.execute(node, name), value);
+            String nameS = asMember.execute(node, name);
+            objectLibrary.writeMember(receiver, nameS, value);
+            SLContext.get(node).getHistoryOperator().onUpdateObjectField(receiver, nameS, value);
         } catch (UnsupportedMessageException | UnknownIdentifierException | UnsupportedTypeException e) {
             // write was not successful. In SL we only have basic support for errors.
             throw SLUndefinedNameException.undefinedProperty(node, name);
@@ -113,7 +129,43 @@ public abstract class SLWritePropertyNode extends SLExpressionNode {
         return value;
     }
 
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        final var op = getContext().getHistoryOperator();
+        final NodeIdentifier identifier = getNodeIdentifier();
+        final CalcResult.Generic receiverWrapped = op.calcGeneric(frame, getReceiverNode());
+        final Object receiver = receiverWrapped.getResult();
+        final CalcResult.Generic nameWrapped = op.calcGeneric(frame, getNameNode());
+        final CalcResult.Generic valueWrapped = op.calcGeneric(frame, getValueNode());
+        final Object value = valueWrapped.getResult();
+
+        if (receiverWrapped.isFresh() || nameWrapped.isFresh() || valueWrapped.isFresh()) {
+            final Object name = nameWrapped.getResult();
+//            final InteropLibrary nameOp = InteropLibrary.getUncached(name);
+//            InteropLibrary receiverOp = InteropLibrary.getUncached(receiver);
+//            try {
+//                if (receiverOp.hasArrayElements(receiver)) {
+//                    receiverOp.writeArrayElement(receiver, nameOp.asLong(name), value);
+//                } else {
+//                    receiverOp.writeMember(receiver, nameOp.asString(name), value);
+//                }
+//            } catch (UnsupportedMessageException | UnknownIdentifierException | UnsupportedTypeException | InvalidArrayIndexException e) {
+//                // write was not successful. In SL we only have basic support for errors.
+//                throw SLUndefinedNameException.undefinedProperty(this, name);
+//            }
+            op.rewriteObjectField(receiver, name.toString(), value, identifier, receiverWrapped.isFresh() || nameWrapped.isFresh());
+            return CalcResult.Generic.fresh(value);
+        }
+
+        return CalcResult.Generic.cached(value);
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return getReceiverNode().hasNewNode() || getNameNode().hasNewNode() || getValueNode().hasNewNode();
+    }
+
     static boolean isSLObject(Object receiver) {
-        return receiver instanceof SLObject;
+        return receiver instanceof SLObjectBase;
     }
 }

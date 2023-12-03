@@ -51,6 +51,7 @@ import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLException;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
 /**
  * Built-in function that goes through to import a symbol from the polyglot bindings.
@@ -71,4 +72,10 @@ public abstract class SLImportBuiltin extends SLBuiltinNode {
         }
     }
 
+    private static final NodeIdentifier staticIdentifier = generateNodeIdentifierForBuiltin("import");
+
+    @Override
+    public NodeIdentifier getNodeIdentifier() {
+        return staticIdentifier;
+    }
 }

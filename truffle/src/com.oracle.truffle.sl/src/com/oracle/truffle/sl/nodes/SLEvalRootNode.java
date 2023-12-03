@@ -42,6 +42,7 @@ package com.oracle.truffle.sl.nodes;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.CompilationFinal;
@@ -55,6 +56,8 @@ import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLStrings;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
+import com.oracle.truffle.sl.runtime.diffexec.FunctionCallSpecialParameter;
 
 /**
  * This class performs two additional tasks:
@@ -72,16 +75,18 @@ public final class SLEvalRootNode extends RootNode {
     private static final TruffleString ROOT_EVAL = SLStrings.constant("root eval");
 
     private final Map<TruffleString, RootCallTarget> functions;
+    private final Set<TruffleString> functionContainsNewNode;
     @CompilationFinal private boolean registered;
 
     @Child private DirectCallNode mainCallNode;
     private final SLLanguage language;
 
-    public SLEvalRootNode(SLLanguage language, RootCallTarget rootFunction, Map<TruffleString, RootCallTarget> functions) {
+    public SLEvalRootNode(SLLanguage language, RootCallTarget rootFunction, Map<TruffleString, RootCallTarget> functions, Set<TruffleString> functionContainsNewNode) {
         super(language);
         this.language = language;
         this.functions = Collections.unmodifiableMap(functions);
         this.mainCallNode = rootFunction != null ? DirectCallNode.create(rootFunction) : null;
+        this.functionContainsNewNode = functionContainsNewNode;
     }
 
     @Override
@@ -136,17 +141,27 @@ public final class SLEvalRootNode extends RootNode {
             return SLNull.SINGLETON;
         } else {
             /* Conversion of arguments to types understood by SL. */
-            Object[] arguments = frame.getArguments();
-            for (int i = 0; i < arguments.length; i++) {
-                arguments[i] = SLContext.fromForeignValue(arguments[i]);
+            Object[] originalArgs = frame.getArguments();
+            Object[] newArgs = new Object[originalArgs.length + 1];
+            for (int i = 0; i < originalArgs.length; i++) {
+                newArgs[i] = SLContext.fromForeignValue(originalArgs[i]);
             }
-            return mainCallNode.call(arguments);
+            if (SLContext.get(this).getHistoryOperator().isInitialExecution()) {
+                newArgs[originalArgs.length] = FunctionCallSpecialParameter.EXEC;
+            } else {
+                newArgs[originalArgs.length] = FunctionCallSpecialParameter.CALC;
+            }
+            final Object result = mainCallNode.call(newArgs);
+            if (result instanceof CalcResult) {
+                return ((CalcResult) result).getGenericResult().getResult();
+            } else {
+                return result;
+            }
         }
     }
 
     @TruffleBoundary
     private void registerFunctions() {
-        SLContext.get(this).getFunctionRegistry().register(functions);
+        SLContext.get(this).getFunctionRegistry().register(functions, functionContainsNewNode);
     }
-
 }

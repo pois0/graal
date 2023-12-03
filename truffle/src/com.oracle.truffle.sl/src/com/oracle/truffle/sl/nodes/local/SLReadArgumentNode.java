@@ -45,6 +45,7 @@ import com.oracle.truffle.api.profiles.BranchProfile;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.parser.SLNodeFactory;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 
 /**
  * Reads a function argument. Arguments are passed in as an object array.
@@ -72,6 +73,7 @@ public class SLReadArgumentNode extends SLExpressionNode {
     public Object executeGeneric(VirtualFrame frame) {
         Object[] args = frame.getArguments();
         if (index < args.length) {
+            getContext().getHistoryOperator().onReadArgument(index);
             return args[index];
         } else {
             /* In the interpreter, record profiling information that the branch was used. */
@@ -79,5 +81,23 @@ public class SLReadArgumentNode extends SLExpressionNode {
             /* Use the default null value. */
             return SLNull.SINGLETON;
         }
+    }
+
+    @Override
+    public CalcResult.Generic calcGenericInner(VirtualFrame frame) {
+        Object[] args = frame.getArguments();
+        if (index < args.length) {
+            return CalcResult.Generic.fresh(args[index]);
+        } else {
+            /* In the interpreter, record profiling information that the branch was used. */
+            outOfBoundsTaken.enter();
+            /* Use the default null value. */
+            return CalcResult.Generic.fresh(SLNull.SINGLETON);
+        }
+    }
+
+    @Override
+    protected boolean hasNewChildNode() {
+        return false;
     }
 }
