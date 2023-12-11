@@ -4,14 +4,18 @@ import com.google.common.hash.Hasher;
 import com.oracle.truffle.api.strings.TruffleString;
 
 public final class NodeIdentifier extends Hashable implements Comparable<NodeIdentifier> {
-    private final TruffleString functionName;
+    private final String functionName;
     private final int number;
     private final boolean isNewNode;
 
-    public NodeIdentifier(TruffleString functionName, int number, boolean isNewNode) {
+    public NodeIdentifier(String functionName, int number, boolean isNewNode) {
         this.functionName = functionName;
         this.number = number;
         this.isNewNode = isNewNode;
+    }
+
+    public NodeIdentifier(TruffleString functionName, int number, boolean isNewNode) {
+        this(functionName.toJavaStringUncached(), number, isNewNode);
     }
 
     public NodeIdentifier(TruffleString functionName, int number) {
@@ -19,10 +23,10 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     }
 
     public NodeIdentifier(String functionName, int number) {
-        this(TruffleString.fromJavaStringUncached(functionName, TruffleString.Encoding.UTF_8), number, false);
+        this(functionName, number, false);
     }
 
-    public TruffleString getFunctionName() {
+    public String getFunctionName() {
         return functionName;
     }
 
@@ -50,7 +54,7 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     @SuppressWarnings("UnstableApiUsage")
     @Override
     public Hasher hash(Hasher hasher) {
-        return hasher.putUnencodedChars(functionName.toJavaStringUncached())
+        return hasher.putUnencodedChars(functionName)
                 .putInt(number)
                 .putBoolean(isNewNode);
     }
@@ -62,7 +66,7 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
         if (compareNumber != 0) return compareNumber;
         int compareIsNew = Boolean.compare(isNewNode, o.isNewNode);
         if (compareIsNew != 0) return compareIsNew;
-        return functionName.toJavaStringUncached().compareTo(o.functionName.toJavaStringUncached());
+        return functionName.compareTo(o.functionName);
     }
 
     @Override

@@ -61,7 +61,7 @@ public abstract class ExecutionHistoryOperator<ExecKey> {
 
     public abstract Object getVariableValue(int slot, NodeIdentifier identifier);
     public abstract Object getObjectFieldValue(Node node, Object receiver, String fieldName, NodeIdentifier identifier);
-    public abstract Object getArrayElementValue(Object array, long index, Object value);
+    public abstract Object getArrayElementValue(Node node, Object array, long index, NodeIdentifier identifier);
 
     public abstract boolean isInitialExecution();
 

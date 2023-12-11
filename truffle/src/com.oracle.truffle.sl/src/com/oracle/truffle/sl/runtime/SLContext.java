@@ -50,6 +50,7 @@ import java.util.List;
 
 import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
 import com.oracle.truffle.sl.runtime.diffexec.ArrayTime;
+import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistory;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperatorImpl;
 import org.graalvm.polyglot.Context;
@@ -106,6 +107,9 @@ import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
  */
 @SuppressWarnings("JavadocReference")
 public final class SLContext {
+    private static ExecutionHistory<ArrayTime> rootHistory = new ExecutionHistory<>(ArrayTime.ZERO);
+    private static boolean rotate = true;
+    public static boolean isInitialExecution = true;
 
     private final SLLanguage language;
     @CompilationFinal private Env env;
@@ -123,7 +127,15 @@ public final class SLContext {
         this.language = language;
         this.allocationReporter = env.lookup(AllocationReporter.class);
         this.functionRegistry = new SLFunctionRegistry(language);
-        var op = this.historyOperator = new ExecutionHistoryOperatorImpl<>(functionRegistry, ArrayTime.ZERO);
+
+        if (rotate) {
+            System.out.println("reset!");
+            rootHistory = new ExecutionHistory<>(ArrayTime.ZERO);
+            isInitialExecution = true;
+        }
+        rotate = !rotate;
+
+        var op = this.historyOperator = new ExecutionHistoryOperatorImpl<>(rootHistory, functionRegistry, ArrayTime.ZERO);
         InstrumentationHandler.staticFactory = op.getTickFactory();
 
         installBuiltins();

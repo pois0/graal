@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
@@ -38,14 +37,13 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     public void replaceReturnedValueOrException(ExecutionContext ctx, Object value) {
-        final TimeInfo<TIME> info = getTimeNN(ctx);
-        info.setValue(value);
+        getTimeNN(ctx).setValue(value);
     }
 
     public void rewriteLocalVariable(ExecutionContext ctx, int slot, Object value) {
-        final TIME time = getTimeNN(ctx).getEnd();
-        final LocalVarOperator<TIME> op = localVarInfo.get(ctx.getCallContext().getBase());
-        final LocalVariableUpdate prevUpdate = op.writeVarList
+        final var time = getTimeNN(ctx).getEnd();
+        final var op = localVarInfo.get(ctx.getCallContext().getBase());
+        final var prevUpdate = op.writeVarList
                 .set(ItemWithTime.binarySearchJustIndex(op.writeVarList, time), new ItemWithTime<>(time, new LocalVariableUpdate(slot, value)))
                 .item();
         ArrayList<ItemWithTime<TIME, Object>> varList = op.writeVarMap.get(prevUpdate.varName());
@@ -53,16 +51,17 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     public ObjectUpdate<TIME> rewriteObjectField(ExecutionContext ctx, TIME objGenTime, String fieldName, Object value, boolean fieldChanged) {
-        final TIME time = getTimeNN(ctx).getEnd();
-        final ItemWithTime<TIME, ObjectUpdate<TIME>> prev = objectUpdateList
+        final var time = getTimeNN(ctx).getEnd();
+        final var prev = objectUpdateList
                 .set(ItemWithTime.binarySearchJustIndex(objectUpdateList, time), new ItemWithTime<>(time, new ObjectUpdate<>(objGenTime, fieldName, value)));
-        final ArrayList<ItemWithTime<TIME, Object>> fieldList = assertNonNull(
-                objectUpdateMap.computeIfAbsent(objGenTime, it -> new HashMap<>()).computeIfAbsent(fieldName, it -> new ArrayList<>()));
+        final var fieldList = assertNonNull(
+                objectUpdateMap.computeIfAbsent(objGenTime, it -> new HashMap<>())
+                        .computeIfAbsent(fieldName, it -> new ArrayList<>())
+        );
 
         if (fieldChanged) {
-            final ObjectUpdate<TIME> prevItem = prev.item();
-            HashMap<String, ArrayList<ItemWithTime<TIME, Object>>> objectHistory = objectUpdateMap.get(prevItem.objectGenCtx());
-            final ArrayList<ItemWithTime<TIME, Object>> prevHistory = objectHistory.get(prevItem.fieldName());
+            final var prevItem = prev.item();
+            final var prevHistory = objectUpdateMap.get(prevItem.objectGenCtx()).get(prevItem.fieldName());
             prevHistory.remove(ItemWithTime.binarySearchJustIndex(prevHistory, time));
             fieldList.add(ItemWithTime.binarySearchWhereInsertTo(fieldList, time), new ItemWithTime<>(time, value));
             return prevItem;
@@ -92,13 +91,13 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     public Object getReturnedValueOrThrow(ExecutionContext ctx) {
-        final Object result = getTimeNN(ctx).getValue();
+        final var result = getTimeNN(ctx).getValue();
         if (result instanceof RuntimeException) throw (RuntimeException) result;
         return result;
     }
 
     public TIME getNextTime(TIME time) {
-        final int i = ItemWithTime.binarySearchJustIndex(timeToContext, time) + 1;
+        final var i = ItemWithTime.binarySearchJustIndex(timeToContext, time) + 1;
         if (i == timeToContext.size()) return time.incAndSimplify();
         return time.mid(timeToContext.get(i).time());
     }
@@ -116,7 +115,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     public HashMap<Integer, ArrayList<ItemWithTime<TIME, Object>>> getLocalHistory(CallContext.ContextBase fca) {
-        final LocalVarOperator<TIME> op = localVarInfo.get(fca);
+        final var op = localVarInfo.get(fca);
         if (op == null) return null;
         return op.writeVarMap;
     }
@@ -130,20 +129,18 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     public void deleteRecords(ExecutionContext ctx) {
-        final TimeInfo<TIME> tp = getTime(ctx);
+        final var tp = getTime(ctx);
         if (tp == null) return;
         deleteRecords(tp.getStart(), tp.getEnd());
     }
 
     public void deleteRecords(ExecutionContext exclusiveStart, ExecutionContext exclusiveEnd) {
-        final TIME startNext = getTimeNN(exclusiveStart).getEnd();
-        final int startI = ItemWithTime.binarySearchNext(timeToContext, startNext);
-        final TIME endPrev = getTimeNN(exclusiveEnd).getEnd();
-        final int endI = ItemWithTime.binarySearchPrev(timeToContext, endPrev);
+        final var startI = ItemWithTime.binarySearchNext(timeToContext, getTimeNN(exclusiveStart).getEnd());
+        final var endI = ItemWithTime.binarySearchPrev(timeToContext, getTimeNN(exclusiveEnd).getEnd());
 
         if (startI >= endI) return;
-        final TIME startTime = timeToContext.get(startI).time();
-        final TIME endTime = timeToContext.get(endI).time();
+        final var startTime = timeToContext.get(startI).time();
+        final var endTime = timeToContext.get(endI).time();
         deleteRecords(startTime, endTime);
     }
 
@@ -153,9 +150,9 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
      */
     public void deleteRecords(TIME startTime, TIME endTime) {
         // delete from timeToContext and contextToTime
-        final List<ItemWithTime<TIME, ExecutionContext>> contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
-        for (ItemWithTime<TIME, ExecutionContext> e : contexts) {
-            final ExecutionContext ctx = e.item();
+        final var contexts = ItemWithTime.subList(timeToContext, startTime, endTime);
+        for (var e : contexts) {
+            final var ctx = e.item();
             contextToTime.get(ctx.getCurrentNodeIdentifier()).remove(ctx.getCallContext());
         }
         contexts.clear();
@@ -164,18 +161,16 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         ItemWithTime.subList(objectReadList, startTime, endTime).clear();
 
         // delete from objectUpdateList and objectUpdateMap
-        final HashMap<TIME, HashSet<String>> updatedFields = new HashMap<>();
-        final List<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = ItemWithTime.subList(this.objectUpdateList, startTime, endTime);
-        for (ItemWithTime<TIME, ObjectUpdate<TIME>> update : objectUpdateList) {
-            final ObjectUpdate<TIME> item = update.item();
+        final var updatedFields = new HashMap<TIME, HashSet<String>>();
+        final var objectUpdateList = ItemWithTime.subList(this.objectUpdateList, startTime, endTime);
+        for (var update : objectUpdateList) {
+            final var item = update.item();
             updatedFields.computeIfAbsent(item.objectGenCtx(), it -> new HashSet<>())
                     .add(item.fieldName());
         }
-        for (Map.Entry<TIME, HashSet<String>> e : updatedFields.entrySet()) {
-            final TIME objGenTime = e.getKey();
-            final HashSet<String> fields = e.getValue();
-            final HashMap<String, ArrayList<ItemWithTime<TIME, Object>>> map = objectUpdateMap.get(objGenTime);
-            for (String field : fields) {
+        for (var e : updatedFields.entrySet()) {
+            final var map = objectUpdateMap.get(e.getKey());
+            for (var field : e.getValue()) {
                 ItemWithTime.subList(map.get(field), startTime, endTime).clear();
             }
         }
@@ -183,14 +178,14 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
 
         // delete localVarInfo
         int start = ItemWithTime.binarySearchApproximately(functionCalls, startTime);
-        final int end = ItemWithTime.binarySearchNext(functionCalls, endTime);
+        final var end = ItemWithTime.binarySearchNext(functionCalls, endTime);
         if (start < 0) {
             start = -start - 1;
         } else {
             deleteFromLocalVarOperator(functionCalls.get(start), startTime, endTime);
         }
-        final List<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> functionCalls = this.functionCalls.subList(start, end);
-        for (ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>> entry : functionCalls) {
+        final var functionCalls = this.functionCalls.subList(start, end);
+        for (var entry : functionCalls) {
             deleteFromLocalVarOperator(entry, startTime, endTime);
         }
 
@@ -199,36 +194,36 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     }
 
     private void deleteFromLocalVarOperator(ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>> entry, TIME startTime, TIME endTime) {
-        final LocalVarOperator<TIME> op = localVarInfo.get(entry.item().getLeft());
+        final var op = localVarInfo.get(entry.item().getLeft());
         if (op == null) return;
-        final List<ItemWithTime<TIME, LocalVariableUpdate>> writeVarList = ItemWithTime.subList(op.writeVarList, startTime, endTime);
-        final HashSet<Integer> vars = new HashSet<>(); // TODO use BitSet
-        for (ItemWithTime<TIME, LocalVariableUpdate> e : writeVarList) {
+        final var writeVarList = ItemWithTime.subList(op.writeVarList, startTime, endTime);
+        final var vars = new HashSet<Integer>(); // TODO use BitSet
+        for (var e : writeVarList) {
             final LocalVariableUpdate item = e.item();
             vars.add(item.varName());
         }
         writeVarList.clear();
-        for (Integer slot : vars) {
+        for (var slot : vars) {
             ItemWithTime.subList(op.writeVarMap.get(slot), startTime, endTime).clear();
         }
-        for (Map.Entry<Integer, ArrayList<TIME>> e : op.readVariable.entrySet()) {
+        for (var e : op.readVariable.entrySet()) {
             Time.subList(e.getValue(), startTime, endTime).clear();
         }
-        for (ArrayList<TIME> times : op.readParam) {
+        for (var times : op.readParam) {
             Time.subList(times, startTime, endTime).clear();
         }
     }
 
     public ExecutionHistory<TIME> merge(ExecutionHistory<TIME> other) {
         if (other.timeToContext.isEmpty()) return this;
-        final TIME initialTime = other.timeToContext.get(0).time();
+        final var initialTime = other.timeToContext.get(0).time();
 //        final TIME endTime = other.timeToContext.get(other.timeToContext.size() - 1).time();
 
         // merge timeToContext
         ItemWithTime.merge(timeToContext, other.timeToContext, initialTime);
 
         // merge contextToTime
-        for (Map.Entry<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> e : other.contextToTime.entrySet()) {
+        for (var e : other.contextToTime.entrySet()) {
             contextToTime.merge(e.getKey(), e.getValue(), (base, v) -> {
                 base.putAll(v);
                 return base;
@@ -239,10 +234,12 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         ItemWithTime.merge(objectReadList, other.objectReadList, initialTime);
 
         // merge objectUpdateMap
-        for (Map.Entry<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> entry : other.objectUpdateMap.entrySet()) {
+        for (var entry : other.objectUpdateMap.entrySet()) {
             objectUpdateMap.merge(entry.getKey(), entry.getValue(), (base, otherValue) -> {
-                for (Map.Entry<String, ArrayList<ItemWithTime<TIME, Object>>> fieldEntry : otherValue.entrySet()) {
-                    base.merge(fieldEntry.getKey(), fieldEntry.getValue(), (baseEntry, otherEntry) -> ItemWithTime.merge(baseEntry, otherEntry, initialTime));
+                for (var fieldEntry : otherValue.entrySet()) {
+                    base.merge(fieldEntry.getKey(), fieldEntry.getValue(), (baseEntry, otherEntry) ->
+                            ItemWithTime.merge(baseEntry, otherEntry, initialTime)
+                    );
                 }
                 return base;
             });
@@ -252,11 +249,11 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         ItemWithTime.merge(objectUpdateList, other.objectUpdateList, initialTime);
 
         // merge localVarInfo
-        for (Map.Entry<CallContext.ContextBase, LocalVarOperator<TIME>> e : other.localVarInfo.entrySet()) {
-            localVarInfo.merge(e.getKey(), e.getValue(), (final LocalVarOperator<TIME> base, final LocalVarOperator<TIME> newValue) -> {
+        for (var e : other.localVarInfo.entrySet()) {
+            localVarInfo.merge(e.getKey(), e.getValue(), (base, newValue) -> {
                 ItemWithTime.merge(base.writeVarList, newValue.writeVarList, initialTime);
 
-                for (Map.Entry<Integer, ArrayList<ItemWithTime<TIME, Object>>> e2 : newValue.writeVarMap.entrySet()) {
+                for (var e2 : newValue.writeVarMap.entrySet()) {
                     base.writeVarMap.merge(
                             e2.getKey(),
                             e2.getValue(),
@@ -266,15 +263,14 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
 
                 // readParam
                 for (int i = 0; i < newValue.readParam.length; i++) {
-                    final ArrayList<TIME> newTimes = newValue.readParam[i];
+                    final var newTimes = newValue.readParam[i];
                     if (newTimes.isEmpty()) continue;
-                    final ArrayList<TIME> thisTimes = base.readParam[i];
-                    final int j = Time.binarySearchWhereInsertTo(thisTimes, initialTime);
-                    thisTimes.addAll(j, newTimes);
+                    final var thisTimes = base.readParam[i];
+                    thisTimes.addAll(Time.binarySearchWhereInsertTo(thisTimes, initialTime), newTimes);
                 }
 
                 // readVariable
-                for (Map.Entry<Integer, ArrayList<TIME>> e2 : newValue.readVariable.entrySet()) {
+                for (var e2 : newValue.readVariable.entrySet()) {
                     base.readVariable.merge(
                             e2.getKey(),
                             e2.getValue(),
@@ -355,7 +351,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
 
         public LocalVarOperator(int paramLen) {
             @SuppressWarnings("unchecked")
-            final ArrayList<TIME>[] readParam = this.readParam = new ArrayList[paramLen];
+            final var readParam = this.readParam = new ArrayList[paramLen];
             for (int i = 0; i < readParam.length; i++) {
                 readParam[i] = new ArrayList<>();
             }

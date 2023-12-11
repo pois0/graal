@@ -57,7 +57,7 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
     }
 
     private static int compare(CallContext e1, CallContext e2) {
-        do {
+        while (true) {
             if (e1 == e2) return 0;
             int niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
             if (niComp != 0) return niComp;
@@ -71,9 +71,13 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
 
             e1 = e1.root;
             e2 = e2.root;
-        } while (e1 != null && e2 != null);
 
-        return e1 == null ? e2 == null ? 0 : 1 : -1;
+            if (e1 == null) {
+                return e2 == null ? 0 : 1;
+            } else if (e2 == null) {
+                return -1;
+            }
+        }
     }
 
     public static abstract sealed class ContextBase extends CallContext {

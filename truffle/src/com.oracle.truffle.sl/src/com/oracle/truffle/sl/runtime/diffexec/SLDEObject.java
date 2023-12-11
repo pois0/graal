@@ -120,13 +120,15 @@ public class SLDEObject extends SLObjectBase {
         Object result;
         if (oh.canUseCache(name)) {
             result = objectLibrary.getOrDefault(this, truffleName, null);
-            if (result != null) return result;
+            if (result == null) throw new RuntimeException("Expected to be Unreachable");
+            return result;
         }
 
         /* Property does not exist. */
         result = oh.getObjectFieldValue(name);
         if (result == null) throw UnknownIdentifierException.create(name);
         objectLibrary.put(this, truffleName, result);
+        oh.onWrite(name);
         return result;
     }
 

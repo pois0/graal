@@ -13,12 +13,12 @@ import com.oracle.truffle.sl.nodes.controlflow.SLBreakException;
 import com.oracle.truffle.sl.nodes.controlflow.SLContinueException;
 import com.oracle.truffle.sl.nodes.controlflow.SLReturnException;
 import com.oracle.truffle.sl.runtime.SLBigInteger;
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.SLNull;
 import com.oracle.truffle.sl.runtime.SLObjectBase;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
-import org.graalvm.collections.Pair;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
@@ -32,8 +32,6 @@ import java.util.WeakHashMap;
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
 public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends ExecutionHistoryOperator<TIME> {
-    private static ExecutionHistory rootHistory = new ExecutionHistory(ArrayTime.ZERO);
-
     private final SLFunctionRegistry functionRegistry;
 
     private final TIME zero;
@@ -43,39 +41,32 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     private final ArrayDeque<HashSet<Integer>> localVarFlagStack = new ArrayDeque<>(); // TODO use Bitset
     private final HashMap<TIME, HashSet<Object>> objectFieldFlags = new HashMap<>();
 
+    private final ExecutionHistory<TIME> rootHistory;
     private ExecutionHistory<TIME> currentHistory;
     private TIME currentTime;
     private boolean isInExec = false;
     private ExecutionContext lastCalcCtx = null;
     private CallContext currentContext = CallContext.ExecutionBase.INSTANCE;
-    private WeakHashMap<SLObjectBase, TIME> objToCtx = new WeakHashMap<>();
-    private HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
+    private final WeakHashMap<SLObjectBase, TIME> objToCtx = new WeakHashMap<>();
+    private final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
     private TIME firstHitAtField;
     private TIME firstHitAtFunctionCall;
     private int newExecCount = 0;
 
-    private static boolean rotate = true;
-    private static boolean isInitialExecution = true;
-
-    public ExecutionHistoryOperatorImpl(SLFunctionRegistry registry, TIME zero) {
+    public ExecutionHistoryOperatorImpl(ExecutionHistory<TIME> rootHistory, SLFunctionRegistry registry, TIME zero) {
         this.functionRegistry = registry;
 
         this.zero = zero;
         this.currentTime = zero;
 
-        if (rotate) {
-            System.out.println("reset!");
-            rootHistory = new ExecutionHistory<>(zero);
-            isInitialExecution = true;
-        }
-        rotate = !rotate;
+        this.rootHistory = rootHistory;
         this.currentHistory = rootHistory;
 
         parameterFlagStack.push(new boolean[0]);
         localVarFlagStack.push(new HashSet<>());
 
-        firstHitAtField = (TIME) rootHistory.getInitialTime();
-        firstHitAtFunctionCall = (TIME) rootHistory.getInitialTime();
+        firstHitAtField = rootHistory.getInitialTime();
+        firstHitAtFunctionCall = rootHistory.getInitialTime();
     }
 
     @Override
@@ -100,7 +91,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onGenerateObject(SLObjectBase object) {
-        final TIME currentTime = this.currentTime;
+        final var currentTime = this.currentTime;
         objToCtx.put(object, currentTime);
         ctxToObj.put(currentTime, new WeakReference<>(object));
         currentHistory.onCreateObject(currentTime);
@@ -109,14 +100,15 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onUpdateLocalVariable(int slot, Object value) {
         localVarOperatorHolder.onUpdateVariable(currentTime, slot, value);
+        //noinspection DataFlowIssue
         localVarFlagStack.peek().add(slot);
     }
 
     @Override
     public void onUpdateObjectField(Object receiver, String fieldName, Object value) {
-        TIME objGenTime = objToCtx.get((SLObjectBase) receiver);
+        final var objGenTime = objToCtx.get((SLObjectBase) receiver);
         currentHistory.onUpdateObjectWithHash(currentTime, objGenTime, fieldName, replaceToMock(value));
-        boolean newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
+        final var newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
         if (newlySet) firstHitAtField = currentHistory.getInitialTime();
     }
@@ -129,14 +121,15 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void rewriteLocalVariable(int slot, Object value, NodeIdentifier identifier) {
         currentHistory.rewriteLocalVariable(getExecutionContext(identifier), slot, replaceToMock(value));
+        //noinspection DataFlowIssue
         localVarFlagStack.peek().add(slot);
     }
 
     @Override
     public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier, boolean fieldChanged) {
         final TIME objGenTime = objToCtx.get((SLObjectBase) receiver);
-        ExecutionHistory.ObjectUpdate<TIME> prevUpdate =
-                currentHistory.rewriteObjectField(getExecutionContext(identifier), objGenTime, fieldName, replaceToMock(value), fieldChanged);
+        final var execCtx = getExecutionContext(identifier);
+        final var prevUpdate = currentHistory.rewriteObjectField(execCtx, objGenTime, fieldName, replaceToMock(value), fieldChanged);
         final var newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
         if (prevUpdate != null) {
@@ -169,7 +162,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onReturnExceptional(NodeIdentifier identifier, TIME onEnterKey, Throwable exception) {
         if (exception instanceof SLReturnException) {
-            final SLReturnException forRecord = new SLReturnException(replaceToMock(((SLReturnException) exception).getResult()));
+            final var forRecord = new SLReturnException(replaceToMock(((SLReturnException) exception).getResult()));
             currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getExecutionContext(identifier), forRecord);
         } else if (exception instanceof ControlFlowException || exception instanceof AbstractTruffleException) {
             currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
@@ -178,7 +171,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onEnterFunctionDuringExec(NodeIdentifier callerIdentifier, TruffleString functionName, int argLen) {
-        final ExecutionHistory<TIME> currentHistory = this.currentHistory;
+        final var currentHistory = this.currentHistory;
         CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new HashSet<>());
@@ -189,7 +182,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onEnterFunctionDuringCalc(NodeIdentifier callerIdentifier, TruffleString functionName, boolean[] argFlags) {
         final ExecutionHistory<TIME> currentHistory = this.currentHistory;
-        CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
+        final var currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new HashSet<>());
         localVarOperatorHolder.push(argFlags.length, currentStack);
@@ -199,7 +192,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onExitFunction(boolean duringCalc) {
-        CallContext elem = currentContext;
+        final var elem = currentContext;
         assert elem instanceof CallContext.FunctionCall;
         currentContext = elem.getRoot();
         localVarOperatorHolder.pop();
@@ -229,11 +222,12 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void calcVoid(VirtualFrame frame, SLStatementNode node) {
 //        System.out.println("call calcVoid: " + node.getClass().getName() + " @ " + node.getSourceSection());
-        final SLStatementNode unwrapped = node.unwrap();
+        final var unwrapped = node.unwrap();
         if (unwrapped != null) {
             calcVoid(frame, unwrapped);
             return;
         }
+
         try {
             switch (shouldReExecute(node)) {
                 case USE_CACHE -> getReturnedValueOrThrow(node.getNodeIdentifier());
@@ -277,26 +271,23 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         final SLExpressionNode unwrapped = calleeNode.unwrap();
         if (unwrapped != null) return calcBoolean(frame, callerNode, unwrapped);
         try {
-            switch (shouldReExecute(calleeNode)) {
-                case USE_CACHE:
+            return switch (shouldReExecute(calleeNode)) {
+                case USE_CACHE -> {
                     final Object obj = getReturnedValueOrThrow(calleeNode.getNodeIdentifier());
                     if (obj instanceof Boolean) {
-                        return CalcResult.Boolean.cached((Boolean) obj);
+                        yield CalcResult.Boolean.cached((Boolean) obj);
                     } else {
                         throw new UnexpectedResultException(obj);
                     }
-                case RE_EXECUTE:
-                    return reExecuteBoolean(calleeNode.getNodeIdentifier(), frame, calleeNode);
-                case NEW_EXECUTE:
-                    return newExecutionBoolean(calleeNode.getNodeIdentifier(), frame, calleeNode);
-            }
+                }
+                case RE_EXECUTE -> reExecuteBoolean(calleeNode.getNodeIdentifier(), frame, calleeNode);
+                case NEW_EXECUTE -> newExecutionBoolean(calleeNode.getNodeIdentifier(), frame, calleeNode);
+            };
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(callerNode, ex.getResult());
         } finally {
             endCalc(calleeNode);
         }
-
-        throw new RuntimeException("Never reach here");
     }
 
     @Override
@@ -305,40 +296,37 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         final SLExpressionNode unwrapped = calleeNode.unwrap();
         if (unwrapped != null) return calcLong(frame, callerNode, unwrapped);
         try {
-            switch (shouldReExecute(calleeNode)) {
-                case USE_CACHE:
+            return switch (shouldReExecute(calleeNode)) {
+                case USE_CACHE -> {
                     final Object obj = getReturnedValueOrThrow(calleeNode.getNodeIdentifier());
                     if (obj instanceof Long) {
-                        return CalcResult.Long.cached((Long) obj);
+                        yield CalcResult.Long.cached((Long) obj);
                     } else {
                         throw new UnexpectedResultException(obj);
                     }
-                case RE_EXECUTE:
-                    return reExecuteLong(calleeNode.getNodeIdentifier(), frame, calleeNode);
-                case NEW_EXECUTE:
-                    return newExecutionLong(calleeNode.getNodeIdentifier(), frame, calleeNode);
-            }
+                }
+                case RE_EXECUTE -> reExecuteLong(calleeNode.getNodeIdentifier(), frame, calleeNode);
+                case NEW_EXECUTE -> newExecutionLong(calleeNode.getNodeIdentifier(), frame, calleeNode);
+            };
         } catch (UnexpectedResultException ex) {
             throw SLException.typeError(callerNode, ex.getResult());
         } finally {
             endCalc(calleeNode);
         }
-
-        throw new RuntimeException("Never reach here");
     }
 
     @Override
     public boolean isInitialExecution() {
-        final boolean isInitialExecution = ExecutionHistoryOperatorImpl.isInitialExecution;
+        final var isInitialExecution = SLContext.isInitialExecution;
         if (isInitialExecution) {
-            ExecutionHistoryOperatorImpl.isInitialExecution = false;
+            SLContext.isInitialExecution = false;
             isInExec = true;
         }
         return isInitialExecution;
     }
 
     public CalcResult.Generic newExecutionGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
-        final TickNode tickNode = getNewTickNode(identifier);
+        final var tickNode = getNewTickNode(identifier);
         startNewExecution(frame, identifier, node);
         tickNode.onEnter(frame);
         try {
@@ -354,7 +342,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     public CalcResult.Boolean newExecutionBoolean(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
-        final TickNode tickNode = getNewTickNode(identifier);
+        final var tickNode = getNewTickNode(identifier);
         startNewExecution(frame, identifier, node);
         tickNode.onEnter(frame);
         try {
@@ -374,7 +362,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     public CalcResult.Long newExecutionLong(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
-        final TickNode tickNode = getNewTickNode(identifier);
+        final var tickNode = getNewTickNode(identifier);
         startNewExecution(frame, identifier, node);
         tickNode.onEnter(frame);
         try {
@@ -394,14 +382,13 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     public void newExecutionVoid(NodeIdentifier identifier, VirtualFrame frame, SLStatementNode node) {
-        final TickNode tickNode = getNewTickNode(identifier);
+        final var tickNode = getNewTickNode(identifier);
         startNewExecution(frame, identifier, node);
         tickNode.onEnter(frame);
         try {
             node.executeVoid(frame);
             tickNode.onReturnValue(frame, null);
         } catch (Throwable e) {
-            e.printStackTrace();
             tickNode.onReturnExceptional(frame, e);
             throw e;
         } finally {
@@ -412,43 +399,39 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public Object getVariableValue(int slot, NodeIdentifier identifier) {
-        final TIME time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
+        final var time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
         //noinspection DataFlowIssue
-        final ArrayList<ItemWithTime<TIME, Object>> varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get(slot);
+        final var varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get(slot);
         return revertObject(varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).item());
     }
 
     @Override
     public Object getObjectFieldValue(Node node, Object receiver, String fieldName, NodeIdentifier identifier) {
-        TIME objGenTime = objToCtx.get((SLObjectBase) receiver);
-        HashMap<String, ArrayList<ItemWithTime<TIME, Object>>> objectHistory = currentHistory.getObjectHistory(objGenTime);
-        ArrayList<ItemWithTime<TIME, Object>> fieldHistory = objectHistory.get(fieldName);
-        if (fieldHistory == null) {
-            System.out.println("fields: " + objectHistory.keySet());
-            throw SLUndefinedNameException.undefinedProperty(node, fieldName);
-        }
-        TIME time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
-        int i = ItemWithTime.binarySearchApply(fieldHistory, time);
+        final var objGenTime = objToCtx.get((SLObjectBase) receiver);
+        final var objectHistory = currentHistory.getObjectHistory(objGenTime);
+        final var fieldHistory = objectHistory.get(fieldName);
+        if (fieldHistory == null) throw SLUndefinedNameException.undefinedProperty(node, fieldName);
+        final var time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
+        final var i = ItemWithTime.binarySearchApply(fieldHistory, time);
         if (i < 0) throw SLUndefinedNameException.undefinedProperty(node, fieldName);
         return revertObject(fieldHistory.get(i).item());
     }
 
     @Override
-    public Object getArrayElementValue(Object array, long index, Object value) {
-        return null;
+    public Object getArrayElementValue(Node node, Object array, long index, NodeIdentifier identifier) {
+        return getObjectFieldValue(node, array, Long.toString(index), identifier);
     }
 
     public void startNewExecution(VirtualFrame frame, NodeIdentifier identifier, Node node) {
-        System.out.println("Start New Execution: " + node.getSourceSection() + " / isInExec" + isInExec);
+//        System.out.println("Start New Execution: " + node.getSourceSection() + " / isInExec" + isInExec);
         if (isInExec) return;
-//        AbstractPolyglotImpl.testCount++;
         isInExec = true;
-        final ExecutionHistory<TIME> history = currentHistory;
-        final ExecutionHistory.TimeInfo<TIME> time = history.getTime(getExecutionContext(identifier));
+        final var history = currentHistory;
+        final var time = history.getTime(getExecutionContext(identifier));
         if (time != null) history.deleteRecords(time.getStart(), time.getEnd());
-        final ExecutionContext lastCalcCtx = this.lastCalcCtx;
+        final var lastCalcCtx = this.lastCalcCtx;
         if (lastCalcCtx != null) {
-            final ExecutionHistory.TimeInfo<TIME> tp = history.getTime(lastCalcCtx);
+            final var tp = history.getTime(lastCalcCtx);
             currentTime = tp == null ? this.currentTime.inc() : history.getNextTime(tp.getEnd());
         }
         constructFrameAndObjects(frame);
@@ -457,12 +440,11 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     public void endNewExecution() {
-        //noinspection unchecked
         currentHistory = rootHistory.merge(currentHistory);
         localVarOperatorHolder.pop();
         isInExec = false;
         newExecCount++;
-        System.out.println("End New Execution");
+//        System.out.println("End New Execution");
     }
 
     private void endCalc(SLStatementNode node) {
@@ -471,7 +453,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @SuppressWarnings("ConstantValue")
     private ShouldReExecuteResult shouldReExecute(SLStatementNode node) {
-        final boolean logging = false;
+        final var logging = false;
         if (node.isNewNode()) {
             if (logging) System.out.println("New Execution: isNewNode");
             return ShouldReExecuteResult.NEW_EXECUTE;
@@ -481,19 +463,19 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
             return ShouldReExecuteResult.RE_EXECUTE;
         }
 
-        final ExecutionHistory<TIME> currentHistory = this.currentHistory;
-        NodeIdentifier nodeIdentifier = node.getNodeIdentifier();
-        ExecutionContext execCtx = getExecutionContext(nodeIdentifier);
-        ExecutionHistory.TimeInfo<TIME> tp = currentHistory.getTime(execCtx);
+        final var currentHistory = this.currentHistory;
+        final var nodeIdentifier = node.getNodeIdentifier();
+        final var execCtx = getExecutionContext(nodeIdentifier);
+        final var tp = currentHistory.getTime(execCtx);
         if (tp == null) {
             if (logging) System.out.println("New Execution: no prev exec");
             return ShouldReExecuteResult.NEW_EXECUTE;
         }
 
-        TIME fcStart = this.firstHitAtFunctionCall;
+        var fcStart = this.firstHitAtFunctionCall;
         if (fcStart.compareTo(tp.getEnd()) < 0) {
             fcStart = Time.max(fcStart, tp.getStart());
-            for (ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>> entry : currentHistory.getFunctionEnters(fcStart, tp.getEnd())) {
+            for (var entry : currentHistory.getFunctionEnters(fcStart, tp.getEnd())) {
                 if (functionRegistry.containNewNode(entry.item().getRight())) {
                     firstHitAtFunctionCall = entry.time();
                     if (logging) System.out.println("Excuse: new function: " + entry.item().getRight());
@@ -505,12 +487,12 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
         ExecutionHistory.LocalVarOperator<TIME> op = localVarOperatorHolder.peek();
 
-        final HashSet<Integer> localVarFlags = assertNonNull(localVarFlagStack.peek());
+        final var localVarFlags = assertNonNull(localVarFlagStack.peek());
         for (int slot : localVarFlags) {
-            ArrayList<TIME> readVarHistory = op.getReadVar(slot);
+            final var readVarHistory = op.getReadVar(slot);
             if (readVarHistory == null || readVarHistory.isEmpty()) continue;
-            final int start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
-            final int end = Time.binarySearchNext(readVarHistory, tp.getEnd());
+            final var start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
+            final var end = Time.binarySearchNext(readVarHistory, tp.getEnd());
             if (start != end) {
                 if (logging) System.out.println("Excuse: flagged var / " + slot + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
                 return ShouldReExecuteResult.RE_EXECUTE;
@@ -534,8 +516,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         TIME fldStart = firstHitAtField;
         if (!objectFieldFlags.isEmpty() && fldStart.compareTo(tp.getEnd()) < 0) {
             fldStart = tp.getStart();
-            for (ItemWithTime<TIME, ExecutionHistory.ReadObjectField<TIME>> entry : this.currentHistory.getReadOperations(fldStart, tp.getEnd())) {
-                HashSet<Object> fields = objectFieldFlags.get(entry.item().objGenCtx());
+            for (var entry : this.currentHistory.getReadOperations(fldStart, tp.getEnd())) {
+                final var fields = objectFieldFlags.get(entry.item().objGenCtx());
                 if (fields != null && fields.contains(entry.item().fieldName())) {
                     firstHitAtField = entry.time();
                     if (logging) System.out.println("Excuse: flagged Fld / " + entry.item().objGenCtx() + ", " + entry.item().fieldName() + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
@@ -622,16 +604,13 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     private void constructFrameAndObjects(VirtualFrame frame) {
         final TIME time = currentTime;
-        ExecutionHistory<TIME> history = currentHistory;
-        HashMap<Integer, ArrayList<ItemWithTime<TIME, Object>>> local = history.getLocalHistory(currentContext.getBase());
+        final var history = currentHistory;
+        final var local = history.getLocalHistory(currentContext.getBase());
         if (local == null) return;
 
-        final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>(this.ctxToObj);
-        final WeakHashMap<SLObjectBase, TIME> objToCtx = new WeakHashMap<>(this.objToCtx);
-
         for (Map.Entry<Integer, ArrayList<ItemWithTime<TIME, Object>>> entry : local.entrySet()) {
-            int slot = entry.getKey();
-            ArrayList<ItemWithTime<TIME, Object>> list = entry.getValue();
+            final int slot = entry.getKey();
+            final var list = entry.getValue();
 
             int i = ItemWithTime.binarySearchApply(list, time);
             if (i < 0) continue;
@@ -640,11 +619,14 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
                 frame.setLong(slot, (Long) value);
             } else if (value instanceof Boolean) {
                 frame.setBoolean(slot, (Boolean) value);
-            } else if (value instanceof SLBigInteger || value instanceof String || value instanceof TruffleString || value == SLNull.SINGLETON) {
+            } else if (value instanceof SLBigInteger
+                    || value instanceof String
+                    || value instanceof TruffleString
+                    || value == SLNull.SINGLETON) {
                 frame.setObject(slot, value);
             } else if (value instanceof ExecutionHistory.ObjectReference) {
                 //noinspection unchecked
-                Object obj = generateObject(((ExecutionHistory.ObjectReference<TIME>) value).objGenCtx(), history, ctxToObj);
+                Object obj = generateObject(((ExecutionHistory.ObjectReference<TIME>) value).objGenCtx());
                 frame.setObject(slot, obj);
             } else if (value instanceof FunctionReference) {
                 frame.setObject(slot, getFunction(((FunctionReference) value).functionName()));
@@ -653,24 +635,23 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
             }
         }
 
-        this.ctxToObj = ctxToObj;
-        this.objToCtx = objToCtx;
     }
 
-    private SLObjectBase generateObject(TIME objGenCtx, ExecutionHistory<TIME> history, HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj) {
-        return ctxToObj.computeIfAbsent(objGenCtx,
-                it -> {
-                    final HashMap<String, ArrayList<ItemWithTime<TIME, Object>>> objectHistory = rootHistory.getObjectHistory(it);
-                    SLObjectBase object = new SLDEObject(new ObjectHistory(objectHistory));
-                    objToCtx.put(object, it);
-                    currentHistory.onCreateObject(it);
-                    return new WeakReference<>(object);
-                })
-                .get();
+    private SLObjectBase generateObject(TIME objGenCtx) {
+        final var ref = ctxToObj.get(objGenCtx);
+        SLObjectBase obj;
+        if (ref != null) {
+            obj = ref.get();
+            if (obj != null) return obj;
+        }
+
+        obj = new SLDEObject(new ObjectHistory(rootHistory.getObjectHistory(objGenCtx)));
+        ctxToObj.put(objGenCtx, new WeakReference<>(obj));
+        objToCtx.put(obj, objGenCtx);
+        return obj;
     }
 
     private Object replaceToMock(Object value) {
-        Object saveNewValue;
         if (value == null
                 || value instanceof Long
                 || value instanceof Boolean
@@ -678,16 +659,14 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
                 || value instanceof SLBigInteger
                 || value instanceof TruffleString
                 || value == SLNull.SINGLETON) {
-            saveNewValue = value;
+            return value;
         } else if (value instanceof SLFunction) {
-            saveNewValue = new FunctionReference(((SLFunction) value).getName());
+            return new FunctionReference(((SLFunction) value).getName());
         } else if (value instanceof SLObjectBase) {
-            saveNewValue = new ExecutionHistory.ObjectReference<>(objToCtx.get((SLObjectBase) value));
+            return new ExecutionHistory.ObjectReference<>(objToCtx.get((SLObjectBase) value));
         } else {
             throw new RuntimeException("Unavailable object: " + value.getClass().getName());
         }
-
-        return saveNewValue;
     }
     
     private Object revertObject(Object value) {
@@ -701,7 +680,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         } else if (value instanceof ExecutionHistory.ObjectReference) {
             //noinspection unchecked
             TIME objGenTime = ((ExecutionHistory.ObjectReference<TIME>) value).objGenCtx();
-            return generateObject(objGenTime, currentHistory, ctxToObj);
+            return generateObject(objGenTime);
         } else if (value instanceof FunctionReference funcRef) {
             final SLFunction function = getFunction(funcRef.functionName());
             assert function != null : "Unknown function: " + funcRef.functionName;
@@ -727,39 +706,29 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
         @Override
         public boolean existsField(String fieldName) {
-            ArrayList<ItemWithTime<TIME, Object>> fieldHistory = objectHistory.get(fieldName);
-            return fieldHistory != null && !fieldHistory.isEmpty()
+            final var fieldHistory = objectHistory.get(fieldName);
+            return fieldHistory != null
+                    && !fieldHistory.isEmpty()
                     && fieldHistory.get(0).time().compareTo(currentTime) <= 0;
         }
 
         @Override
         public Object getObjectFieldValue(String fieldName) {
-            ArrayList<ItemWithTime<TIME, Object>> fieldHistory = objectHistory.get(fieldName);
-            if (fieldHistory == null) {
-                System.out.println("Fields: " + objectHistory.keySet());
-                System.out.println(fieldName);
-                return null;
-            }
-            int i = ItemWithTime.binarySearchApply(fieldHistory, currentTime);
-            if (i < 0) {
-                System.out.println("History: " + fieldHistory);
-                System.out.println(currentTime);
-                return null;
-            }
+            final var fieldHistory = objectHistory.get(fieldName);
+            if (fieldHistory == null) return null;
+            final var i = ItemWithTime.binarySearchApply(fieldHistory, currentTime);
+            if (i < 0) return null;
             return revertObject(fieldHistory.get(i).item());
         }
 
         @Override
         public boolean canUseCache(String member) {
-            Integer last = lastUpdateNewExecCount.put(member, newExecCount);
-            System.out.println("canUseCache: " + last);
-            System.out.println(newExecCount);
+            final Integer last = lastUpdateNewExecCount.get(member);
             return last != null && last == newExecCount;
         }
 
         @Override
         public void onWrite(String member) {
-            System.out.println("onWrite: " + currentTime + " / " + newExecCount);
             lastUpdateNewExecCount.put(member, newExecCount);
         }
     }
@@ -776,8 +745,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         }
 
         public void push(int paramLen, CallContext.ContextBase ctx) {
-            ScopeInfo<TIME>[] stack = this.stack;
-            final int currentLen = stack.length;
+            var stack = this.stack;
+            final var currentLen = stack.length;
             if (pointer == currentLen) this.stack = stack = Arrays.copyOf(stack, currentLen + (currentLen >> 1));
             stack[pointer++] = new ScopeInfo<>(paramLen, ctx);
         }
@@ -809,16 +778,16 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         public void onReadParam(TIME time, int paramIndex) {
             peek().onReadParam(time, paramIndex);
         }
-    }
 
-    private static final class ScopeInfo<TIME extends Time<TIME>> {
-        final int paramLen;
-        final CallContext.ContextBase cc;
-        ExecutionHistory.LocalVarOperator<TIME> op = null;
+        private static final class ScopeInfo<TIME extends Time<TIME>> {
+            final int paramLen;
+            final CallContext.ContextBase cc;
+            ExecutionHistory.LocalVarOperator<TIME> op = null;
 
-        public ScopeInfo(int paramLen, CallContext.ContextBase cc) {
-            this.paramLen = paramLen;
-            this.cc = cc;
+            public ScopeInfo(int paramLen, CallContext.ContextBase cc) {
+                this.paramLen = paramLen;
+                this.cc = cc;
+            }
         }
     }
 
