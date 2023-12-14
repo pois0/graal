@@ -1486,7 +1486,7 @@ final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotI
             final long elapsed = System.nanoTime() - l;
             System.out.println("Time: " + elapsed);
             executed++;
-            if (executed > 50) {
+            if (executed > 100) {
                 if (executed % 2 == 0) {
                     System.err.println(prevElapsed + "," + elapsed + ", " + AbstractPolyglotImpl.testCount + ", " + AbstractPolyglotImpl.constructCost);
                 } else {

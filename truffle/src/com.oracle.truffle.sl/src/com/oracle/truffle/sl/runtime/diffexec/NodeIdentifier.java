@@ -62,9 +62,9 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     @Override
     public int compareTo(NodeIdentifier o) {
         if (this == o) return 0;
-        final int compareNumber = Integer.compare(number, o.number);
+        final var compareNumber = Integer.compare(number, o.number);
         if (compareNumber != 0) return compareNumber;
-        int compareIsNew = Boolean.compare(isNewNode, o.isNewNode);
+        final var compareIsNew = Boolean.compare(isNewNode, o.isNewNode);
         if (compareIsNew != 0) return compareIsNew;
         return functionName.compareTo(o.functionName);
     }

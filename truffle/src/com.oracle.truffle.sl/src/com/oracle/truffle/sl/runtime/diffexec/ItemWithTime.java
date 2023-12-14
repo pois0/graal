@@ -29,8 +29,12 @@ public record ItemWithTime<TIME extends Time<TIME>, E>(TIME time, E item) {
     }
 
     public static <TIME extends Time<TIME>, E> int binarySearchNext(ArrayList<ItemWithTime<TIME, E>> list, TIME time) {
-        int low = 0;
-        int high = list.size() - 1;
+        return binarySearchNext(list, 0, list.size(), time);
+    }
+
+    public static <TIME extends Time<TIME>, E> int binarySearchNext(ArrayList<ItemWithTime<TIME, E>> list, int start, int end, TIME time) {
+        int low = start;
+        int high = end - 1;
 
         while (low <= high) {
             final int mid = (low + high) >>> 1;
@@ -149,7 +153,7 @@ public record ItemWithTime<TIME extends Time<TIME>, E>(TIME time, E item) {
     /** both inclusive */
     public static <TIME extends Time<TIME>, E> List<ItemWithTime<TIME, E>> subList(ArrayList<ItemWithTime<TIME, E>> list, TIME startTime, TIME endTime) {
         final int start = binarySearchWhereInsertTo(list, startTime);
-        final int end = binarySearchNext(list, endTime);
+        final int end = binarySearchNext(list, start, list.size(), endTime);
         return list.subList(start, end);
     }
 

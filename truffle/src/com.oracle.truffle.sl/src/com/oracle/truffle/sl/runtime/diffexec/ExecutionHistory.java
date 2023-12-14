@@ -12,13 +12,13 @@ import static com.oracle.truffle.sl.Util.assertNonNull;
 
 public final class ExecutionHistory<TIME extends Time<TIME>> {
     private final TIME zero;
-    private final ArrayList<ItemWithTime<TIME, ExecutionContext>> timeToContext = new ArrayList<>(100_000);
-    private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime = new HashMap<>();
-    private final ArrayList<ItemWithTime<TIME, ReadObjectField<TIME>>> objectReadList = new ArrayList<>(100_000);
-    private final HashMap<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> objectUpdateMap = new HashMap<>();
-    private final ArrayList<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = new ArrayList<>(100_000);
-    private final HashMap<CallContext.ContextBase, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(10_000);
-    private final ArrayList<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> functionCalls = new ArrayList<>(2_500);
+    private final ArrayList<ItemWithTime<TIME, ExecutionContext>> timeToContext = new ArrayList<>(1_000);
+    private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime = new HashMap<>(1_000);
+    private final ArrayList<ItemWithTime<TIME, ReadObjectField<TIME>>> objectReadList = new ArrayList<>(1_000);
+    private final HashMap<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> objectUpdateMap = new HashMap<>(1_000);
+    private final ArrayList<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = new ArrayList<>(1_000);
+    private final HashMap<CallContext.ContextBase, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
+    private final ArrayList<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> functionCalls = new ArrayList<>(250);
 
     public ExecutionHistory(TIME zero) {
         this.zero = zero;
