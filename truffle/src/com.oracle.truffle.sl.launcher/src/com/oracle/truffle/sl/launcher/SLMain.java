@@ -80,7 +80,7 @@ public final class SLMain {
             System.exit(executeSource(source, System.in, System.out, options));
             // @formatter:on
         } else {
-            for (int i = 0; i < 150; i++) {
+            for (int i = 0; i < 200; i++) {
                 System.out.println("execute " + i);
                 source = Source.newBuilder(SL, new File(file)).build();
                 executeSource(source, System.in, System.out, options);

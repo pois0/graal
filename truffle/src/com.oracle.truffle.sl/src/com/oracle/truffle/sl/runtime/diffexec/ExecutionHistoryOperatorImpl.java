@@ -24,10 +24,12 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.function.BiFunction;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
@@ -38,8 +40,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     private final LocalVarOperatorHolder localVarOperatorHolder = new LocalVarOperatorHolder(0);
     private final ArrayDeque<boolean[]> parameterFlagStack = new ArrayDeque<>();
-    private final ArrayDeque<HashSet<Integer>> localVarFlagStack = new ArrayDeque<>(); // TODO use Bitset
-    private final HashMap<TIME, HashSet<Object>> objectFieldFlags = new HashMap<>();
+    private final ArrayDeque<BitSet> localVarFlagStack = new ArrayDeque<>(); // TODO use Bitset
+    private final HashMap<TIME, HashSet<String>> objectFieldFlags = new HashMap<>();
 
     private final ExecutionHistory<TIME> rootHistory;
     private ExecutionHistory<TIME> currentHistory;
@@ -63,7 +65,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         this.currentHistory = rootHistory;
 
         parameterFlagStack.push(new boolean[0]);
-        localVarFlagStack.push(new HashSet<>());
+        localVarFlagStack.push(new BitSet());
 
         firstHitAtField = rootHistory.getInitialTime();
         firstHitAtFunctionCall = rootHistory.getInitialTime();
@@ -101,7 +103,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     public void onUpdateLocalVariable(int slot, Object value) {
         localVarOperatorHolder.onUpdateVariable(currentTime, slot, value);
         //noinspection DataFlowIssue
-        localVarFlagStack.peek().add(slot);
+        localVarFlagStack.peek().set(slot);
     }
 
     @Override
@@ -122,7 +124,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     public void rewriteLocalVariable(int slot, Object value, NodeIdentifier identifier) {
         currentHistory.rewriteLocalVariable(getExecutionContext(identifier), slot, replaceToMock(value));
         //noinspection DataFlowIssue
-        localVarFlagStack.peek().add(slot);
+        localVarFlagStack.peek().set(slot);
     }
 
     @Override
@@ -174,7 +176,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         final var currentHistory = this.currentHistory;
         CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
-        localVarFlagStack.push(new HashSet<>());
+        localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argLen, currentStack);
         currentHistory.onEnterFunction(currentTime, functionName, currentStack);
     }
@@ -184,7 +186,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         final ExecutionHistory<TIME> currentHistory = this.currentHistory;
         final var currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
-        localVarFlagStack.push(new HashSet<>());
+        localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argFlags.length, currentStack);
         parameterFlagStack.push(argFlags);
         currentHistory.onEnterFunction(currentHistory.getTimeNN(lastCalcCtx).getEnd(), functionName, currentStack);
@@ -488,14 +490,17 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         ExecutionHistory.LocalVarOperator<TIME> op = localVarOperatorHolder.peek();
 
         final var localVarFlags = assertNonNull(localVarFlagStack.peek());
-        for (int slot : localVarFlags) {
-            final var readVarHistory = op.getReadVar(slot);
-            if (readVarHistory == null || readVarHistory.isEmpty()) continue;
-            final var start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
-            final var end = Time.binarySearchNext(readVarHistory, tp.getEnd());
-            if (start != end) {
-                if (logging) System.out.println("Excuse: flagged var / " + slot + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
-                return ShouldReExecuteResult.RE_EXECUTE;
+        {
+            int slot = -1;
+            while ((slot = localVarFlags.nextSetBit(++slot)) >= 0) {
+                final var readVarHistory = op.getReadVar(slot);
+                if (readVarHistory == null || readVarHistory.isEmpty()) continue;
+                final var start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
+                final var end = Time.binarySearchNext(readVarHistory, tp.getEnd());
+                if (start != end) {
+                    if (logging) System.out.println("Excuse: flagged var / " + slot + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
+                    return ShouldReExecuteResult.RE_EXECUTE;
+                }
             }
         }
 
@@ -638,17 +643,26 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     private SLObjectBase generateObject(TIME objGenCtx) {
-        final var ref = ctxToObj.get(objGenCtx);
-        SLObjectBase obj;
-        if (ref != null) {
-            obj = ref.get();
-            if (obj != null) return obj;
-        }
+        final var remappingFunction = new BiFunction<TIME, WeakReference<SLObjectBase>, WeakReference<SLObjectBase>>() {
+            private SLObjectBase obj;
 
-        obj = new SLDEObject(new ObjectHistory(rootHistory.getObjectHistory(objGenCtx)));
-        ctxToObj.put(objGenCtx, new WeakReference<>(obj));
-        objToCtx.put(obj, objGenCtx);
-        return obj;
+            @Override
+            public WeakReference<SLObjectBase> apply(TIME time, WeakReference<SLObjectBase> ref) {
+                if (ref != null) {
+                    final var tmp = ref.get();
+                    if (tmp != null) {
+                        obj = tmp;
+                        return ref;
+                    }
+                }
+
+                final var tmp = obj = new SLDEObject(new ObjectHistory(rootHistory.getObjectHistory(objGenCtx)));
+                objToCtx.put(tmp, time);
+                return new WeakReference<>(tmp);
+            }
+        };
+        ctxToObj.compute(objGenCtx, remappingFunction);
+        return remappingFunction.obj;
     }
 
     private Object replaceToMock(Object value) {

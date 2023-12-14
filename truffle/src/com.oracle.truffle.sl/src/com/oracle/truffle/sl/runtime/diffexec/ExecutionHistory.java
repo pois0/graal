@@ -75,7 +75,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         objectUpdateMap.putIfAbsent(time, new HashMap<>());
     }
 
-    public void onReadObjectField(TIME time, TIME objGenTime, Object field) {
+    public void onReadObjectField(TIME time, TIME objGenTime, String field) {
         objectReadList.add(new ItemWithTime<>(time, new ReadObjectField<>(objGenTime, field)));
     }
 
@@ -333,7 +333,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         }
     }
 
-    public record ReadObjectField<TIME extends Time<TIME>>(TIME objGenCtx, Object fieldName) {}
+    public record ReadObjectField<TIME extends Time<TIME>>(TIME objGenCtx, String fieldName) {}
 
     public record LocalVariableUpdate(int varName, Object object) {}
 

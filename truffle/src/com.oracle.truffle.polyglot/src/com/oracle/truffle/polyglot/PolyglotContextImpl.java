@@ -1481,11 +1481,11 @@ final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotI
             languageContext.checkAccess(null);
             languageContext.ensureInitialized(null);
             CallTarget target = languageContext.parseCached(null, truffleSource, null);
+            executed++;
             long l = System.nanoTime();
             Object result = target.call(PolyglotImpl.EMPTY_ARGS);
             final long elapsed = System.nanoTime() - l;
             System.out.println("Time: " + elapsed);
-            executed++;
             if (executed > 100) {
                 if (executed % 2 == 0) {
                     System.err.println(prevElapsed + "," + elapsed + ", " + AbstractPolyglotImpl.testCount + ", " + AbstractPolyglotImpl.constructCost);
