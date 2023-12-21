@@ -49,6 +49,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
+import com.oracle.truffle.polyglot.PolyglotContextImpl;
 import com.oracle.truffle.sl.runtime.diffexec.ArrayTime;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistory;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
@@ -96,6 +97,7 @@ import com.oracle.truffle.sl.builtins.SLRegisterShutdownHookBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLStackTraceBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLTypeOfBuiltinFactory;
 import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
+import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
 
 /**
  * The run-time state of SL during execution. The context is created by the {@link SLLanguage}. It
@@ -118,7 +120,7 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
-    private final ExecutionHistoryOperator<ArrayTime> historyOperator;
+    private final ExecutionHistoryOperatorImpl<ArrayTime> historyOperator;
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins) {
         this.env = env;
@@ -294,6 +296,13 @@ public final class SLContext {
                 throw shouldNotReachHere("Shutdown hook is not executable!", e);
             }
         }
+    }
+
+    public void writeMetrix() {
+
+        PolyglotContextImpl.newExecCount = historyOperator.newExecCount;
+        PolyglotContextImpl.recalcNodeCount = historyOperator.recalcNodeCount;
+        PolyglotContextImpl.restoredFieldCount = historyOperator.restoredFieldCount;
     }
 
     public ExecutionHistoryOperator<ArrayTime> getHistoryOperator() {

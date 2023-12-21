@@ -53,7 +53,11 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     private final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
     private TIME firstHitAtField;
     private TIME firstHitAtFunctionCall;
-    private int newExecCount = 0;
+    public int newExecCount = 0;
+
+    // Metrics
+    public int recalcNodeCount = 0;
+    public int restoredFieldCount = 0;
 
     public ExecutionHistoryOperatorImpl(ExecutionHistory<TIME> rootHistory, SLFunctionRegistry registry, TIME zero) {
         this.functionRegistry = registry;
@@ -451,6 +455,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     private void endCalc(SLStatementNode node) {
         lastCalcCtx = getExecutionContext(node.getNodeIdentifier());
+        recalcNodeCount++;
     }
 
     @SuppressWarnings("ConstantValue")
@@ -728,6 +733,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
         @Override
         public Object getObjectFieldValue(String fieldName) {
+            restoredFieldCount++;
             final var fieldHistory = objectHistory.get(fieldName);
             if (fieldHistory == null) return null;
             final var i = ItemWithTime.binarySearchApply(fieldHistory, currentTime);

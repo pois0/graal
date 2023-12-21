@@ -122,7 +122,12 @@ import com.oracle.truffle.polyglot.PolyglotLocals.LocalLocation;
 import com.oracle.truffle.polyglot.PolyglotThreadLocalActions.HandshakeConfig;
 import com.oracle.truffle.polyglot.SystemThread.LanguageSystemThread;
 
-final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotImpl.VMObject {
+public final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotImpl.VMObject {
+
+    public static int newExecCount = -1;
+    public static int recalcNodeCount = -1;
+    public static int restoredFieldCount = -1;
+
     private static int executed = 0;
     private static long prevElapsed = 0;
 
@@ -1488,7 +1493,10 @@ final class PolyglotContextImpl implements com.oracle.truffle.polyglot.PolyglotI
             System.out.println("Time: " + elapsed);
             if (executed > 100) {
                 if (executed % 2 == 0) {
-                    System.err.println(prevElapsed + "," + elapsed + ", " + AbstractPolyglotImpl.testCount + ", " + AbstractPolyglotImpl.constructCost);
+                    if (newExecCount >= 0) {
+                        System.err.println(prevElapsed + "," + elapsed + ", " + newExecCount+ ", " + recalcNodeCount + "," + restoredFieldCount);
+                        newExecCount = -1;
+                    }
                 } else {
                     prevElapsed = elapsed;
                 }

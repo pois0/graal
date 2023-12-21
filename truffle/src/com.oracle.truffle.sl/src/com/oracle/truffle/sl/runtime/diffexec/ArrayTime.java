@@ -4,7 +4,7 @@ import com.google.common.hash.Hasher;
 
 import java.util.Arrays;
 
-public final class ArrayTime extends Time<ArrayTime> {
+public final class ArrayTime extends Time<ArrayTime> implements Comparable<ArrayTime> {
     private final int[] raw;
 
     public static final ArrayTime ZERO = new ArrayTime(new int[]{0});

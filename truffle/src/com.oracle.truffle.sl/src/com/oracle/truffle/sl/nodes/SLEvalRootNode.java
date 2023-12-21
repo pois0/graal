@@ -136,27 +136,31 @@ public final class SLEvalRootNode extends RootNode {
              */
             registerFunctions();
         }
-        if (mainCallNode == null) {
-            /* The source code did not have a "main" function, so nothing to execute. */
-            return SLNull.SINGLETON;
-        } else {
-            /* Conversion of arguments to types understood by SL. */
-            Object[] originalArgs = frame.getArguments();
-            Object[] newArgs = new Object[originalArgs.length + 1];
-            for (int i = 0; i < originalArgs.length; i++) {
-                newArgs[i] = SLContext.fromForeignValue(originalArgs[i]);
-            }
-            if (SLContext.get(this).getHistoryOperator().isInitialExecution()) {
-                newArgs[originalArgs.length] = FunctionCallSpecialParameter.EXEC;
+        try {
+            if (mainCallNode == null) {
+                /* The source code did not have a "main" function, so nothing to execute. */
+                return SLNull.SINGLETON;
             } else {
-                newArgs[originalArgs.length] = FunctionCallSpecialParameter.CALC;
+                /* Conversion of arguments to types understood by SL. */
+                Object[] originalArgs = frame.getArguments();
+                Object[] newArgs = new Object[originalArgs.length + 1];
+                for (int i = 0; i < originalArgs.length; i++) {
+                    newArgs[i] = SLContext.fromForeignValue(originalArgs[i]);
+                }
+                if (SLContext.get(this).getHistoryOperator().isInitialExecution()) {
+                    newArgs[originalArgs.length] = FunctionCallSpecialParameter.EXEC;
+                } else {
+                    newArgs[originalArgs.length] = FunctionCallSpecialParameter.CALC;
+                }
+                final Object result = mainCallNode.call(newArgs);
+                if (result instanceof CalcResult) {
+                    return ((CalcResult) result).getGenericResult().getResult();
+                } else {
+                    return result;
+                }
             }
-            final Object result = mainCallNode.call(newArgs);
-            if (result instanceof CalcResult) {
-                return ((CalcResult) result).getGenericResult().getResult();
-            } else {
-                return result;
-            }
+        } finally {
+            SLContext.get(this).writeMetrix();
         }
     }
 
