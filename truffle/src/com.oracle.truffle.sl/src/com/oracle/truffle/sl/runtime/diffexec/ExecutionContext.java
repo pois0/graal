@@ -2,7 +2,7 @@ package com.oracle.truffle.sl.runtime.diffexec;
 
 import com.google.common.hash.Hasher;
 
-public class ExecutionContext extends Hashable implements Comparable<ExecutionContext> {
+public final class ExecutionContext extends Hashable implements Comparable<ExecutionContext> {
     private final CallContext callContext;
     private final NodeIdentifier currentNodeIdentifier;
 

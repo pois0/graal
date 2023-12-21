@@ -40,7 +40,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     private final LocalVarOperatorHolder localVarOperatorHolder = new LocalVarOperatorHolder(0);
     private final ArrayDeque<boolean[]> parameterFlagStack = new ArrayDeque<>();
-    private final ArrayDeque<BitSet> localVarFlagStack = new ArrayDeque<>(); // TODO use Bitset
+    private final ArrayDeque<BitSet> localVarFlagStack = new ArrayDeque<>();
     private final HashMap<TIME, HashSet<String>> objectFieldFlags = new HashMap<>();
 
     private final ExecutionHistory<TIME> rootHistory;
@@ -437,7 +437,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
             currentTime = tp == null ? this.currentTime.inc() : history.getNextTime(tp.getEnd());
         }
         constructFrameAndObjects(frame);
-        currentHistory = new ExecutionHistory<>(zero);
+        currentHistory = new ExecutionHistory<>(zero, currentHistory);
         localVarOperatorHolder.duplicate();
     }
 
@@ -710,7 +710,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         return functionRegistry.getFunction(functionName);
     }
 
-    private class ObjectHistory implements SLDEObject.ObjectHistory {
+    private final class ObjectHistory implements SLDEObject.ObjectHistory {
         private final HashMap<String, ArrayList<ItemWithTime<TIME, Object>>> objectHistory;
         private final HashMap<String, Integer> lastUpdateNewExecCount = new HashMap<>();
 

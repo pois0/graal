@@ -13,15 +13,26 @@ import static com.oracle.truffle.sl.Util.assertNonNull;
 public final class ExecutionHistory<TIME extends Time<TIME>> {
     private final TIME zero;
     private final ArrayList<ItemWithTime<TIME, ExecutionContext>> timeToContext = new ArrayList<>(1_000);
-    private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime = new HashMap<>(1_000);
+    private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime;
+    private final boolean sharedContextToTime;
     private final ArrayList<ItemWithTime<TIME, ReadObjectField<TIME>>> objectReadList = new ArrayList<>(1_000);
     private final HashMap<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> objectUpdateMap = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = new ArrayList<>(1_000);
     private final HashMap<CallContext.ContextBase, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> functionCalls = new ArrayList<>(250);
 
-    public ExecutionHistory(TIME zero) {
+    private ExecutionHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
         this.zero = zero;
+        this.contextToTime = contextToTime;
+        this.sharedContextToTime = sharedContextToTime;
+    }
+
+    public ExecutionHistory(TIME zero) {
+        this(zero, new HashMap<>(1_000), false);
+    }
+
+    public ExecutionHistory(TIME zero, ExecutionHistory<TIME> history) {
+        this(zero, history.contextToTime, true);
     }
 
     public void onReturnValue(TIME startTime, TIME endTime, ExecutionContext ctx, Object value) {
@@ -223,11 +234,13 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         ItemWithTime.merge(timeToContext, other.timeToContext, initialTime);
 
         // merge contextToTime
-        for (var e : other.contextToTime.entrySet()) {
-            contextToTime.merge(e.getKey(), e.getValue(), (base, v) -> {
-                base.putAll(v);
-                return base;
-            });
+        if (sharedContextToTime) {
+            for (var e : other.contextToTime.entrySet()) {
+                contextToTime.merge(e.getKey(), e.getValue(), (base, v) -> {
+                    base.putAll(v);
+                    return base;
+                });
+            }
         }
 
         // merge objectReadList
