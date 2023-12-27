@@ -108,7 +108,20 @@ public final class CallContext implements Comparable<CallContext> {
     }
 
     public static boolean equals(CallContext e1, CallContext e2) {
-        return compare(e1, e2) == 0;
+        while (true) {
+            if (e1 == e2) return true;
+            if (!NodeIdentifier.equals(e1.nodeIdentifier, e2.nodeIdentifier)) return false;
+            if (e1.loopCount != e2.loopCount) return false;
+
+            e1 = e1.root;
+            e2 = e2.root;
+
+            if (e1 == null) {
+                return e2 == null;
+            } else if (e2 == null) {
+                return false;
+            }
+        }
     }
 
     private static int compare(CallContext e1, CallContext e2) {

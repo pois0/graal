@@ -26,9 +26,7 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     }
 
     public static boolean equals(NodeIdentifier e1, NodeIdentifier e2) {
-        if (e1.isNewNode != e2.isNewNode) return false;
-        if (e1.number != e2.number) return false;
-        return e1.functionNumber == e2.functionNumber;
+        return e1.number == e2.number && e1.functionNumber == e2.functionNumber && e1.isNewNode == e2.isNewNode;
     }
 
     @Override

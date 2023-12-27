@@ -12,7 +12,7 @@ import java.util.Random;
 import java.util.Set;
 
 final class SimpleLanguageParserSupport {
-    private final static Random rand = new Random();
+    private final static Random rand = new Random(0);
     private static boolean rotate = true;
 
     static Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> getMapSetPair(SimpleLanguageParser parser) {

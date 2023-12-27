@@ -200,6 +200,7 @@ import org.graalvm.collections.Pair;
  * variables.
  * </ul>
  */
+@SuppressWarnings("JavadocReference")
 @TruffleLanguage.Registration(id = SLLanguage.ID, name = "SL", defaultMimeType = SLLanguage.MIME_TYPE, characterMimeTypes = SLLanguage.MIME_TYPE, contextPolicy = ContextPolicy.SHARED, fileTypeDetectors = SLFileDetector.class, //
                 website = "https://www.graalvm.org/graalvm-as-a-platform/implement-language/")
 @ProvidedTags({StandardTags.CallTag.class, StandardTags.StatementTag.class, StandardTags.RootTag.class, StandardTags.RootBodyTag.class, StandardTags.ExpressionTag.class, DebuggerTags.AlwaysHalt.class,
@@ -412,16 +413,16 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
         return rootShape;
     }
 
-    /**
-     * Allocate an empty object. All new objects initially have no properties. Properties are added
-     * when they are first stored, i.e., the store triggers a shape change of the object.
-     */
-    public SLObject createObject(AllocationReporter reporter) {
-        reporter.onEnter(null, 0, AllocationReporter.SIZE_UNKNOWN);
-        SLObject object = new SLObject(rootShape);
-        reporter.onReturnValue(object, 0, AllocationReporter.SIZE_UNKNOWN);
-        return object;
-    }
+//    /**
+//     * Allocate an empty object. All new objects initially have no properties. Properties are added
+//     * when they are first stored, i.e., the store triggers a shape change of the object.
+//     */
+//    public SLObject createObject(AllocationReporter reporter) {
+//        reporter.onEnter(null, 0, AllocationReporter.SIZE_UNKNOWN);
+//        SLObject object = new SLObject(rootShape);
+//        reporter.onReturnValue(object, 0, AllocationReporter.SIZE_UNKNOWN);
+//        return object;
+//    }
 
     private static final LanguageReference<SLLanguage> REFERENCE = LanguageReference.create(SLLanguage.class);
 

@@ -7,6 +7,7 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.nodes.UnexpectedResultException;
 import com.oracle.truffle.api.strings.TruffleString;
 import com.oracle.truffle.sl.SLException;
+import com.oracle.truffle.sl.SLLanguage;
 import com.oracle.truffle.sl.nodes.SLExpressionNode;
 import com.oracle.truffle.sl.nodes.SLStatementNode;
 import com.oracle.truffle.sl.nodes.controlflow.SLBreakException;
@@ -17,6 +18,7 @@ import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLFunction;
 import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.SLNull;
+import com.oracle.truffle.sl.runtime.SLObject;
 import com.oracle.truffle.sl.runtime.SLObjectBase;
 import com.oracle.truffle.sl.runtime.SLUndefinedNameException;
 
@@ -28,7 +30,6 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.function.BiFunction;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
@@ -49,7 +50,6 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     private boolean isInExec = false;
     private ExecutionContext lastCalcCtx = null;
     private CallContext currentContext = CallContext.EXECUTION_BASE;
-    private final WeakHashMap<SLObjectBase, TIME> objToCtx = new WeakHashMap<>();
     private final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
     private TIME firstHitAtField;
     private TIME firstHitAtFunctionCall;
@@ -87,7 +87,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onReadObjectField(Object receiver, String fieldName) {
-        currentHistory.onReadObjectField(currentTime, objToCtx.get((SLObjectBase) receiver), fieldName);
+        //noinspection unchecked
+        currentHistory.onReadObjectField(currentTime, (TIME) ((SLObjectBase) receiver).getObjGenTime(), fieldName);
     }
 
     @Override
@@ -96,11 +97,12 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     }
 
     @Override
-    public void onGenerateObject(SLObjectBase object) {
+    public Object generateObject(Node node) {
         final var currentTime = this.currentTime;
-        objToCtx.put(object, currentTime);
+        final var object = new SLObject(SLLanguage.get(node).getRootShape(), currentTime);
         ctxToObj.put(currentTime, new WeakReference<>(object));
         currentHistory.onCreateObject(currentTime);
+        return object;
     }
 
     @Override
@@ -112,7 +114,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onUpdateObjectField(Object receiver, String fieldName, Object value) {
-        final var objGenTime = objToCtx.get((SLObjectBase) receiver);
+        @SuppressWarnings("unchecked")
+        final var objGenTime = (TIME) ((SLObjectBase) receiver).getObjGenTime();
         currentHistory.onUpdateObjectWithHash(currentTime, objGenTime, fieldName, replaceToMock(value));
         final var newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
                 .add(fieldName);
@@ -133,7 +136,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier, boolean fieldChanged) {
-        final TIME objGenTime = objToCtx.get((SLObjectBase) receiver);
+        @SuppressWarnings("unchecked")
+        final var objGenTime = (TIME) ((SLObjectBase) receiver).getObjGenTime();
         final var execCtx = getExecutionContext(identifier);
         final var prevUpdate = currentHistory.rewriteObjectField(execCtx, objGenTime, fieldName, replaceToMock(value), fieldChanged);
         final var newlySet = objectFieldFlags.computeIfAbsent(objGenTime, it -> new HashSet<>())
@@ -413,7 +417,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public Object getObjectFieldValue(Node node, Object receiver, String fieldName, NodeIdentifier identifier) {
-        final var objGenTime = objToCtx.get((SLObjectBase) receiver);
+        @SuppressWarnings("unchecked")
+        final var objGenTime = (TIME)((SLObjectBase) receiver).getObjGenTime();
         final var objectHistory = currentHistory.getObjectHistory(objGenTime);
         final var fieldHistory = objectHistory.get(fieldName);
         if (fieldHistory == null) throw SLUndefinedNameException.undefinedProperty(node, fieldName);
@@ -494,35 +499,48 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
         ExecutionHistory.LocalVarOperator<TIME> op = localVarOperatorHolder.peek();
 
+        ShouldReExecuteResult reExecute2 = checkVarRead(node, op, tp, logging);
+        if (reExecute2 != ShouldReExecuteResult.USE_CACHE) return reExecute2;
+
+        ShouldReExecuteResult reExecute1 = checkParamRead(node, op, tp, logging);
+        if (reExecute1 != ShouldReExecuteResult.USE_CACHE) return reExecute1;
+
+        ShouldReExecuteResult reExecute = checkObjectRead(node, tp, logging);
+        if (reExecute != ShouldReExecuteResult.USE_CACHE) return reExecute;
+
+        if (logging) System.out.println("Using cache!: " + node.getSourceSection());
+        return ShouldReExecuteResult.USE_CACHE;
+    }
+
+    private ShouldReExecuteResult checkVarRead(SLStatementNode node, ExecutionHistory.LocalVarOperator<TIME> op, ExecutionHistory.TimeInfo<TIME> tp, boolean logging) {
         final var localVarFlags = assertNonNull(localVarFlagStack.peek());
-        {
-            int slot = -1;
-            while ((slot = localVarFlags.nextSetBit(++slot)) >= 0) {
-                final var readVarHistory = op.getReadVar(slot);
-                if (readVarHistory == null || readVarHistory.isEmpty()) continue;
-                final var start = Time.binarySearchWhereInsertTo(readVarHistory, tp.getStart());
-                final var end = Time.binarySearchNext(readVarHistory, tp.getEnd());
-                if (start != end) {
-                    if (logging) System.out.println("Excuse: flagged var / " + slot + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
-                    return ShouldReExecuteResult.RE_EXECUTE;
-                }
+        int slot = -1;
+        while ((slot = localVarFlags.nextSetBit(++slot)) >= 0) {
+            final var readVarHistory = op.getReadVar(slot);
+            if (readVarHistory == null || readVarHistory.isEmpty()) continue;
+            if (Time.existsRecord(readVarHistory, tp.getStart(), tp.getEnd())) {
+                if (logging) System.out.println("Excuse: flagged var / " + slot + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
+                return ShouldReExecuteResult.RE_EXECUTE;
             }
         }
+        return ShouldReExecuteResult.USE_CACHE;
+    }
 
+    private ShouldReExecuteResult checkParamRead(SLStatementNode node, ExecutionHistory.LocalVarOperator<TIME> op, ExecutionHistory.TimeInfo<TIME> tp, boolean logging) {
         final boolean[] paramFlags = assertNonNull(parameterFlagStack.peek());
         for (int i = 0; i < paramFlags.length; i++) {
             if (!paramFlags[i]) continue;
             ArrayList<TIME> readParamHistory = op.getReadParam(i);
             if (readParamHistory.isEmpty()) continue;
-            final int start = Time.binarySearchWhereInsertTo(readParamHistory, tp.getStart());
-            final int end = Time.binarySearchNext(readParamHistory, tp.getEnd());
-            if (start != end) {
+            if (Time.existsRecord(readParamHistory, tp.getStart(), tp.getEnd())) {
                 if (logging) System.out.println("Excuse: flagged param / " + i + " @ " + node.getSourceSection() + " in " + tp.getStart() + "~" + tp.getEnd());
                 return ShouldReExecuteResult.RE_EXECUTE;
             }
         }
+        return ShouldReExecuteResult.USE_CACHE;
+    }
 
-
+    private ShouldReExecuteResult checkObjectRead(SLStatementNode node, ExecutionHistory.TimeInfo<TIME> tp, boolean logging) {
         TIME fldStart = firstHitAtField;
         if (!objectFieldFlags.isEmpty() && fldStart.compareTo(tp.getEnd()) < 0) {
             fldStart = tp.getStart();
@@ -536,8 +554,6 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
             }
             firstHitAtField = this.currentHistory.getNextTime(tp.getEnd());
         }
-
-        if (logging) System.out.println("Using cache!: " + node.getSourceSection());
         return ShouldReExecuteResult.USE_CACHE;
     }
 
@@ -661,8 +677,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
                     }
                 }
 
-                final var tmp = obj = new SLDEObject(new ObjectHistory(rootHistory.getObjectHistory(objGenCtx)));
-                objToCtx.put(tmp, time);
+                final var tmp = obj = new SLDEObject(new ObjectHistory(rootHistory.getObjectHistory(objGenCtx)), time);
                 return new WeakReference<>(tmp);
             }
         };
@@ -682,7 +697,8 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         } else if (value instanceof SLFunction) {
             return new FunctionReference(((SLFunction) value).getName());
         } else if (value instanceof SLObjectBase) {
-            return new ExecutionHistory.ObjectReference<>(objToCtx.get((SLObjectBase) value));
+            //noinspection unchecked
+            return new ExecutionHistory.ObjectReference<>((TIME) ((SLObjectBase) value).getObjGenTime());
         } else {
             throw new RuntimeException("Unavailable object: " + value.getClass().getName());
         }

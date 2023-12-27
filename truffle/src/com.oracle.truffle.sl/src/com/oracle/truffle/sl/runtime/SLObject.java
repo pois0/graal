@@ -84,8 +84,8 @@ import com.oracle.truffle.sl.SLLanguage;
 public final class SLObject extends SLObjectBase {
     protected static final int CACHE_LIMIT = 3;
 
-    public SLObject(Shape shape) {
-        super(shape);
+    public SLObject(Shape shape, Object objGenTime) {
+        super(shape, objGenTime);
     }
 
     @ExportMessage

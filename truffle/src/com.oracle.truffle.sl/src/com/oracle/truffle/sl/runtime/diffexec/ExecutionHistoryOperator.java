@@ -31,7 +31,7 @@ public abstract class ExecutionHistoryOperator<ExecKey> {
     public abstract void onReadObjectField(Object receiver, String fieldName);
     public abstract void onReadArrayElement(Object array, long index);
 
-    public abstract void onGenerateObject(SLObjectBase object);
+    public abstract Object generateObject(Node node);
 
     public abstract void onUpdateLocalVariable(int slot, Object value);
     public abstract void onUpdateObjectField(Object receiver, String fieldName, Object value);

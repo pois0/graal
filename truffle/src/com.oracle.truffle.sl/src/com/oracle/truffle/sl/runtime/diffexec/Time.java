@@ -23,6 +23,13 @@ public abstract class Time<T extends Time<?>> extends Hashable implements Compar
         return i < 0 ? -i - 1 : i + 1;
     }
 
+    public static <T extends Time<T>> boolean existsRecord(ArrayList<T> list, T start, T end) {
+        final int i = binarySearchWhereInsertTo(list, start);
+        if (i == list.size()) return false;
+        T time = list.get(i);
+        return time.compareTo(end) <= 0;
+    }
+
     public static <T extends Time<T>> List<T> subList(ArrayList<T> list, T startTime, T endTime) {
         final int start = binarySearchWhereInsertTo(list, startTime);
         final int end = binarySearchNext(list, endTime);

@@ -26,8 +26,8 @@ public class SLDEObject extends SLObjectBase {
 
     final ObjectHistory oh;
 
-    SLDEObject(ObjectHistory oh) {
-        super(SHAPE);
+    SLDEObject(ObjectHistory oh, Object objGenTime) {
+        super(SHAPE, objGenTime);
         this.oh = oh;
     }
 

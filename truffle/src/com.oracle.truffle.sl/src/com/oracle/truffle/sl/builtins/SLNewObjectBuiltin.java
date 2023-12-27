@@ -68,9 +68,7 @@ public abstract class SLNewObjectBuiltin extends SLBuiltinNode {
     @SuppressWarnings("unused")
     public Object newObject(SLNull o,
                     @Cached(value = "lookup()", neverDefault = true) AllocationReporter reporter) {
-        SLObject object = SLLanguage.get(this).createObject(reporter);
-        getContext().getHistoryOperator().onGenerateObject(object);
-        return object;
+        return getContext().getHistoryOperator().generateObject(this);
     }
 
     final AllocationReporter lookup() {
