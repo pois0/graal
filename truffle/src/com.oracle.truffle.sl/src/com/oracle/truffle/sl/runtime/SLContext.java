@@ -110,7 +110,6 @@ import org.graalvm.polyglot.impl.AbstractPolyglotImpl;
 @SuppressWarnings("JavadocReference")
 public final class SLContext {
     private static ExecutionHistory<ArrayTime> rootHistory = new ExecutionHistory<>(ArrayTime.ZERO);
-    private static boolean rotate = true;
     public static boolean isInitialExecution = true;
 
     private final SLLanguage language;
@@ -122,7 +121,7 @@ public final class SLContext {
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
     private final ExecutionHistoryOperatorImpl<ArrayTime> historyOperator;
 
-    public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins) {
+    public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins, boolean rotate) {
         this.env = env;
         this.input = new BufferedReader(new InputStreamReader(env.in()));
         this.output = new PrintWriter(env.out(), true);
@@ -133,9 +132,9 @@ public final class SLContext {
         if (rotate) {
             System.out.println("reset!");
             rootHistory = new ExecutionHistory<>(ArrayTime.ZERO);
+            SLBuiltinNode.resetBuiltinFunctionMapping();
             isInitialExecution = true;
         }
-        rotate = !rotate;
 
         var op = this.historyOperator = new ExecutionHistoryOperatorImpl<>(rootHistory, functionRegistry, ArrayTime.ZERO);
         InstrumentationHandler.staticFactory = op.getTickFactory();

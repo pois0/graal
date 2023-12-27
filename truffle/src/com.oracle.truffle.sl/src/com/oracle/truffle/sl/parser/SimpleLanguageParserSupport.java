@@ -20,11 +20,11 @@ final class SimpleLanguageParserSupport {
 
         // TODO
         if (rotate) {
-            System.out.println("Parser: 1st!");
+            System.out.println("Parser: 1st");
             rotate = false;
             return Pair.create(parser.factory.getAllFunctions(), parser.factory.getFunctionContainsNewNode());
         }
-        System.out.println("Parser: 2nd!");
+        System.out.println("Parser: 2nd");
         rotate = true;
 
         int statementSize = 0;

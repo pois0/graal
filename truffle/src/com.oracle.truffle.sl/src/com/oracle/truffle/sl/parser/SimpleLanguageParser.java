@@ -187,7 +187,7 @@ public class SimpleLanguageParser extends Parser {
 	    throw new SLParseError(source, line, col, length, String.format("Error(s) parsing script:%n" + location + message));
 	}
 
-	public static Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> parseSL(SLLanguage language, Source source) {
+	public static Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> parseSL(SLLanguage language, Source source, Map<String, Integer> functionMapping) {
 	    SimpleLanguageLexer lexer = new SimpleLanguageLexer(CharStreams.fromString(source.getCharacters().toString()));
 	    SimpleLanguageParser parser = new SimpleLanguageParser(new CommonTokenStream(lexer));
 	    lexer.removeErrorListeners();
@@ -195,7 +195,7 @@ public class SimpleLanguageParser extends Parser {
 	    BailoutErrorListener listener = new BailoutErrorListener(source);
 	    lexer.addErrorListener(listener);
 	    parser.addErrorListener(listener);
-	    parser.factory = new SLNodeFactory(language, source);
+	    parser.factory = new SLNodeFactory(language, source, functionMapping);
 	    parser.source = source;
 	    parser.simplelanguage();
 

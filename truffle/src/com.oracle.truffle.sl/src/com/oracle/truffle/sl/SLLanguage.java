@@ -42,6 +42,7 @@ package com.oracle.truffle.sl;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -206,6 +207,10 @@ import org.graalvm.collections.Pair;
 public final class SLLanguage extends TruffleLanguage<SLContext> {
     public static volatile int counter;
 
+    private static boolean rotate = false;
+    public static final HashMap<String, Integer> functionMapping = new HashMap<>();
+    private static int functionId = 1;
+
     public static final String ID = "sl";
     public static final String MIME_TYPE = "application/x-sl";
     private static final Source BUILTIN_SOURCE = Source.newBuilder(SLLanguage.ID, "", "SL builtin").build();
@@ -226,7 +231,11 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
 
     @Override
     protected SLContext createContext(Env env) {
-        return new SLContext(this, env, new ArrayList<>(EXTERNAL_BUILTINS));
+        var rotate = SLLanguage.rotate = !SLLanguage.rotate;
+        if (rotate) {
+            functionMapping.clear();
+        }
+        return new SLContext(this, env, new ArrayList<>(EXTERNAL_BUILTINS), rotate);
     }
 
     @Override
@@ -268,7 +277,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          */
         for (int i = 0; i < argumentCount; i++) {
             final SLReadArgumentNode readArgumentNode = new SLReadArgumentNode(i);
-            readArgumentNode.setIdentifier(new NodeIdentifier("__builtin", i));
+            readArgumentNode.setIdentifier(new NodeIdentifier(-1, i, false));
             argumentNodes[i] = readArgumentNode;
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */
@@ -315,7 +324,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * the functions with the SLContext happens lazily in SLEvalRootNode.
          */
         if (request.getArgumentNames().isEmpty()) {
-            final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(this, source);
+            final var ff = SimpleLanguageParser.parseSL(this, source, functionMapping);
             functions = ff.getLeft();
             functionContainsNewNode = ff.getRight();
         } else {
@@ -332,7 +341,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
             sb.append(";}");
             String language = source.getLanguage() == null ? ID : source.getLanguage();
             Source decoratedSource = Source.newBuilder(language, sb.toString(), source.getName()).build();
-            final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(this, decoratedSource);
+            final var ff = SimpleLanguageParser.parseSL(this, decoratedSource, functionMapping);
             functions = ff.getLeft();
             functionContainsNewNode = ff.getRight();
         }
@@ -433,5 +442,9 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          * or natural exit triggered during natural context close.
          */
         context.runShutdownHooks();
+    }
+
+    public static int getFunctionIdAndIncrement() {
+        return functionId++;
     }
 }

@@ -265,11 +265,11 @@ public final class SLBlockNode extends SLStatementNode implements BlockNode.Elem
                 List<SLStatementNode> list = new ArrayList<>();
                 Collections.addAll(list, elements);
                 DeleteNode delNode = new DeleteNode(ident);
-                delNode.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 1, true));
+                delNode.setIdentifier(new NodeIdentifier(ident.getFunctionNumber(), 1, true));
                 delNode.setNewNode();
                 list.add(j, delNode);
                 block = BlockNode.create(list.toArray(new SLStatementNode[0]), this);
-                element.setIdentifier(new NodeIdentifier(ident.getFunctionName(), 0, true));
+                element.setIdentifier(new NodeIdentifier(ident.getFunctionNumber(), 0, true));
                 element.setNewNode();
                 return;
             }

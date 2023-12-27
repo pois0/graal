@@ -1,33 +1,20 @@
 package com.oracle.truffle.sl.runtime.diffexec;
 
 import com.google.common.hash.Hasher;
-import com.oracle.truffle.api.strings.TruffleString;
 
 public final class NodeIdentifier extends Hashable implements Comparable<NodeIdentifier> {
-    private final String functionName;
+    private final int functionNumber;
     private final int number;
     private final boolean isNewNode;
 
-    public NodeIdentifier(String functionName, int number, boolean isNewNode) {
-        this.functionName = functionName;
+    public NodeIdentifier(int functionNumber, int number, boolean isNewNode) {
+        this.functionNumber = functionNumber;
         this.number = number;
         this.isNewNode = isNewNode;
     }
 
-    public NodeIdentifier(TruffleString functionName, int number, boolean isNewNode) {
-        this(functionName.toJavaStringUncached(), number, isNewNode);
-    }
-
-    public NodeIdentifier(TruffleString functionName, int number) {
-        this(functionName, number, false);
-    }
-
-    public NodeIdentifier(String functionName, int number) {
-        this(functionName, number, false);
-    }
-
-    public String getFunctionName() {
-        return functionName;
+    public int getFunctionNumber() {
+        return functionNumber;
     }
 
     public int getNumber() {
@@ -41,7 +28,7 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     public static boolean equals(NodeIdentifier e1, NodeIdentifier e2) {
         if (e1.isNewNode != e2.isNewNode) return false;
         if (e1.number != e2.number) return false;
-        return e1.functionName.equals(e2.functionName);
+        return e1.functionNumber == e2.functionNumber;
     }
 
     @Override
@@ -54,25 +41,24 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
     @SuppressWarnings("UnstableApiUsage")
     @Override
     public Hasher hash(Hasher hasher) {
-        return hasher.putUnencodedChars(functionName)
+        return hasher.putInt(functionNumber)
                 .putInt(number)
                 .putBoolean(isNewNode);
     }
 
     @Override
     public int compareTo(NodeIdentifier o) {
-        if (this == o) return 0;
-        final var compareNumber = Integer.compare(number, o.number);
-        if (compareNumber != 0) return compareNumber;
-        final var compareIsNew = Boolean.compare(isNewNode, o.isNewNode);
-        if (compareIsNew != 0) return compareIsNew;
-        return functionName.compareTo(o.functionName);
+        final var nComp = Integer.compare(number, o.number);
+        if (nComp != 0) return nComp;
+        final var fnComp = Integer.compare(functionNumber, o.functionNumber);
+        if (fnComp != 0) return fnComp;
+        return Boolean.compare(isNewNode, o.isNewNode);
     }
 
     @Override
     public String toString() {
         return "NodeIdentifier{" +
-                "functionName=" + functionName +
+                "functionName=" + functionNumber +
                 ", number=" + number +
                 ", isNewNode=" + isNewNode +
                 '}';

@@ -53,6 +53,8 @@ import com.oracle.truffle.sl.runtime.SLFunctionRegistry;
 import com.oracle.truffle.sl.runtime.diffexec.CalcResult;
 import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 
+import java.util.HashMap;
+
 /**
  * Base class for all builtin functions. It contains the Truffle DSL annotation {@link NodeChild}
  * that defines the function arguments.<br>
@@ -101,8 +103,15 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
         return false;
     }
 
+    private static final HashMap<String, Integer> functionMapping = new HashMap<>();
+    private static int builtinFunctionNumber = -2;
     protected static NodeIdentifier generateNodeIdentifierForBuiltin(String functionName) {
-        TruffleString truffleStringTS = TruffleString.fromJavaStringUncached(functionName, TruffleString.Encoding.UTF_8);
-        return new NodeIdentifier(truffleStringTS, 0, false);
+        var i = functionMapping.computeIfAbsent(functionName, key -> builtinFunctionNumber--);
+        return new NodeIdentifier(i, 0, false);
+    }
+
+    public static void resetBuiltinFunctionMapping() {
+        functionMapping.clear();
+        builtinFunctionNumber = -2;
     }
 }

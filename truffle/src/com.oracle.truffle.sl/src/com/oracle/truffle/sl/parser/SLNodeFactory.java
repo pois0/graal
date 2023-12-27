@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.oracle.truffle.sl.runtime.SLContext;
 import com.oracle.truffle.sl.runtime.SLStrings;
 import com.oracle.truffle.sl.runtime.diffexec.NodeIdentifier;
 import org.antlr.v4.runtime.Parser;
@@ -151,16 +152,18 @@ public class SLNodeFactory {
     private int expNumber;
     private int newExpNumber;
     private boolean inNewExp;
+    private final Map<String, Integer> functionMapping;
 
     /* State while parsing a block. */
     private LexicalScope lexicalScope;
     private final SLLanguage language;
 
-    public SLNodeFactory(SLLanguage language, Source source) {
+    public SLNodeFactory(SLLanguage language, Source source, Map<String, Integer> functionMapping) {
         this.language = language;
         this.source = source;
         this.sourceString = SLStrings.fromJavaString(source.getCharacters().toString());
         this.allFunctions = new HashMap<>();
+        this.functionMapping = functionMapping;
     }
 
     public Map<TruffleString, RootCallTarget> getAllFunctions() {
@@ -662,10 +665,11 @@ public class SLNodeFactory {
     }
 
     private NodeIdentifier newIdentifier() {
+        final int i = functionMapping.computeIfAbsent(functionName.toJavaStringUncached(), key -> SLLanguage.getFunctionIdAndIncrement());
         if (inNewExp) {
-            return new NodeIdentifier(functionName, newExpNumber++, true);
+            return new NodeIdentifier(i, newExpNumber++, true);
         } else {
-            return new NodeIdentifier(functionName, expNumber++);
+            return new NodeIdentifier(i, expNumber++, false);
         }
     }
 

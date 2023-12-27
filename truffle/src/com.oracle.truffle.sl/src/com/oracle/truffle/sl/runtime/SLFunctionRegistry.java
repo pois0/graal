@@ -133,7 +133,7 @@ public final class SLFunctionRegistry {
     }
 
     public void register(Source newFunctions) {
-        final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(language, newFunctions);
+        final Pair<Map<TruffleString, RootCallTarget>, Set<TruffleString>> ff = SimpleLanguageParser.parseSL(language, newFunctions, SLLanguage.functionMapping);
         register(ff.getLeft(), ff.getRight());
     }
 
