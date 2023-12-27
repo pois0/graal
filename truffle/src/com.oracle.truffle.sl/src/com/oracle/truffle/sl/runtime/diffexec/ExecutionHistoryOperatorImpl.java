@@ -48,7 +48,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     private TIME currentTime;
     private boolean isInExec = false;
     private ExecutionContext lastCalcCtx = null;
-    private CallContext currentContext = CallContext.ExecutionBase.INSTANCE;
+    private CallContext currentContext = CallContext.EXECUTION_BASE;
     private final WeakHashMap<SLObjectBase, TIME> objToCtx = new WeakHashMap<>();
     private final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
     private TIME firstHitAtField;
@@ -178,7 +178,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onEnterFunctionDuringExec(NodeIdentifier callerIdentifier, TruffleString functionName, int argLen) {
         final var currentHistory = this.currentHistory;
-        CallContext.FunctionCall currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
+        final var currentStack = CallContext.functionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argLen, currentStack);
@@ -188,7 +188,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onEnterFunctionDuringCalc(NodeIdentifier callerIdentifier, TruffleString functionName, boolean[] argFlags) {
         final ExecutionHistory<TIME> currentHistory = this.currentHistory;
-        final var currentStack = new CallContext.FunctionCall(this.currentContext, callerIdentifier);
+        final var currentStack = CallContext.functionCall(this.currentContext, callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argFlags.length, currentStack);
@@ -199,7 +199,7 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
     @Override
     public void onExitFunction(boolean duringCalc) {
         final var elem = currentContext;
-        assert elem instanceof CallContext.FunctionCall;
+        assert elem.isFunctionCall();
         currentContext = elem.getRoot();
         localVarOperatorHolder.pop();
         localVarFlagStack.pop();
@@ -208,20 +208,20 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
     @Override
     public void onEnterLoop(NodeIdentifier identifier) {
-        this.currentContext = new CallContext.Loop(this.currentContext, identifier);
+        this.currentContext = CallContext.loop(this.currentContext, identifier);
     }
 
     @Override
     public void onEnterNextIteration() {
         CallContext elem = currentContext;
-        assert elem instanceof CallContext.Loop;
-        currentContext = ((CallContext.Loop) elem).increment();
+        assert elem.isLoop();
+        currentContext = CallContext.loopNextIter(elem);
     }
 
     @Override
     public void onExitLoop() {
         CallContext elem = currentContext;
-        assert elem instanceof CallContext.Loop;
+        assert elem.isLoop();
         currentContext = elem.getRoot();
     }
 
@@ -760,11 +760,11 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
         public LocalVarOperatorHolder(int executionParamLen) {
             @SuppressWarnings("unchecked")
             final ScopeInfo<TIME>[] stack = new ScopeInfo[32];
-            stack[0] = new ScopeInfo<>(executionParamLen, CallContext.ExecutionBase.INSTANCE);
+            stack[0] = new ScopeInfo<>(executionParamLen, CallContext.EXECUTION_BASE);
             this.stack = stack;
         }
 
-        public void push(int paramLen, CallContext.ContextBase ctx) {
+        public void push(int paramLen, CallContext ctx) {
             var stack = this.stack;
             final var currentLen = stack.length;
             if (pointer == currentLen) this.stack = stack = Arrays.copyOf(stack, currentLen + (currentLen >> 1));
@@ -801,10 +801,10 @@ public final class ExecutionHistoryOperatorImpl<TIME extends Time<TIME>> extends
 
         private static final class ScopeInfo<TIME extends Time<TIME>> {
             final int paramLen;
-            final CallContext.ContextBase cc;
+            final CallContext cc;
             ExecutionHistory.LocalVarOperator<TIME> op = null;
 
-            public ScopeInfo(int paramLen, CallContext.ContextBase cc) {
+            public ScopeInfo(int paramLen, CallContext cc) {
                 this.paramLen = paramLen;
                 this.cc = cc;
             }

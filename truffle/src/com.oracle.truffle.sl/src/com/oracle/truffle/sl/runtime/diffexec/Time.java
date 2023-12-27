@@ -23,7 +23,7 @@ public abstract class Time<T extends Time<?>> extends Hashable implements Compar
         return i < 0 ? -i - 1 : i + 1;
     }
 
-    public static <T extends Time<T>>List<T> subList(ArrayList<T> list, T startTime, T endTime) {
+    public static <T extends Time<T>> List<T> subList(ArrayList<T> list, T startTime, T endTime) {
         final int start = binarySearchWhereInsertTo(list, startTime);
         final int end = binarySearchNext(list, endTime);
         return list.subList(start, end);

@@ -4,6 +4,7 @@ import com.oracle.truffle.api.strings.TruffleString;
 import org.graalvm.collections.Pair;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -18,8 +19,8 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     private final ArrayList<ItemWithTime<TIME, ReadObjectField<TIME>>> objectReadList = new ArrayList<>(1_000);
     private final HashMap<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> objectUpdateMap = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = new ArrayList<>(1_000);
-    private final HashMap<CallContext.ContextBase, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
-    private final ArrayList<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> functionCalls = new ArrayList<>(250);
+    private final HashMap<CallContext, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
+    private final ArrayList<ItemWithTime<TIME, Pair<CallContext, TruffleString>>> functionCalls = new ArrayList<>(250);
 
     private ExecutionHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
         this.zero = zero;
@@ -97,7 +98,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         objectUpdateList.add(new ItemWithTime<>(time, new ObjectUpdate<>(objGenTime, fieldName, newValue)));
     }
 
-    public void onEnterFunction(TIME time, TruffleString funcName, CallContext.ContextBase ctx) {
+    public void onEnterFunction(TIME time, TruffleString funcName, CallContext ctx) {
         functionCalls.add(new ItemWithTime<>(time, Pair.create(ctx, funcName)));
     }
 
@@ -117,15 +118,15 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         return ItemWithTime.subList(objectReadList, startTime, endTime);
     }
 
-    public List<ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>>> getFunctionEnters(TIME startTime, TIME endTime) {
+    public List<ItemWithTime<TIME, Pair<CallContext, TruffleString>>> getFunctionEnters(TIME startTime, TIME endTime) {
         return ItemWithTime.subList(functionCalls, startTime, endTime);
     }
 
-    public LocalVarOperator<TIME> getLocalVarOperator(CallContext.ContextBase ctx, int paramLen) {
+    public LocalVarOperator<TIME> getLocalVarOperator(CallContext ctx, int paramLen) {
         return localVarInfo.computeIfAbsent(ctx, it -> new LocalVarOperator<>(paramLen));
     }
 
-    public HashMap<Integer, ArrayList<ItemWithTime<TIME, Object>>> getLocalHistory(CallContext.ContextBase fca) {
+    public HashMap<Integer, ArrayList<ItemWithTime<TIME, Object>>> getLocalHistory(CallContext fca) {
         final var op = localVarInfo.get(fca);
         if (op == null) return null;
         return op.writeVarMap;
@@ -204,18 +205,21 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         functionCalls.clear();
     }
 
-    private void deleteFromLocalVarOperator(ItemWithTime<TIME, Pair<CallContext.ContextBase, TruffleString>> entry, TIME startTime, TIME endTime) {
+    private void deleteFromLocalVarOperator(ItemWithTime<TIME, Pair<CallContext, TruffleString>> entry, TIME startTime, TIME endTime) {
         final var op = localVarInfo.get(entry.item().getLeft());
         if (op == null) return;
         final var writeVarList = ItemWithTime.subList(op.writeVarList, startTime, endTime);
-        final var vars = new HashSet<Integer>(); // TODO use BitSet
+        final var vars = new BitSet();
         for (var e : writeVarList) {
             final LocalVariableUpdate item = e.item();
-            vars.add(item.varName());
+            vars.set(item.varName());
         }
         writeVarList.clear();
-        for (var slot : vars) {
-            ItemWithTime.subList(op.writeVarMap.get(slot), startTime, endTime).clear();
+        {
+            int i = -1;
+            while ((i = vars.nextSetBit(++i)) >= 0) {
+                ItemWithTime.subList(op.writeVarMap.get(i), startTime, endTime).clear();
+            }
         }
         for (var e : op.readVariable.entrySet()) {
             Time.subList(e.getValue(), startTime, endTime).clear();

@@ -3,51 +3,106 @@ package com.oracle.truffle.sl.runtime.diffexec;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 
-public abstract sealed class CallContext implements Comparable<CallContext> {
-    protected final NodeIdentifier nodeIdentifier;
-    protected final CallContext root;
-    protected final int hashCode;
+public final class CallContext implements Comparable<CallContext> {
+    private final NodeIdentifier nodeIdentifier;
+    private final CallContext root;
+    private final int loopCount;
+    private final int hashCode;
 
-    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, int hashCode) {
+    public static final CallContext EXECUTION_BASE = new CallContext(null, null, -1, 0);
+
+    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, int loopCount, int hashCode) {
         this.root = root;
         this.nodeIdentifier = nodeIdentifier;
+        this.loopCount = loopCount;
         this.hashCode = hashCode;
     }
 
-    public final CallContext getRoot() {
+    @SuppressWarnings("UnstableApiUsage")
+    private CallContext(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
+        this(root, nodeIdentifier, loopCount, hashCode(root, nodeIdentifier).putInt(loopCount).hash().asInt());
+    }
+
+    public static CallContext functionCall(CallContext root, NodeIdentifier calleeIdentifier) {
+        return new CallContext(
+                root,
+                calleeIdentifier,
+                -1
+        );
+    }
+
+    public static CallContext loop(CallContext root, NodeIdentifier identifier, int loopCount) {
+        return new CallContext(
+                root,
+                identifier,
+                loopCount
+        );
+    }
+
+    public static CallContext loop(CallContext root, NodeIdentifier identifier) {
+        return new CallContext(
+                root,
+                identifier,
+                0
+        );
+    }
+
+    public static CallContext loopNextIter(CallContext currentIter) {
+        assert currentIter.loopCount >= 0;
+        return new CallContext(
+                currentIter.root,
+                currentIter.nodeIdentifier,
+                currentIter.loopCount + 1
+        );
+    }
+
+    public CallContext getRoot() {
         return root;
     }
 
-    public final NodeIdentifier getNodeIdentifier() {
+    public NodeIdentifier getNodeIdentifier() {
         return nodeIdentifier;
     }
 
-    public abstract ContextBase getBase();
+    public CallContext getBase() {
+        return loopCount < 0 ? this : root.getBase();
+    }
+
+    public boolean isExecutionBase() {
+        return loopCount < 0;
+    }
+
+    public boolean isLoop() {
+        return loopCount >= 0;
+    }
+
+    public boolean isFunctionCall() {
+        return loopCount < 0 && root != null;
+    }
 
     public int depth() {
         return root.depth() + 1;
     }
 
     @Override
-    public final int hashCode() {
+    public int hashCode() {
         return hashCode;
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
         if (!(o instanceof CallContext)) return false;
 
         return equals(this, (CallContext) o);
     }
 
     @Override
-    public final int compareTo(CallContext o) {
+    public int compareTo(CallContext o) {
         return compare(this, o);
     }
 
     @SuppressWarnings("UnstableApiUsage")
-    protected static Hasher hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
+    private static Hasher hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
         return nodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())
                 .putInt(root != null ? root.hashCode() : 0);
     }
@@ -59,15 +114,10 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
     private static int compare(CallContext e1, CallContext e2) {
         while (true) {
             if (e1 == e2) return 0;
-            int niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
+            final var niComp = e1.nodeIdentifier.compareTo(e2.nodeIdentifier);
             if (niComp != 0) return niComp;
-            if (e1 instanceof Loop l1) {
-                if (!(e2 instanceof Loop l2)) return 1;
-                int loopComp = Integer.compare(l1.loopCount, l2.loopCount);
-                if (loopComp != 0) return loopComp;
-            } else if (e2 instanceof Loop) {
-                return -1;
-            }
+            final var lcComp = Integer.compare(e1.loopCount, e2.loopCount);
+            if (lcComp != 0) return lcComp;
 
             e1 = e1.root;
             e2 = e2.root;
@@ -77,107 +127,6 @@ public abstract sealed class CallContext implements Comparable<CallContext> {
             } else if (e2 == null) {
                 return -1;
             }
-        }
-    }
-
-    public static abstract sealed class ContextBase extends CallContext {
-        private ContextBase(CallContext root, NodeIdentifier nodeIdentifier, int hashCode) {
-            super(root, nodeIdentifier, hashCode);
-        }
-    }
-
-    public final static class ExecutionBase extends ContextBase {
-        public static final ExecutionBase INSTANCE = new ExecutionBase();
-
-        private ExecutionBase() {
-            super(null, null, 0);
-        }
-
-        @Override
-        public int depth() {
-            return 0;
-        }
-
-        @Override
-        public ContextBase getBase() {
-            return this;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            return o == this; // ExecutionBase is a singleton class
-        }
-
-        @Override
-        public String toString() {
-            return "ExecutionBase";
-        }
-
-    }
-
-    public static final class FunctionCall extends ContextBase {
-        public FunctionCall(CallContext root, NodeIdentifier nodeIdentifier) {
-            super(root,
-                    nodeIdentifier,
-                    hashCode(root, nodeIdentifier).putInt(0).hash().asInt());
-        }
-
-        @Override
-        public ContextBase getBase() {
-            return this;
-        }
-
-        @Override
-        public String toString() {
-            return "FunctionCall{" +
-                    "nodeIdentifier=" + nodeIdentifier +
-                    ", root=" + root +
-                    '}';
-        }
-    }
-
-    public static final class Loop extends CallContext {
-        private final ContextBase base;
-        private final int loopCount;
-
-        public Loop(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
-            super(root,
-                    nodeIdentifier,
-                    hashCode(root, nodeIdentifier, loopCount));
-            this.base = root.getBase();
-            this.loopCount = loopCount;
-        }
-
-        public Loop(CallContext root, NodeIdentifier nodeIdentifier) {
-            this(root,
-                    nodeIdentifier,
-                    0);
-        }
-
-        public int getLoopCount() {
-            return loopCount;
-        }
-
-        public CallContext increment() {
-            return new Loop(root, nodeIdentifier,  loopCount + 1);
-        }
-
-        @Override
-        public ContextBase getBase() {
-            return base;
-        }
-
-        @SuppressWarnings("UnstableApiUsage")
-        private static int hashCode(CallContext root, NodeIdentifier nodeIdentifier, int loopCount) {
-            return hashCode(root, nodeIdentifier).putInt(loopCount + 1).hash().asInt();
-        }
-
-        @Override
-        public String toString() {
-            return "Loop{" + "loopCount=" + loopCount +
-                    ", nodeIdentifier=" + nodeIdentifier +
-                    ", root=" + root +
-                    '}';
         }
     }
 }
