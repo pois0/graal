@@ -11,7 +11,7 @@ import java.util.List;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
-public final class ExecutionHistory<TIME extends Time<TIME>> {
+public final class DiffExecHistory<TIME extends Time<TIME>> {
     private final TIME zero;
     private final ArrayList<ItemWithTime<TIME, ExecutionContext>> timeToContext = new ArrayList<>(1_000);
     private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime;
@@ -22,17 +22,17 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
     private final HashMap<CallContext, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, Pair<CallContext, TruffleString>>> functionCalls = new ArrayList<>(250);
 
-    private ExecutionHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
+    private DiffExecHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
         this.zero = zero;
         this.contextToTime = contextToTime;
         this.sharedContextToTime = sharedContextToTime;
     }
 
-    public ExecutionHistory(TIME zero) {
+    public DiffExecHistory(TIME zero) {
         this(zero, new HashMap<>(1_000), false);
     }
 
-    public ExecutionHistory(TIME zero, ExecutionHistory<TIME> history) {
+    public DiffExecHistory(TIME zero, DiffExecHistory<TIME> history) {
         this(zero, history.contextToTime, true);
     }
 
@@ -229,7 +229,7 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
         }
     }
 
-    public ExecutionHistory<TIME> merge(ExecutionHistory<TIME> other) {
+    public DiffExecHistory<TIME> merge(DiffExecHistory<TIME> other) {
         if (other.timeToContext.isEmpty()) return this;
         final var initialTime = other.timeToContext.get(0).time();
 //        final TIME endTime = other.timeToContext.get(other.timeToContext.size() - 1).time();
@@ -352,14 +352,6 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
 
     public record ReadObjectField<TIME extends Time<TIME>>(TIME objGenCtx, String fieldName) {}
 
-    public record LocalVariableUpdate(int varName, Object object) {}
-
-    public record ObjectReference<TIME extends Time<TIME>>(TIME objGenCtx) {
-        public ObjectReference {
-            if (objGenCtx == null) throw new NullPointerException();
-        }
-    }
-
     public final static class LocalVarOperator<TIME extends Time<TIME>> {
         private final HashMap<Integer, ArrayList<ItemWithTime<TIME, Object>>> writeVarMap = new HashMap<>();
         private final ArrayList<ItemWithTime<TIME, LocalVariableUpdate>> writeVarList = new ArrayList<>();
@@ -397,6 +389,4 @@ public final class ExecutionHistory<TIME extends Time<TIME>> {
             return readVariable.get(slot);
         }
     }
-
-    public record ObjectUpdate<TIME extends Time<TIME>>(TIME objectGenCtx, String fieldName, Object newValue) {}
 }
