@@ -54,6 +54,8 @@ import com.oracle.truffle.sl.runtime.diffexec.ArrayTime;
 import com.oracle.truffle.sl.runtime.diffexec.DiffExecHistory;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.diffexec.DiffExecRuntime;
+import com.oracle.truffle.sl.runtime.diffexec.NewDiffExecHistory;
+import com.oracle.truffle.sl.runtime.diffexec.NewDiffExecRuntime;
 import com.oracle.truffle.sl.runtime.diffexec.RecordOnlyRuntime;
 import org.graalvm.polyglot.Context;
 
@@ -110,6 +112,7 @@ import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
 @SuppressWarnings("JavadocReference")
 public final class SLContext {
     private static DiffExecHistory<ArrayTime> rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
+//    private static NewDiffExecHistory<ArrayTime> rootHistory = new NewDiffExecHistory<>(ArrayTime.ZERO);
     public static boolean isInitialExecution = true;
 
     private final SLLanguage language;
@@ -119,8 +122,9 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
-//    private final DiffExecRuntime<ArrayTime> historyOperator;
-    private final RecordOnlyRuntime<ArrayTime> historyOperator;
+    private final DiffExecRuntime<ArrayTime> historyOperator;
+//    private final NewDiffExecRuntime<ArrayTime> historyOperator;
+//    private final RecordOnlyRuntime<ArrayTime> historyOperator;
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins, boolean rotate) {
         this.env = env;
@@ -133,12 +137,14 @@ public final class SLContext {
         if (rotate) {
             System.out.println("reset!");
             rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
+//            rootHistory = new NewDiffExecHistory<>(ArrayTime.ZERO);
             SLBuiltinNode.resetBuiltinFunctionMapping();
             isInitialExecution = true;
         }
 
-//        var op = this.historyOperator = new DiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
-        var op = this.historyOperator = new RecordOnlyRuntime<>(ArrayTime.ZERO);
+        var op = this.historyOperator = new DiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
+//        var op = this.historyOperator = new NewDiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
+//        var op = this.historyOperator = new RecordOnlyRuntime<>(ArrayTime.ZERO);
         InstrumentationHandler.staticFactory = op.getTickFactory();
 
         installBuiltins();
@@ -300,12 +306,12 @@ public final class SLContext {
     }
 
     public void writeMetrix() {
-//        PolyglotContextImpl.newExecCount = historyOperator.newExecCount;
-//        PolyglotContextImpl.recalcNodeCount = historyOperator.recalcNodeCount;
-//        PolyglotContextImpl.restoredFieldCount = historyOperator.restoredFieldCount;
-        PolyglotContextImpl.newExecCount = 0;
-        PolyglotContextImpl.recalcNodeCount = 0;
-        PolyglotContextImpl.restoredFieldCount = 0;
+        PolyglotContextImpl.newExecCount = historyOperator.newExecCount;
+        PolyglotContextImpl.recalcNodeCount = historyOperator.recalcNodeCount;
+        PolyglotContextImpl.restoredFieldCount = historyOperator.restoredFieldCount;
+//        PolyglotContextImpl.newExecCount = 0;
+//        PolyglotContextImpl.recalcNodeCount = 0;
+//        PolyglotContextImpl.restoredFieldCount = 0;
     }
 
     public ExecutionHistoryOperator<ArrayTime> getHistoryOperator() {

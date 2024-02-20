@@ -91,9 +91,7 @@ public final class CallContext implements Comparable<CallContext> {
 
     @Override
     public boolean equals(Object o) {
-        if (!(o instanceof CallContext)) return false;
-
-        return equals(this, (CallContext) o);
+        return o instanceof CallContext && equals(this, (CallContext) o);
     }
 
     @Override

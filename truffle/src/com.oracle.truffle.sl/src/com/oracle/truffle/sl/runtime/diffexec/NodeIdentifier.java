@@ -2,12 +2,16 @@ package com.oracle.truffle.sl.runtime.diffexec;
 
 import com.google.common.hash.Hasher;
 
+import java.util.HashMap;
+
 public final class NodeIdentifier extends Hashable implements Comparable<NodeIdentifier> {
     private final int functionNumber;
     private final int number;
     private final boolean isNewNode;
 
-    public NodeIdentifier(int functionNumber, int number, boolean isNewNode) {
+    private static final HashMap<Integer, HashMap<Integer, NodeIdentifier>[]> nodeIdentifierCache = new HashMap<>();
+
+    private NodeIdentifier(int functionNumber, int number, boolean isNewNode) {
         this.functionNumber = functionNumber;
         this.number = number;
         this.isNewNode = isNewNode;
@@ -27,6 +31,20 @@ public final class NodeIdentifier extends Hashable implements Comparable<NodeIde
 
     public static boolean equals(NodeIdentifier e1, NodeIdentifier e2) {
         return e1.number == e2.number && e1.functionNumber == e2.functionNumber && e1.isNewNode == e2.isNewNode;
+    }
+
+    public static NodeIdentifier create(int functionNumber, int number, boolean isNewNode) {
+        final var functionCache = nodeIdentifierCache.computeIfAbsent(functionNumber, it -> new HashMap[2]);
+        int i = isNewNode ? 1 : 0;
+        var cache = functionCache[i];
+        if (cache == null) {
+            cache = functionCache[i] = new HashMap<>();
+        }
+        return cache.computeIfAbsent(number, it -> new NodeIdentifier(functionNumber, number, isNewNode));
+    }
+
+    public static void clearCache() {
+        nodeIdentifierCache.clear();
     }
 
     @Override

@@ -667,9 +667,9 @@ public class SLNodeFactory {
     private NodeIdentifier newIdentifier() {
         final int i = functionMapping.computeIfAbsent(functionName.toJavaStringUncached(), key -> SLLanguage.getFunctionIdAndIncrement());
         if (inNewExp) {
-            return new NodeIdentifier(i, newExpNumber++, true);
+            return NodeIdentifier.create(i, newExpNumber++, true);
         } else {
-            return new NodeIdentifier(i, expNumber++, false);
+            return NodeIdentifier.create(i, expNumber++, false);
         }
     }
 

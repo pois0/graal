@@ -11,28 +11,29 @@ import java.util.List;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
-public final class DiffExecHistory<TIME extends Time<TIME>> {
+public final class NewDiffExecHistory<TIME extends Time<TIME>> {
     private final TIME zero;
     private final ArrayList<ItemWithTime<TIME, ExecutionContext>> timeToContext = new ArrayList<>(1_000);
     private final HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime;
     private final boolean sharedContextToTime;
+    private final HashMap<TIME, HashMap<String, ArrayList<TIME>>> objectReadMap = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, ReadObjectField<TIME>>> objectReadList = new ArrayList<>(1_000);
     private final HashMap<TIME, HashMap<String, ArrayList<ItemWithTime<TIME, Object>>>> objectUpdateMap = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, ObjectUpdate<TIME>>> objectUpdateList = new ArrayList<>(1_000);
     private final HashMap<CallContext, LocalVarOperator<TIME>> localVarInfo = new HashMap<>(1_000);
     private final ArrayList<ItemWithTime<TIME, Pair<CallContext, TruffleString>>> functionCalls = new ArrayList<>(250);
 
-    private DiffExecHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
+    private NewDiffExecHistory(TIME zero, HashMap<NodeIdentifier, HashMap<CallContext, TimeInfo<TIME>>> contextToTime, boolean sharedContextToTime) {
         this.zero = zero;
         this.contextToTime = contextToTime;
         this.sharedContextToTime = sharedContextToTime;
     }
 
-    public DiffExecHistory(TIME zero) {
+    public NewDiffExecHistory(TIME zero) {
         this(zero, new HashMap<>(0x40000), false);
     }
 
-    public DiffExecHistory(TIME zero, DiffExecHistory<TIME> history) {
+    public NewDiffExecHistory(TIME zero, NewDiffExecHistory<TIME> history) {
         this(zero, history.contextToTime, true);
     }
 
@@ -52,7 +53,7 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
         getTimeNN(ctx).setValue(value);
     }
 
-    public void rewriteLocalVariable(ExecutionContext ctx, int slot, Object value) {
+    public LocalVarOperator<TIME> rewriteLocalVariable(ExecutionContext ctx, int slot, Object value) {
         final var time = getTimeNN(ctx).getEnd();
         final var op = localVarInfo.get(ctx.getCallContext().getBase());
         final var prevUpdate = op.writeVarList
@@ -60,12 +61,12 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
                 .item();
         ArrayList<ItemWithTime<TIME, Object>> varList = op.writeVarMap.get(prevUpdate.varName());
         varList.set(ItemWithTime.binarySearchJustIndex(varList, time), new ItemWithTime<>(time, value));
+        return op;
     }
 
-    public ObjectUpdate<TIME> rewriteObjectField(ExecutionContext ctx, TIME objGenTime, String fieldName, Object value, boolean fieldChanged) {
-        final var time = getTimeNN(ctx).getEnd();
+    public ObjectUpdate<TIME> rewriteObjectField(TIME currentTime, TIME objGenTime, String fieldName, Object value, boolean fieldChanged) {
         final var prev = objectUpdateList
-                .set(ItemWithTime.binarySearchJustIndex(objectUpdateList, time), new ItemWithTime<>(time, new ObjectUpdate<>(objGenTime, fieldName, value)));
+                .set(ItemWithTime.binarySearchJustIndex(objectUpdateList, currentTime), new ItemWithTime<>(currentTime, new ObjectUpdate<>(objGenTime, fieldName, value)));
         final var fieldList = assertNonNull(
                 objectUpdateMap.computeIfAbsent(objGenTime, it -> new HashMap<>())
                         .computeIfAbsent(fieldName, it -> new ArrayList<>())
@@ -74,11 +75,11 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
         if (fieldChanged) {
             final var prevItem = prev.item();
             final var prevHistory = objectUpdateMap.get(prevItem.objectGenCtx()).get(prevItem.fieldName());
-            prevHistory.remove(ItemWithTime.binarySearchJustIndex(prevHistory, time));
-            fieldList.add(ItemWithTime.binarySearchWhereInsertTo(fieldList, time), new ItemWithTime<>(time, value));
+            prevHistory.remove(ItemWithTime.binarySearchJustIndex(prevHistory, currentTime));
+            fieldList.add(ItemWithTime.binarySearchWhereInsertTo(fieldList, currentTime), new ItemWithTime<>(currentTime, value));
             return prevItem;
         } else {
-            fieldList.set(ItemWithTime.binarySearchJustIndex(fieldList, time), new ItemWithTime<>(time, value));
+            fieldList.set(ItemWithTime.binarySearchJustIndex(fieldList, currentTime), new ItemWithTime<>(currentTime, value));
             return null;
         }
     }
@@ -89,6 +90,9 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
 
     public void onReadObjectField(TIME time, TIME objGenTime, String field) {
         objectReadList.add(new ItemWithTime<>(time, new ReadObjectField<>(objGenTime, field)));
+        objectReadMap.computeIfAbsent(objGenTime, it -> new HashMap<>())
+                .computeIfAbsent(field, it -> new ArrayList<>())
+                .add(time);
     }
 
     public void onUpdateObjectWithHash(TIME time, TIME objGenTime, String fieldName, Object newValue) {
@@ -114,8 +118,12 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
         return time.mid(timeToContext.get(i).time());
     }
 
-    public List<ItemWithTime<TIME, ReadObjectField<TIME>>> getReadOperations(TIME startTime, TIME endTime) {
-        return ItemWithTime.subList(objectReadList, startTime, endTime);
+    public List<TIME> getFieldReadHistory(TIME time, TIME objGenTime, String fieldName) {
+        HashMap<String, ArrayList<TIME>> objHistory = objectReadMap.get(objGenTime);
+        if (objHistory == null) return List.of();
+        ArrayList<TIME> readList = objHistory.get(fieldName);
+        if (readList == null) return List.of();
+        return Time.subListSince(readList, time);
     }
 
     public List<ItemWithTime<TIME, Pair<CallContext, TruffleString>>> getFunctionEnters(TIME startTime, TIME endTime) {
@@ -169,24 +177,41 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
         }
         contexts.clear();
 
-        // delete from objectReadList
-        ItemWithTime.subList(objectReadList, startTime, endTime).clear();
+        // delete from objectReadList and objectReadMap
+        {
+            final var readFields = new HashMap<TIME, HashSet<String>>();
+            final var deleteObjectReadList = ItemWithTime.subList(objectReadList, startTime, endTime);
+            for (var read : deleteObjectReadList) {
+                final var item = read.item();
+                readFields.computeIfAbsent(item.objGenCtx(), it -> new HashSet<>())
+                        .add(item.fieldName());
+            }
+            for (var e : readFields.entrySet()) {
+                final var map = objectReadMap.get(e.getKey());
+                for (var field : e.getValue()) {
+                    Time.subList(map.get(field), startTime, endTime).clear();
+                }
+            }
+            deleteObjectReadList.clear();
+        }
 
         // delete from objectUpdateList and objectUpdateMap
-        final var updatedFields = new HashMap<TIME, HashSet<String>>();
-        final var objectUpdateList = ItemWithTime.subList(this.objectUpdateList, startTime, endTime);
-        for (var update : objectUpdateList) {
-            final var item = update.item();
-            updatedFields.computeIfAbsent(item.objectGenCtx(), it -> new HashSet<>())
-                    .add(item.fieldName());
-        }
-        for (var e : updatedFields.entrySet()) {
-            final var map = objectUpdateMap.get(e.getKey());
-            for (var field : e.getValue()) {
-                ItemWithTime.subList(map.get(field), startTime, endTime).clear();
+        {
+            final var updatedFields = new HashMap<TIME, HashSet<String>>();
+            final var objectUpdateList = ItemWithTime.subList(this.objectUpdateList, startTime, endTime);
+            for (var update : objectUpdateList) {
+                final var item = update.item();
+                updatedFields.computeIfAbsent(item.objectGenCtx(), it -> new HashSet<>())
+                        .add(item.fieldName());
             }
+            for (var e : updatedFields.entrySet()) {
+                final var map = objectUpdateMap.get(e.getKey());
+                for (var field : e.getValue()) {
+                    ItemWithTime.subList(map.get(field), startTime, endTime).clear();
+                }
+            }
+            objectUpdateList.clear();
         }
-        objectUpdateList.clear();
 
         // delete localVarInfo
         int start = ItemWithTime.binarySearchApproximately(functionCalls, startTime);
@@ -229,7 +254,7 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
         }
     }
 
-    public DiffExecHistory<TIME> merge(DiffExecHistory<TIME> other) {
+    public NewDiffExecHistory<TIME> merge(NewDiffExecHistory<TIME> other) {
         if (other.timeToContext.isEmpty()) return this;
         final var initialTime = other.timeToContext.get(0).time();
 //        final TIME endTime = other.timeToContext.get(other.timeToContext.size() - 1).time();
@@ -245,6 +270,18 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
                     return base;
                 });
             }
+        }
+
+        // merge objectReadMap
+        for (var entry : other.objectReadMap.entrySet()) {
+            objectReadMap.merge(entry.getKey(), entry.getValue(), (base, otherValue) -> {
+                for (var fieldEntry: otherValue.entrySet()) {
+                    base.merge(fieldEntry.getKey(), fieldEntry.getValue(), (baseEntry, otherEntry) ->
+                            Time.merge(baseEntry, otherEntry, initialTime)
+                    );
+                }
+                return base;
+            });
         }
 
         // merge objectReadList
@@ -381,12 +418,13 @@ public final class DiffExecHistory<TIME extends Time<TIME>> {
                     .add(time);
         }
 
-        public ArrayList<TIME> getReadParam(int paramIndex) {
+        public List<TIME> getReadParam(int paramIndex) {
             return readParam[paramIndex];
         }
 
-        public ArrayList<TIME> getReadVar(int slot) {
-            return readVariable.get(slot);
+        public List<TIME> getReadVar(int slot) {
+            ArrayList<TIME> reads = readVariable.get(slot);
+            return reads != null ? reads : List.of();
         }
     }
 }

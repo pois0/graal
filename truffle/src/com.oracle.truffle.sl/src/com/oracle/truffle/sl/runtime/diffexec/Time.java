@@ -36,6 +36,11 @@ public abstract class Time<T extends Time<?>> extends Hashable implements Compar
         return list.subList(start, end);
     }
 
+    public static <T extends Time<T>> List<T> subListSince(ArrayList<T> list, T startTime) {
+        final int start = binarySearchNext(list, startTime);
+        return list.subList(start, list.size());
+    }
+
     public static <T extends Time<T>> ArrayList<T> merge(ArrayList<T> base, ArrayList<T> newList, T initialTime) {
         if (newList.isEmpty()) return base;
         final int i = binarySearchWhereInsertTo(base, initialTime);

@@ -278,7 +278,7 @@ public final class SLLanguage extends TruffleLanguage<SLContext> {
          */
         for (int i = 0; i < argumentCount; i++) {
             final SLReadArgumentNode readArgumentNode = new SLReadArgumentNode(i);
-            readArgumentNode.setIdentifier(new NodeIdentifier(-1, i, false));
+            readArgumentNode.setIdentifier(NodeIdentifier.create(-1, i, false));
             argumentNodes[i] = readArgumentNode;
         }
         /* Instantiate the builtin node. This node performs the actual functionality. */

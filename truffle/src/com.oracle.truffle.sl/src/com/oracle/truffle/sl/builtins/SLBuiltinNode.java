@@ -107,7 +107,7 @@ public abstract class SLBuiltinNode extends SLExpressionNode {
     private static int builtinFunctionNumber = -2;
     protected static NodeIdentifier generateNodeIdentifierForBuiltin(String functionName) {
         var i = functionMapping.computeIfAbsent(functionName, key -> builtinFunctionNumber--);
-        return new NodeIdentifier(i, 0, false);
+        return NodeIdentifier.create(i, 0, false);
     }
 
     public static void resetBuiltinFunctionMapping() {
