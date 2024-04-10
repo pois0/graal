@@ -30,12 +30,12 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.TreeSet;
+import java.util.PriorityQueue;
 import java.util.function.BiFunction;
 
 import static com.oracle.truffle.sl.Util.assertNonNull;
 
-public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends ExecutionHistoryOperator<TIME> {
+public final class CachedDiffExecRuntime<TIME extends Time<TIME>> extends ExecutionHistoryOperator<TIME> {
     private final SLFunctionRegistry functionRegistry;
 
     private final TIME zero;
@@ -43,14 +43,14 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
     private final LocalVarOperatorHolder localVarOperatorHolder;
     private final ArrayDeque<BitSet> localVarFlagStack = new ArrayDeque<>();
     private final HashMap<TIME, HashSet<String>> objectFieldFlags = new HashMap<>();
-    private final TreeSet<TIME> recalcTimes = new TreeSet<>();
+    private final PriorityQueue<TIME> recalcTimes = new PriorityQueue<>();
 
-    private final NewDiffExecHistory<TIME> rootHistory;
-    private NewDiffExecHistory<TIME> currentHistory;
+    private final CachedDiffExecHistory<TIME> rootHistory;
+    private CachedDiffExecHistory<TIME> currentHistory;
     private TIME currentTime;
     private boolean isInExec = false;
-    private ExecutionContext lastCalcCtx = null;
-    private CallContext currentContext = CallContext.EXECUTION_BASE;
+    private CachedExecutionContext lastCalcCtx = null;
+    private CachedCallContext currentContext;
     private final HashMap<TIME, WeakReference<SLObjectBase>> ctxToObj = new HashMap<>();
     private TIME firstHitAtFunctionCall;
     public int newExecCount = 0;
@@ -59,7 +59,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
     public int recalcNodeCount = 0;
     public int restoredFieldCount = 0;
 
-    public NewDiffExecRuntime(NewDiffExecHistory<TIME> rootHistory, SLFunctionRegistry registry, TIME zero) {
+    public CachedDiffExecRuntime(CachedDiffExecHistory<TIME> rootHistory, SLFunctionRegistry registry, TIME zero) {
         this.functionRegistry = registry;
 
         this.zero = zero;
@@ -67,7 +67,8 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
         this.rootHistory = rootHistory;
         this.currentHistory = rootHistory;
-        this.localVarOperatorHolder = new LocalVarOperatorHolder(0);
+        this.localVarOperatorHolder = new LocalVarOperatorHolder(0, rootHistory.getExecutionBase());
+        this.currentContext = rootHistory.getExecutionBase();
 
         localVarFlagStack.push(new BitSet());
 
@@ -107,7 +108,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
     @Override
     public void onUpdateLocalVariable(int slot, Object value) {
         final var op = localVarOperatorHolder.onUpdateVariable(currentTime, slot, value);
-        setVariableDirty(op, slot);
+        setVariableDirty(currentTime, op, slot);
     }
 
     @Override
@@ -125,16 +126,16 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
     @Override
     public void rewriteLocalVariable(int slot, Object value, NodeIdentifier identifier) {
-        final var execCtx = getExecutionContext(identifier);
+        final var execCtx = getCachedExecutionContext(identifier);
         final var op = currentHistory.rewriteLocalVariable(execCtx, slot, replaceToMock(value));
-        setVariableDirty(op, slot);
+        setVariableDirty(currentHistory.getTimeNN(execCtx).getEnd(), op, slot);
     }
 
     @Override
     public void rewriteObjectField(Object receiver, String fieldName, Object value, NodeIdentifier identifier, boolean fieldChanged) {
         @SuppressWarnings("unchecked")
         final var objGenTime = (TIME) ((SLObjectBase) receiver).getObjGenTime();
-        final var execCtx = getExecutionContext(identifier);
+        final var execCtx = getCachedExecutionContext(identifier);
         final var currentTime = currentHistory.getTimeNN(execCtx).getEnd();
         final var prevUpdate = currentHistory.rewriteObjectField(currentTime, objGenTime, fieldName, replaceToMock(value), fieldChanged);
         setFieldDirty(currentTime, objGenTime, fieldName);
@@ -150,7 +151,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
     @Override
     public void deleteHistory(NodeIdentifier identifier) {
-        currentHistory.deleteRecords(getExecutionContext(identifier));
+        currentHistory.deleteRecords(getCachedExecutionContext(identifier));
     }
 
     @Override
@@ -160,16 +161,16 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
     @Override
     public void onReturnValue(NodeIdentifier identifier, TIME onEnterKey, Object result) {
-        currentHistory.onReturnValue(onEnterKey, getAndIncrementTime(), getExecutionContext(identifier), replaceToMock(result));
+        currentHistory.onReturnValue(onEnterKey, getAndIncrementTime(), getCachedExecutionContext(identifier), replaceToMock(result));
     }
 
     @Override
     public void onReturnExceptional(NodeIdentifier identifier, TIME onEnterKey, Throwable exception) {
         if (exception instanceof SLReturnException) {
             final var forRecord = new SLReturnException(replaceToMock(((SLReturnException) exception).getResult()));
-            currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getExecutionContext(identifier), forRecord);
+            currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getCachedExecutionContext(identifier), forRecord);
         } else if (exception instanceof ControlFlowException || exception instanceof AbstractTruffleException) {
-            currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getExecutionContext(identifier), (RuntimeException) exception);
+            currentHistory.onReturnExceptional(onEnterKey, getAndIncrementTime(), getCachedExecutionContext(identifier), (RuntimeException) exception);
         }
     }
 
@@ -214,14 +215,14 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
     @Override
     public void onEnterNextIteration() {
-        CallContext elem = currentContext;
+        CachedCallContext elem = currentContext;
         assert elem.isLoop();
         currentContext = elem.loopNextIter();
     }
 
     @Override
     public void onExitLoop() {
-        CallContext elem = currentContext;
+        CachedCallContext elem = currentContext;
         assert elem.isLoop();
         currentContext = elem.getRoot();
     }
@@ -242,7 +243,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
                     try {
                         reExecuteVoid(node.getNodeIdentifier(), frame, node);
                     } catch (SLReturnException | SLBreakException | SLContinueException e) {
-                        currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(node.getNodeIdentifier()));
+                        currentHistory.deleteRecords(lastCalcCtx, getCachedExecutionContext(node.getNodeIdentifier()));
                         throw e;
                     }
                 }
@@ -265,7 +266,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
                 case NEW_EXECUTE -> CalcResult.Generic.fresh(newExecutionGeneric(calleeNode.getNodeIdentifier(), frame, calleeNode));
             };
         } catch (SLReturnException | SLBreakException | SLContinueException e) {
-            currentHistory.deleteRecords(lastCalcCtx, getExecutionContext(calleeNode.getNodeIdentifier()));
+            currentHistory.deleteRecords(lastCalcCtx, getCachedExecutionContext(calleeNode.getNodeIdentifier()));
             throw e;
         } finally {
             endCalc(calleeNode);
@@ -406,7 +407,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
     @Override
     public Object getVariableValue(int slot, NodeIdentifier identifier) {
-        final var time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
+        final var time = currentHistory.getTimeNN(getCachedExecutionContext(identifier)).getEnd();
         //noinspection DataFlowIssue
         final var varHistory = currentHistory.getLocalHistory(currentContext.getBase()).get(slot);
         return revertObject(varHistory.get(ItemWithTime.binarySearchApply(varHistory, time)).item());
@@ -419,7 +420,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         final var objectHistory = currentHistory.getObjectHistory(objGenTime);
         final var fieldHistory = objectHistory.get(fieldName);
         if (fieldHistory == null) throw SLUndefinedNameException.undefinedProperty(node, fieldName);
-        final var time = currentHistory.getTimeNN(getExecutionContext(identifier)).getEnd();
+        final var time = currentHistory.getTimeNN(getCachedExecutionContext(identifier)).getEnd();
         final var i = ItemWithTime.binarySearchApply(fieldHistory, time);
         if (i < 0) throw SLUndefinedNameException.undefinedProperty(node, fieldName);
         return revertObject(fieldHistory.get(i).item());
@@ -435,7 +436,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         if (isInExec) return;
         isInExec = true;
         final var history = currentHistory;
-        final var time = history.getTime(getExecutionContext(identifier));
+        final var time = history.getTime(getCachedExecutionContext(identifier));
         if (time != null) history.deleteRecords(time.getStart(), time.getEnd());
         final var lastCalcCtx = this.lastCalcCtx;
         if (lastCalcCtx != null) {
@@ -443,7 +444,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
             currentTime = tp == null ? this.currentTime.inc() : history.getNextTime(tp.getEnd());
         }
         constructFrameAndObjects(frame);
-        currentHistory = new NewDiffExecHistory<>(zero, currentHistory);
+        currentHistory = new CachedDiffExecHistory<>(zero, currentHistory);
         localVarOperatorHolder.duplicate();
     }
 
@@ -456,7 +457,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
     }
 
     private void endCalc(SLStatementNode node) {
-        lastCalcCtx = getExecutionContext(node.getNodeIdentifier());
+        lastCalcCtx = getCachedExecutionContext(node.getNodeIdentifier());
         recalcNodeCount++;
     }
 
@@ -474,7 +475,7 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
 
         final var currentHistory = this.currentHistory;
         final var nodeIdentifier = node.getNodeIdentifier();
-        final var execCtx = getExecutionContext(nodeIdentifier);
+        final var execCtx = getCachedExecutionContext(nodeIdentifier);
         final var tp = currentHistory.getTime(execCtx);
         if (tp == null) {
             if (logging) System.out.println("New Execution: no prev exec");
@@ -494,24 +495,28 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
             firstHitAtFunctionCall = currentHistory.getNextTime(tp.getEnd());
         }
 
-        TIME ceiling = recalcTimes.ceiling(tp.getStart());
-        if (ceiling != null && tp.getEnd().compareTo(ceiling) >= 0) {
+        var nextRecalc = recalcTimes.peek();
+        while (nextRecalc != null && nextRecalc.compareTo(tp.getStart()) < 0) {
+            recalcTimes.poll();
+            nextRecalc = recalcTimes.peek();
+        }
+        if (nextRecalc != null && nextRecalc.compareTo(tp.getEnd()) <= 0) {
             if (logging) System.out.println("Recalc!!: " + node.getSourceSection());
             return ShouldReExecuteResult.RE_EXECUTE;
-        } else {
-            if (logging) System.out.println("Using cache!: " + node.getSourceSection());
-            return ShouldReExecuteResult.USE_CACHE;
         }
+
+        if (logging) System.out.println("Using cache!: " + node.getSourceSection());
+        return ShouldReExecuteResult.USE_CACHE;
     }
 
     private void reExecuteVoid(NodeIdentifier identifier, VirtualFrame frame, SLStatementNode node) {
         try {
             node.calcVoidInner(frame);
         } catch (Throwable e) {
-            currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
+            currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), null);
+        currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), null);
     }
 
     private CalcResult.Generic reExecuteGeneric(NodeIdentifier identifier, VirtualFrame frame, SLExpressionNode node) {
@@ -519,10 +524,10 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         try {
             value = node.calcGenericInner(frame);
         } catch (Throwable e) {
-            currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
+            currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceToMock(value.getResult()));
+        currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), replaceToMock(value.getResult()));
         return value;
     }
 
@@ -531,10 +536,10 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         try {
             value = node.calcBooleanInner(frame);
         } catch (Throwable e) {
-            currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
+            currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceToMock(value.getResult()));
+        currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), replaceToMock(value.getResult()));
         return value;
     }
 
@@ -543,10 +548,10 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         try {
             value = node.calcLongInner(frame);
         } catch (Throwable e) {
-            currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), e);
+            currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), e);
             throw e;
         }
-        currentHistory.replaceReturnedValueOrException(getExecutionContext(identifier), replaceToMock(value.getResult()));
+        currentHistory.replaceReturnedValueOrException(getCachedExecutionContext(identifier), replaceToMock(value.getResult()));
         return value;
     }
 
@@ -556,15 +561,15 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         return tmp;
     }
 
-    private ExecutionContext getExecutionContext(NodeIdentifier identifier) {
-        return new ExecutionContext(currentContext, identifier);
+    private CachedExecutionContext getCachedExecutionContext(NodeIdentifier identifier) {
+        return new CachedExecutionContext(currentContext, identifier);
     }
 
     private Object getReturnedValueOrThrow(NodeIdentifier identifier) {
-        return getReturnedValueOrThrow(getExecutionContext(identifier));
+        return getReturnedValueOrThrow(getCachedExecutionContext(identifier));
     }
 
-    private Object getReturnedValueOrThrow(ExecutionContext execCtx) {
+    private Object getReturnedValueOrThrow(CachedExecutionContext execCtx) {
         try {
             //noinspection UnnecessaryLocalVariable
             final Object o = revertObject(currentHistory.getReturnedValueOrThrow(execCtx));
@@ -583,11 +588,11 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         }
     }
 
-    private void setVariableDirty(NewDiffExecHistory.LocalVarOperator<TIME> op, int slot) {
+    private void setVariableDirty(TIME currentTime, CachedDiffExecHistory.LocalVarOperator<TIME> op, int slot) {
         BitSet top = assertNonNull(localVarFlagStack.peek());
         if (!top.get(slot)) {
             top.set(slot);
-            recalcTimes.addAll(op.getReadVar(slot));
+            recalcTimes.addAll(Time.subListSince(op.getReadVar(slot), currentTime));
         }
     }
 
@@ -736,13 +741,13 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
         private ScopeInfo<TIME>[] stack;
         private int pointer = 1;
 
-        public LocalVarOperatorHolder(int executionParamLen) {
+        public LocalVarOperatorHolder(int executionParamLen, CachedCallContext executionBase) {
             @SuppressWarnings("unchecked")
             final ScopeInfo<TIME>[] stack = this.stack = new ScopeInfo[32];
-            stack[0] = new ScopeInfo<>(executionParamLen, CallContext.EXECUTION_BASE, currentHistory.getLocalVarOperator(CallContext.EXECUTION_BASE, 0));
+            stack[0] = new ScopeInfo<>(executionParamLen, executionBase, currentHistory.getLocalVarOperator(executionBase, 0));
         }
 
-        public NewDiffExecHistory.LocalVarOperator<TIME> push(int paramLen, CallContext ctx) {
+        public CachedDiffExecHistory.LocalVarOperator<TIME> push(int paramLen, CachedCallContext ctx) {
             var stack = this.stack;
             final var currentLen = stack.length;
             if (pointer == currentLen) this.stack = stack = Arrays.copyOf(stack, currentLen + (currentLen >> 1));
@@ -761,11 +766,11 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
             stack[--pointer] = null;
         }
 
-        public NewDiffExecHistory.LocalVarOperator<TIME> peek() {
+        public CachedDiffExecHistory.LocalVarOperator<TIME> peek() {
             return stack[pointer - 1].op;
         }
 
-        public NewDiffExecHistory.LocalVarOperator<TIME> onUpdateVariable(TIME time, int slot, Object newValue) {
+        public CachedDiffExecHistory.LocalVarOperator<TIME> onUpdateVariable(TIME time, int slot, Object newValue) {
             final var op = peek();
             op.onUpdateVariable(time, slot, replaceToMock(newValue));
             return op;
@@ -779,8 +784,8 @@ public final class NewDiffExecRuntime<TIME extends Time<TIME>> extends Execution
             peek().onReadParam(time, paramIndex);
         }
 
-        private record ScopeInfo<TIME extends Time<TIME>>(int paramLen, CallContext cc,
-                                                          NewDiffExecHistory.LocalVarOperator<TIME> op) {}
+        private record ScopeInfo<TIME extends Time<TIME>>(int paramLen, CachedCallContext cc,
+                                                          CachedDiffExecHistory.LocalVarOperator<TIME> op) {}
     }
 
     private enum ShouldReExecuteResult {

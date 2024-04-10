@@ -51,6 +51,8 @@ import java.util.List;
 import com.oracle.truffle.api.instrumentation.InstrumentationHandler;
 import com.oracle.truffle.polyglot.PolyglotContextImpl;
 import com.oracle.truffle.sl.runtime.diffexec.ArrayTime;
+import com.oracle.truffle.sl.runtime.diffexec.CachedDiffExecHistory;
+import com.oracle.truffle.sl.runtime.diffexec.CachedDiffExecRuntime;
 import com.oracle.truffle.sl.runtime.diffexec.DiffExecHistory;
 import com.oracle.truffle.sl.runtime.diffexec.ExecutionHistoryOperator;
 import com.oracle.truffle.sl.runtime.diffexec.DiffExecRuntime;
@@ -111,8 +113,9 @@ import com.oracle.truffle.sl.builtins.SLWrapPrimitiveBuiltinFactory;
  */
 @SuppressWarnings("JavadocReference")
 public final class SLContext {
-    private static DiffExecHistory<ArrayTime> rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
+//    private static DiffExecHistory<ArrayTime> rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
 //    private static NewDiffExecHistory<ArrayTime> rootHistory = new NewDiffExecHistory<>(ArrayTime.ZERO);
+    private static CachedDiffExecHistory<ArrayTime> rootHistory = new CachedDiffExecHistory<>(ArrayTime.ZERO);
     public static boolean isInitialExecution = true;
 
     private final SLLanguage language;
@@ -122,8 +125,9 @@ public final class SLContext {
     private final SLFunctionRegistry functionRegistry;
     private final AllocationReporter allocationReporter;
     private final List<SLFunction> shutdownHooks = new ArrayList<>();
-    private final DiffExecRuntime<ArrayTime> historyOperator;
+//    private final DiffExecRuntime<ArrayTime> historyOperator;
 //    private final NewDiffExecRuntime<ArrayTime> historyOperator;
+    private final CachedDiffExecRuntime<ArrayTime> historyOperator;
 //    private final RecordOnlyRuntime<ArrayTime> historyOperator;
 
     public SLContext(SLLanguage language, TruffleLanguage.Env env, List<NodeFactory<? extends SLBuiltinNode>> externalBuiltins, boolean rotate) {
@@ -136,14 +140,16 @@ public final class SLContext {
 
         if (rotate) {
             System.out.println("reset!");
-            rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
+//            rootHistory = new DiffExecHistory<>(ArrayTime.ZERO);
 //            rootHistory = new NewDiffExecHistory<>(ArrayTime.ZERO);
+            rootHistory = new CachedDiffExecHistory<>(ArrayTime.ZERO);
             SLBuiltinNode.resetBuiltinFunctionMapping();
             isInitialExecution = true;
         }
 
-        var op = this.historyOperator = new DiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
+//        var op = this.historyOperator = new DiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
 //        var op = this.historyOperator = new NewDiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
+        var op = this.historyOperator = new CachedDiffExecRuntime<>(rootHistory, functionRegistry, ArrayTime.ZERO);
 //        var op = this.historyOperator = new RecordOnlyRuntime<>(ArrayTime.ZERO);
         InstrumentationHandler.staticFactory = op.getTickFactory();
 

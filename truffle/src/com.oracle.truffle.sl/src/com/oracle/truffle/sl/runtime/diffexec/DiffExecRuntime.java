@@ -182,7 +182,7 @@ public final class DiffExecRuntime<TIME extends Time<TIME>> extends ExecutionHis
     @Override
     public void onEnterFunctionDuringExec(NodeIdentifier callerIdentifier, TruffleString functionName, int argLen) {
         final var currentHistory = this.currentHistory;
-        final var currentStack = CallContext.functionCall(this.currentContext, callerIdentifier);
+        final var currentStack = this.currentContext.functionCall(callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argLen, currentStack);
@@ -192,7 +192,7 @@ public final class DiffExecRuntime<TIME extends Time<TIME>> extends ExecutionHis
     @Override
     public void onEnterFunctionDuringCalc(NodeIdentifier callerIdentifier, TruffleString functionName, boolean[] argFlags) {
         final DiffExecHistory<TIME> currentHistory = this.currentHistory;
-        final var currentStack = CallContext.functionCall(this.currentContext, callerIdentifier);
+        final var currentStack = this.currentContext.functionCall(callerIdentifier);
         this.currentContext = currentStack;
         localVarFlagStack.push(new BitSet());
         localVarOperatorHolder.push(argFlags.length, currentStack);
@@ -212,14 +212,14 @@ public final class DiffExecRuntime<TIME extends Time<TIME>> extends ExecutionHis
 
     @Override
     public void onEnterLoop(NodeIdentifier identifier) {
-        this.currentContext = CallContext.loop(this.currentContext, identifier);
+        this.currentContext = this.currentContext.loop(identifier);
     }
 
     @Override
     public void onEnterNextIteration() {
         CallContext elem = currentContext;
         assert elem.isLoop();
-        currentContext = CallContext.loopNextIter(elem);
+        currentContext = elem.loopNextIter();
     }
 
     @Override

@@ -107,7 +107,7 @@ public final class RecordOnlyRuntime<TIME extends Time<TIME>> extends ExecutionH
 
     @Override
     public void onEnterFunctionDuringExec(NodeIdentifier callerIdentifier, TruffleString functionName, int argLen) {
-        final var currentStack = CallContext.functionCall(this.currentContext, callerIdentifier);
+        final var currentStack = this.currentContext.functionCall(callerIdentifier);
         this.currentContext = currentStack;
         localVarOperatorHolder.push(argLen, currentStack);
     }
@@ -125,12 +125,12 @@ public final class RecordOnlyRuntime<TIME extends Time<TIME>> extends ExecutionH
 
     @Override
     public void onEnterLoop(NodeIdentifier identifier) {
-        currentContext = CallContext.loop(this.currentContext, identifier);
+        currentContext = this.currentContext.loop(identifier);
     }
 
     @Override
     public void onEnterNextIteration() {
-        currentContext = CallContext.loopNextIter(currentContext);
+        currentContext = currentContext.loopNextIter();
     }
 
     @Override

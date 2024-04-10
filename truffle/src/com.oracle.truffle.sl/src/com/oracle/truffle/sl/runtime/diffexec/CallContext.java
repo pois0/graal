@@ -23,37 +23,29 @@ public final class CallContext implements Comparable<CallContext> {
         this(root, nodeIdentifier, loopCount, hashCode(root, nodeIdentifier).putInt(loopCount).hash().asInt());
     }
 
-    public static CallContext functionCall(CallContext root, NodeIdentifier calleeIdentifier) {
+    public CallContext functionCall(NodeIdentifier calleeIdentifier) {
         return new CallContext(
-                root,
+                this,
                 calleeIdentifier,
                 -1
         );
     }
 
-    public static CallContext loop(CallContext root, NodeIdentifier identifier, int loopCount) {
+    public CallContext loop(NodeIdentifier identifier, int loopCount) {
         return new CallContext(
-                root,
+                this,
                 identifier,
                 loopCount
         );
     }
 
-    public static CallContext loop(CallContext root, NodeIdentifier identifier) {
-        return new CallContext(
-                root,
-                identifier,
-                0
-        );
+    public CallContext loop(NodeIdentifier identifier) {
+        return loop(identifier, 0);
     }
 
-    public static CallContext loopNextIter(CallContext currentIter) {
-        assert currentIter.loopCount >= 0;
-        return new CallContext(
-                currentIter.root,
-                currentIter.nodeIdentifier,
-                currentIter.loopCount + 1
-        );
+    public CallContext loopNextIter() {
+        assert loopCount >= 0;
+        return root.loop(nodeIdentifier, loopCount + 1);
     }
 
     public CallContext getRoot() {
@@ -80,10 +72,6 @@ public final class CallContext implements Comparable<CallContext> {
         return loopCount < 0 && root != null;
     }
 
-    public int depth() {
-        return root.depth() + 1;
-    }
-
     @Override
     public int hashCode() {
         return hashCode;
@@ -101,7 +89,8 @@ public final class CallContext implements Comparable<CallContext> {
 
     @SuppressWarnings("UnstableApiUsage")
     private static Hasher hashCode(CallContext root, NodeIdentifier nodeIdentifier) {
-        return nodeIdentifier.hash(Hashing.murmur3_32_fixed().newHasher())
+        return Hashing.murmur3_32_fixed().newHasher()
+                .putInt(nodeIdentifier.hashCode())
                 .putInt(root != null ? root.hashCode() : 0);
     }
 
